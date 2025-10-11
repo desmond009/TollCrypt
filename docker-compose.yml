@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: tollchain-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: tollchain
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - tollchain-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tollchain-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/tollchain?authSource=admin
+      # Alchemy testnet RPC URLs (prioritized for development)
+      ALCHEMY_SEPOLIA_URL: ${ALCHEMY_SEPOLIA_URL}
+      ALCHEMY_MUMBAI_URL: ${ALCHEMY_MUMBAI_URL}
+      ALCHEMY_GOERLI_URL: ${ALCHEMY_GOERLI_URL}
+      # Alchemy mainnet RPC URLs (for production)
+      ALCHEMY_POLYGON_URL: ${ALCHEMY_POLYGON_URL}
+      ALCHEMY_MAINNET_URL: ${ALCHEMY_MAINNET_URL}
+      # Fallback testnet RPC URLs
+      SEPOLIA_RPC_URL: ${SEPOLIA_RPC_URL}
+      MUMBAI_RPC_URL: ${MUMBAI_RPC_URL}
+      GOERLI_RPC_URL: ${GOERLI_RPC_URL}
+      # Fallback mainnet RPC URLs
+      POLYGON_RPC_URL: ${POLYGON_RPC_URL}
+      ETHEREUM_RPC_URL: ${ETHEREUM_RPC_URL}
+      # Contract addresses
+      TOLL_COLLECTION_ADDRESS: ${TOLL_COLLECTION_ADDRESS}
+      ANON_AADHAAR_VERIFIER_ADDRESS: ${ANON_AADHAAR_VERIFIER_ADDRESS}
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongodb
+    networks:
+      - tollchain-network
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tollchain-frontend
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: http://localhost:3001
+      REACT_APP_WALLETCONNECT_PROJECT_ID: ${WALLETCONNECT_PROJECT_ID}
+      REACT_APP_TOLL_COLLECTION_ADDRESS: ${TOLL_COLLECTION_ADDRESS}
+      REACT_APP_USDC_ADDRESS: ${USDC_ADDRESS}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - tollchain-network
+
+  # Admin Dashboard
+  admin-dashboard:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
+    container_name: tollchain-admin
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: http://localhost:3001
+    ports:
+      - "3002:80"
+    depends_on:
+      - backend
+    networks:
+      - tollchain-network
+
+  # Hardware Integration (Python)
+  hardware:
+    build:
+      context: ./hardware
+      dockerfile: Dockerfile
+    container_name: tollchain-hardware
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:3001
+      WEBSOCKET_URL: ws://backend:3001
+      TOLL_BOOTH_ID: TB001
+      LATITUDE: 12.9716
+      LONGITUDE: 77.5946
+    depends_on:
+      - backend
+    networks:
+      - tollchain-network
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0  # RFID reader
+    volumes:
+      - /dev/video0:/dev/video0    # Camera access
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: tollchain-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - admin-dashboard
+      - backend
+    networks:
+      - tollchain-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  tollchain-network:
+    driver: bridge

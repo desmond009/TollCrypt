@@ -1,0 +1,52 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.20"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+verbosity = 2
+fuzz = { runs = 256 }
+invariant = { runs = 256, depth = 15 }
+fs_permissions = [{ access = "read", path = "./" }]
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[rpc_endpoints]
+# Alchemy testnet endpoints (recommended for development)
+alchemy_sepolia = "${ALCHEMY_SEPOLIA_URL}"
+alchemy_mumbai = "${ALCHEMY_MUMBAI_URL}"
+alchemy_goerli = "${ALCHEMY_GOERLI_URL}"
+
+# Alchemy mainnet endpoints (for production)
+alchemy_mainnet = "${ALCHEMY_MAINNET_URL}"
+alchemy_polygon = "${ALCHEMY_POLYGON_URL}"
+
+# Fallback testnet endpoints (free public endpoints)
+sepolia = "https://rpc.sepolia.eth.gateway.fm"
+mumbai = "https://rpc.ankr.com/polygon_mumbai"
+goerli = "https://rpc.ankr.com/eth_goerli"
+
+# Alternative reliable endpoints
+sepolia_alt = "https://sepolia.drpc.org"
+mumbai_alt = "https://polygon-mumbai.drpc.org"
+goerli_alt = "https://goerli.drpc.org"
+
+# Fallback mainnet endpoints
+polygon = "https://polygon-mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+ethereum = "https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+
+[etherscan]
+polygon = { key = "${POLYGONSCAN_API_KEY}" }
+mumbai = { key = "${POLYGONSCAN_API_KEY}" }
+ethereum = { key = "${ETHERSCAN_API_KEY}" }
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+
+[doc]
+out = "docs"

@@ -1,0 +1,95 @@
+import mongoose, { Document, Schema } from 'mongoose';
+
+export interface ITollTransaction extends Document {
+  transactionId: string;
+  vehicleId: string;
+  payer: string;
+  amount: number;
+  currency: string;
+  zkProofHash: string;
+  status: 'pending' | 'confirmed' | 'failed' | 'disputed';
+  blockchainTxHash?: string;
+  blockNumber?: number;
+  gasUsed?: number;
+  timestamp: Date;
+  metadata?: {
+    tollBoothId?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+    vehicleType?: string;
+    discountApplied?: number;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const TollTransactionSchema = new Schema<ITollTransaction>({
+  transactionId: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true
+  },
+  vehicleId: {
+    type: String,
+    required: true,
+    index: true
+  },
+  payer: {
+    type: String,
+    required: true,
+    index: true
+  },
+  amount: {
+    type: Number,
+    required: true
+  },
+  currency: {
+    type: String,
+    default: 'USDC'
+  },
+  zkProofHash: {
+    type: String,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'failed', 'disputed'],
+    default: 'pending'
+  },
+  blockchainTxHash: {
+    type: String,
+    index: true
+  },
+  blockNumber: {
+    type: Number
+  },
+  gasUsed: {
+    type: Number
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  },
+  metadata: {
+    tollBoothId: String,
+    location: {
+      latitude: Number,
+      longitude: Number
+    },
+    vehicleType: String,
+    discountApplied: Number
+  }
+}, {
+  timestamps: true
+});
+
+// Indexes for better query performance
+TollTransactionSchema.index({ vehicleId: 1, timestamp: -1 });
+TollTransactionSchema.index({ payer: 1, timestamp: -1 });
+TollTransactionSchema.index({ status: 1, timestamp: -1 });
+TollTransactionSchema.index({ zkProofHash: 1 });
+
+export const TollTransaction = mongoose.model<ITollTransaction>('TollTransaction', TollTransactionSchema);
