@@ -1,44 +1,58 @@
 import React from 'react';
-import { useAccount, useDisconnect } from 'wagmi';
-import { WalletConnect } from './WalletConnect';
+import { useAccount, useBalance } from 'wagmi';
 
 export const Header: React.FC = () => {
   const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { data: balance } = useBalance({
+    address: address,
+  });
 
   return (
-    <header className="bg-white shadow">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-6">
-          <div className="flex items-center">
-            <h1 className="text-3xl font-bold text-primary-600">
-              TollChain
-            </h1>
-            <span className="ml-2 text-sm text-gray-500">
-              Blockchain Toll Collection
-            </span>
+    <header className="bg-black border-b border-gray-800 px-4 py-4">
+      <div className="flex justify-between items-center">
+        {/* Logo */}
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-yellow-400 rounded-lg mr-3 flex items-center justify-center">
+            <span className="text-black font-bold text-sm">TC</span>
           </div>
-          
-          <div className="flex items-center space-x-4">
-            {isConnected ? (
-              <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-600">
-                  <span className="font-medium">Connected:</span>
-                  <span className="ml-1 font-mono">
-                    {address?.slice(0, 6)}...{address?.slice(-4)}
-                  </span>
+          <h1 className="text-xl font-bold text-white">
+            Toll Chain
+          </h1>
+        </div>
+        
+        {/* Wallet Info */}
+        <div className="flex items-center space-x-3">
+          {isConnected ? (
+            <>
+              <div className="text-right">
+                <div className="text-sm text-white">
+                  {balance ? `${parseFloat(balance.formatted).toFixed(4)} ${balance.symbol}` : '0 ETH'}
                 </div>
-                <button
-                  onClick={() => disconnect()}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Disconnect
-                </button>
+                <div className="text-xs text-gray-400">Base Sepolia</div>
               </div>
-            ) : (
-              <WalletConnect />
-            )}
-          </div>
+              
+              <div className="flex items-center bg-gray-800 rounded-full px-3 py-2">
+                <div className="w-6 h-6 bg-gradient-to-r from-green-400 to-orange-400 rounded-full mr-2"></div>
+                <span className="text-white text-sm font-mono">
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
+                </span>
+                <svg className="w-4 h-4 text-gray-400 ml-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
+                </svg>
+              </div>
+              
+              <button className="bg-gray-800 rounded-lg px-3 py-2 flex items-center">
+                <svg className="w-5 h-5 text-white mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
+                </svg>
+                <span className="text-white text-sm">Menu</span>
+              </button>
+            </>
+          ) : (
+            <div className="text-sm text-gray-400">
+              Connect Wallet
+            </div>
+          )}
         </div>
       </div>
     </header>

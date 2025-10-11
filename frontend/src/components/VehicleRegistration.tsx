@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther } from 'viem';
 
 // Mock contract addresses - in production, these would come from environment variables
 const TOLL_COLLECTION_ADDRESS = '0x...'; // Replace with actual contract address
-const USDC_ADDRESS = '0x...'; // Replace with actual USDC contract address
 
 const TOLL_COLLECTION_ABI = [
   {
@@ -50,58 +48,60 @@ export const VehicleRegistration: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <form onSubmit={handleRegisterVehicle} className="space-y-4">
         <div>
-          <label htmlFor="vehicleId" className="block text-sm font-medium text-gray-700">
-            Vehicle ID (RFID/QR Code)
+          <label htmlFor="vehicleId" className="block text-sm font-medium text-white mb-2">
+            Vehicle Number
           </label>
           <input
             type="text"
             id="vehicleId"
             value={vehicleId}
             onChange={(e) => setVehicleId(e.target.value)}
-            placeholder="Enter your vehicle ID"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            placeholder="MJ20CA1343"
+            className="input-field w-full"
             required
           />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-white mb-2">
+            Vehicle ID Proof
+          </label>
+          <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
+            <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
+            </svg>
+            <p className="text-gray-400 text-sm">Upload Vehicle Documents</p>
+            <p className="text-gray-500 text-xs mt-1">Please upload your ID proof with latest details</p>
+          </div>
         </div>
         
         <button
           type="submit"
           disabled={isPending || isConfirming || isLoading}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary w-full"
         >
-          {isPending || isConfirming ? 'Registering...' : 'Register Vehicle'}
+          {isPending || isConfirming ? 'Registering...' : 'Create Wallet'}
         </button>
       </form>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-sm text-red-600">
+        <div className="bg-red-900 border border-red-700 rounded-lg p-4">
+          <p className="text-sm text-red-300">
             Error: {error.message}
           </p>
         </div>
       )}
 
       {isSuccess && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4">
-          <p className="text-sm text-green-600">
+        <div className="bg-green-900 border border-green-700 rounded-lg p-4">
+          <p className="text-sm text-green-300">
             Vehicle registered successfully! Transaction hash: {hash}
           </p>
         </div>
       )}
-
-      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-        <h4 className="text-sm font-medium text-blue-800 mb-2">
-          Privacy Notice
-        </h4>
-        <p className="text-sm text-blue-700">
-          Your vehicle registration uses zero-knowledge proofs to verify your Aadhaar identity 
-          without revealing any personal information. Only your wallet address and vehicle ID 
-          are stored on the blockchain.
-        </p>
-      </div>
     </div>
   );
 };

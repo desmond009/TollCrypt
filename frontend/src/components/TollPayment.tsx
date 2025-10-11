@@ -88,10 +88,10 @@ export const TollPayment: React.FC = () => {
       const amountWei = parseEther(amount);
       
       writeUsdcContract({
-        address: USDC_ADDRESS,
+        address: USDC_ADDRESS as `0x${string}`,
         abi: USDC_ABI,
         functionName: 'approve',
-        args: [TOLL_COLLECTION_ADDRESS, amountWei],
+        args: [TOLL_COLLECTION_ADDRESS as `0x${string}`, amountWei],
       });
 
       // Wait for approval, then process toll payment
@@ -99,10 +99,10 @@ export const TollPayment: React.FC = () => {
         const zkProofHash = await generateZKProof();
         
         writeTollContract({
-          address: TOLL_COLLECTION_ADDRESS,
+          address: TOLL_COLLECTION_ADDRESS as `0x${string}`,
           abi: TOLL_COLLECTION_ABI,
           functionName: 'processTollPayment',
-          args: [vehicleId, zkProofHash, amountWei],
+          args: [vehicleId, zkProofHash as `0x${string}`, amountWei],
         });
       }
     } catch (err) {
@@ -116,19 +116,19 @@ export const TollPayment: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-        <h4 className="text-sm font-medium text-blue-800 mb-2">
+    <div className="space-y-4">
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-white mb-2">
           USDC Balance
         </h4>
-        <p className="text-sm text-blue-700">
+        <p className="text-lg font-semibold text-yellow-400">
           {formatBalance(usdcBalance)} USDC
         </p>
       </div>
 
       <form onSubmit={handleTollPayment} className="space-y-4">
         <div>
-          <label htmlFor="paymentVehicleId" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="paymentVehicleId" className="block text-sm font-medium text-white mb-2">
             Vehicle ID
           </label>
           <input
@@ -136,14 +136,14 @@ export const TollPayment: React.FC = () => {
             id="paymentVehicleId"
             value={vehicleId}
             onChange={(e) => setVehicleId(e.target.value)}
-            placeholder="Enter vehicle ID for toll payment"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            placeholder="MJ20CA1343"
+            className="input-field w-full"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="amount" className="block text-sm font-medium text-white mb-2">
             Amount (USDC)
           </label>
           <input
@@ -153,7 +153,7 @@ export const TollPayment: React.FC = () => {
             onChange={(e) => setAmount(e.target.value)}
             min="0.01"
             step="0.01"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            className="input-field w-full"
             required
           />
         </div>
@@ -161,7 +161,7 @@ export const TollPayment: React.FC = () => {
         <button
           type="submit"
           disabled={isTollPending || isTollConfirming || isUsdcPending || isUsdcConfirming || isGeneratingProof}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary w-full"
         >
           {isGeneratingProof ? 'Generating ZK Proof...' : 
            isUsdcPending || isUsdcConfirming ? 'Approving USDC...' :
@@ -171,31 +171,20 @@ export const TollPayment: React.FC = () => {
       </form>
 
       {(tollError || usdcError) && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-sm text-red-600">
+        <div className="bg-red-900 border border-red-700 rounded-lg p-4">
+          <p className="text-sm text-red-300">
             Error: {tollError?.message || usdcError?.message}
           </p>
         </div>
       )}
 
       {isTollSuccess && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4">
-          <p className="text-sm text-green-600">
+        <div className="bg-green-900 border border-green-700 rounded-lg p-4">
+          <p className="text-sm text-green-300">
             Toll payment processed successfully! Transaction hash: {tollHash}
           </p>
         </div>
       )}
-
-      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-        <h4 className="text-sm font-medium text-yellow-800 mb-2">
-          Privacy Protection
-        </h4>
-        <p className="text-sm text-yellow-700">
-          Your toll payment uses zero-knowledge proofs to verify your Aadhaar identity 
-          without revealing any personal information. The payment is processed anonymously 
-          on the blockchain.
-        </p>
-      </div>
     </div>
   );
 };

@@ -45,7 +45,7 @@ interface Vehicle {
 
 export const VehicleList: React.FC = () => {
   const { address } = useAccount();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [, setVehicles] = useState<Vehicle[]>([]);
 
   // Get user's vehicle IDs
   const { data: vehicleIds } = useReadContract({
@@ -67,7 +67,7 @@ export const VehicleList: React.FC = () => {
   if (!address) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">Please connect your wallet to view vehicles</p>
+        <p className="text-gray-400">Please connect your wallet to view vehicles</p>
       </div>
     );
   }
@@ -75,8 +75,13 @@ export const VehicleList: React.FC = () => {
   if (!vehicleIds || vehicleIds.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">No vehicles registered yet</p>
-        <p className="text-sm text-gray-400 mt-2">
+        <div className="w-16 h-16 bg-gray-800 rounded-xl mx-auto mb-4 flex items-center justify-center">
+          <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
+          </svg>
+        </div>
+        <p className="text-gray-400">No vehicles registered yet</p>
+        <p className="text-sm text-gray-500 mt-2">
           Register a vehicle using the form above
         </p>
       </div>
@@ -84,23 +89,30 @@ export const VehicleList: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
-      {vehicleIds.map((vehicleId, index) => (
+    <div className="space-y-3">
+      {vehicleIds.map((vehicleId: string, index: number) => (
         <div
           key={index}
-          className="bg-gray-50 border border-gray-200 rounded-lg p-4"
+          className="bg-gray-800 border border-gray-700 rounded-lg p-4"
         >
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">
-                Vehicle ID: {vehicleId}
-              </h3>
-              <p className="text-sm text-gray-500">
-                Status: Active
-              </p>
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-yellow-400 rounded-lg mr-3 flex items-center justify-center">
+                <svg className="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-white font-medium">
+                  {vehicleId}
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Status: Active
+                </p>
+              </div>
             </div>
             <div className="text-right">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900 text-green-300">
                 Registered
               </span>
             </div>
