@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 
-// Mock contract addresses
-const TOLL_COLLECTION_ADDRESS = '0x...'; // Replace with actual contract address
+// Contract addresses from deployment
+const TOLL_COLLECTION_ADDRESS = '0x824c0fac2b80f9de4cb0ee6aa51c96694323c2e4' as const;
 
 const TOLL_COLLECTION_ABI = [
   {

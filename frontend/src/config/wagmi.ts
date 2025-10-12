@@ -1,22 +1,35 @@
-import { createConfig, http } from 'wagmi';
-import { mainnet, polygon, polygonMumbai } from 'wagmi/chains';
-import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
+import { defaultWagmiConfig } from '@web3modal/wagmi/react/config'
+import { mainnet, polygon, polygonMumbai, sepolia } from 'wagmi/chains'
 
 // Get project ID from environment variables
-const projectId = process.env.REACT_APP_WALLETCONNECT_PROJECT_ID || 'your-project-id';
+const projectId = process.env.REACT_APP_WALLETCONNECT_PROJECT_ID;
 
-export const config = createConfig({
-  chains: [mainnet, polygon, polygonMumbai],
-  connectors: [
-    injected(),
-    walletConnect({ projectId }),
-    coinbaseWallet({ appName: 'TollChain' }),
-  ],
-  transports: {
-    [mainnet.id]: http(),
-    [polygon.id]: http(),
-    [polygonMumbai.id]: http(),
-  },
+// Check if project ID is properly configured
+if (!projectId || projectId === 'your_walletconnect_project_id' || projectId === 'your-project-id') {
+  console.warn(
+    '⚠️ WalletConnect Project ID not configured properly. ' +
+    'Please set REACT_APP_WALLETCONNECT_PROJECT_ID in your .env file. ' +
+    'Get your project ID from https://cloud.walletconnect.com/'
+  );
+}
+
+const metadata = {
+  name: 'TollChain',
+  description: 'Blockchain-based toll collection system',
+  url: 'https://tollchain.com',
+  icons: ['https://tollchain.com/icon.png']
+}
+
+const chains = [sepolia, mainnet, polygon, polygonMumbai] as const
+
+export const config = defaultWagmiConfig({
+  chains,
+  projectId: projectId || '811086b95de154e2b8f4b4b4b4b4b4b4b4b4b4b4b',
+  metadata,
+  enableWalletConnect: !!projectId,
+  enableInjected: true,
+  enableEIP6963: true,
+  enableCoinbase: true
 });
 
 declare module 'wagmi' {

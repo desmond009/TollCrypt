@@ -7,7 +7,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import mongoose from 'mongoose';
 
-import { connectToBlockchain } from './services/blockchainService';
+import { connectToBlockchain, cleanupBlockchainConnection } from './services/blockchainService';
 import { setupSocketHandlers } from './services/socketService';
 import { vehicleRoutes } from './routes/vehicleRoutes';
 import { tollRoutes } from './routes/tollRoutes';
@@ -135,6 +135,7 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
+  cleanupBlockchainConnection();
   server.close(() => {
     mongoose.connection.close();
     process.exit(0);
@@ -143,6 +144,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully');
+  cleanupBlockchainConnection();
   server.close(() => {
     mongoose.connection.close();
     process.exit(0);

@@ -7,10 +7,13 @@ export interface ITollTransaction extends Document {
   amount: number;
   currency: string;
   zkProofHash: string;
+  tollLocation: string;
+  useGaslessTransaction: boolean;
   status: 'pending' | 'confirmed' | 'failed' | 'disputed';
   blockchainTxHash?: string;
   blockNumber?: number;
   gasUsed?: number;
+  gasPrice?: number;
   timestamp: Date;
   metadata?: {
     tollBoothId?: string;
@@ -20,6 +23,11 @@ export interface ITollTransaction extends Document {
     };
     vehicleType?: string;
     discountApplied?: number;
+    rfidDetected?: boolean;
+    processedAt?: Date;
+    gaslessTransaction?: boolean;
+    paymasterAddress?: string;
+    accountAbstractionWallet?: string;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -54,6 +62,14 @@ const TollTransactionSchema = new Schema<ITollTransaction>({
     type: String,
     required: true
   },
+  tollLocation: {
+    type: String,
+    required: true
+  },
+  useGaslessTransaction: {
+    type: Boolean,
+    default: false
+  },
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'failed', 'disputed'],
@@ -69,6 +85,9 @@ const TollTransactionSchema = new Schema<ITollTransaction>({
   gasUsed: {
     type: Number
   },
+  gasPrice: {
+    type: Number
+  },
   timestamp: {
     type: Date,
     default: Date.now
@@ -80,7 +99,15 @@ const TollTransactionSchema = new Schema<ITollTransaction>({
       longitude: Number
     },
     vehicleType: String,
-    discountApplied: Number
+    discountApplied: Number,
+    rfidDetected: {
+      type: Boolean,
+      default: false
+    },
+    processedAt: Date,
+    gaslessTransaction: Boolean,
+    paymasterAddress: String,
+    accountAbstractionWallet: String
   }
 }, {
   timestamps: true
@@ -91,5 +118,7 @@ TollTransactionSchema.index({ vehicleId: 1, timestamp: -1 });
 TollTransactionSchema.index({ payer: 1, timestamp: -1 });
 TollTransactionSchema.index({ status: 1, timestamp: -1 });
 TollTransactionSchema.index({ zkProofHash: 1 });
+TollTransactionSchema.index({ tollLocation: 1 });
+TollTransactionSchema.index({ useGaslessTransaction: 1 });
 
 export const TollTransaction = mongoose.model<ITollTransaction>('TollTransaction', TollTransactionSchema);

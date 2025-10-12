@@ -25,6 +25,11 @@ let provider: JsonRpcProvider;
 let tollCollectionContract: Contract;
 let anonAadhaarVerifierContract: Contract;
 
+// Filter management
+let eventFilters: Map<string, any> = new Map();
+let pollingInterval: NodeJS.Timeout | null = null;
+let isPolling = false;
+
 export async function connectToBlockchain() {
   try {
     // Check if running in mock mode first
@@ -81,73 +86,182 @@ export async function connectToBlockchain() {
   }
 }
 
-function setupEventListeners() {
-  // Listen for vehicle registration events
-  tollCollectionContract.on('VehicleRegistered', async (owner: string, vehicleId: string, timestamp: bigint, event: any) => {
-    console.log(`Vehicle registered: ${vehicleId} by ${owner}`);
+async function setupEventListeners() {
+  try {
+    // Create filters for each event type
+    const vehicleRegisteredFilter = await tollCollectionContract.filters.VehicleRegistered();
+    const tollPaidFilter = await tollCollectionContract.filters.TollPaid();
+    const vehicleBlacklistedFilter = await tollCollectionContract.filters.VehicleBlacklisted();
     
-    try {
-      // Update local database
-      await Vehicle.findOneAndUpdate(
-        { vehicleId },
-        {
-          vehicleId,
-          owner,
-          isActive: true,
-          isBlacklisted: false,
-          registrationTime: new Date(Number(timestamp) * 1000)
-        },
-        { upsert: true, new: true }
-      );
-    } catch (error) {
-      console.error('Error updating vehicle in database:', error);
-    }
-  });
+    // Store filters for cleanup
+    eventFilters.set('VehicleRegistered', vehicleRegisteredFilter);
+    eventFilters.set('TollPaid', tollPaidFilter);
+    eventFilters.set('VehicleBlacklisted', vehicleBlacklistedFilter);
+    
+    // Start polling for events
+    startEventPolling();
+    
+    console.log('Event listeners setup with manual polling');
+  } catch (error) {
+    console.error('Error setting up event listeners:', error);
+    throw error;
+  }
+}
 
-  // Listen for toll payment events
-  tollCollectionContract.on('TollPaid', async (payer: string, vehicleId: string, amount: bigint, tollId: bigint, zkProofHash: string, timestamp: bigint, event: any) => {
-    console.log(`Toll paid: ${amount} by ${payer} for vehicle ${vehicleId}`);
-    
+async function startEventPolling() {
+  if (isPolling) {
+    return; // Already polling
+  }
+  
+  isPolling = true;
+  console.log('Starting event polling...');
+  
+  // Poll every 5 seconds
+  pollingInterval = setInterval(async () => {
     try {
-      // Create transaction record
-      const transaction = new TollTransaction({
-        transactionId: `toll_${tollId}`,
+      await pollForEvents();
+    } catch (error) {
+      console.error('Error during event polling:', error);
+      // If we get filter errors, recreate the filters
+      if (error instanceof Error && error.message.includes('filter not found')) {
+        console.log('Recreating filters due to filter not found error...');
+        await recreateFilters();
+      }
+    }
+  }, 5000);
+}
+
+async function pollForEvents() {
+  for (const [eventName, filter] of eventFilters) {
+    try {
+      const events = await tollCollectionContract.queryFilter(filter);
+      
+      for (const event of events) {
+        await processEvent(eventName, event);
+      }
+    } catch (error) {
+      // Handle filter not found errors gracefully
+      if (error instanceof Error && error.message.includes('filter not found')) {
+        console.log(`Filter for ${eventName} not found, will recreate on next cycle`);
+        eventFilters.delete(eventName);
+      } else {
+        console.error(`Error polling ${eventName} events:`, error);
+      }
+    }
+  }
+}
+
+async function processEvent(eventName: string, event: any) {
+  try {
+    switch (eventName) {
+      case 'VehicleRegistered':
+        await handleVehicleRegistered(event);
+        break;
+      case 'TollPaid':
+        await handleTollPaid(event);
+        break;
+      case 'VehicleBlacklisted':
+        await handleVehicleBlacklisted(event);
+        break;
+    }
+  } catch (error) {
+    console.error(`Error processing ${eventName} event:`, error);
+  }
+}
+
+async function handleVehicleRegistered(event: any) {
+  const [owner, vehicleId, timestamp] = event.args;
+  console.log(`Vehicle registered: ${vehicleId} by ${owner}`);
+  
+  try {
+    await Vehicle.findOneAndUpdate(
+      { vehicleId },
+      {
         vehicleId,
-        payer,
-        amount: Number(ethers.formatEther(amount)),
-        zkProofHash,
-        status: 'confirmed',
-        blockchainTxHash: event.transactionHash,
-        blockNumber: event.blockNumber,
-        timestamp: new Date(Number(timestamp) * 1000)
-      });
-      
-      await transaction.save();
-      
-      // Update vehicle's last toll time
-      await Vehicle.findOneAndUpdate(
-        { vehicleId },
-        { lastTollTime: new Date(Number(timestamp) * 1000) }
-      );
-      
-    } catch (error) {
-      console.error('Error processing toll payment event:', error);
-    }
-  });
+        owner,
+        isActive: true,
+        isBlacklisted: false,
+        registrationTime: new Date(Number(timestamp) * 1000)
+      },
+      { upsert: true, new: true }
+    );
+  } catch (error) {
+    console.error('Error updating vehicle in database:', error);
+  }
+}
 
-  // Listen for vehicle blacklist events
-  tollCollectionContract.on('VehicleBlacklisted', async (vehicleId: string, isBlacklisted: boolean, timestamp: bigint, event: any) => {
-    console.log(`Vehicle ${vehicleId} blacklist status: ${isBlacklisted}`);
+async function handleTollPaid(event: any) {
+  const [payer, vehicleId, amount, tollId, zkProofHash, timestamp] = event.args;
+  console.log(`Toll paid: ${amount} by ${payer} for vehicle ${vehicleId}`);
+  
+  try {
+    const transaction = new TollTransaction({
+      transactionId: `toll_${tollId}`,
+      vehicleId,
+      payer,
+      amount: Number(ethers.formatEther(amount)),
+      zkProofHash,
+      status: 'confirmed',
+      blockchainTxHash: event.transactionHash,
+      blockNumber: event.blockNumber,
+      timestamp: new Date(Number(timestamp) * 1000)
+    });
     
-    try {
-      await Vehicle.findOneAndUpdate(
-        { vehicleId },
-        { isBlacklisted }
-      );
-    } catch (error) {
-      console.error('Error updating vehicle blacklist status:', error);
-    }
-  });
+    await transaction.save();
+    
+    await Vehicle.findOneAndUpdate(
+      { vehicleId },
+      { lastTollTime: new Date(Number(timestamp) * 1000) }
+    );
+  } catch (error) {
+    console.error('Error processing toll payment event:', error);
+  }
+}
+
+async function handleVehicleBlacklisted(event: any) {
+  const [vehicleId, isBlacklisted, timestamp] = event.args;
+  console.log(`Vehicle ${vehicleId} blacklist status: ${isBlacklisted}`);
+  
+  try {
+    await Vehicle.findOneAndUpdate(
+      { vehicleId },
+      { isBlacklisted }
+    );
+  } catch (error) {
+    console.error('Error updating vehicle blacklist status:', error);
+  }
+}
+
+async function recreateFilters() {
+  try {
+    console.log('Recreating event filters...');
+    
+    // Clear existing filters
+    eventFilters.clear();
+    
+    // Recreate filters
+    const vehicleRegisteredFilter = await tollCollectionContract.filters.VehicleRegistered();
+    const tollPaidFilter = await tollCollectionContract.filters.TollPaid();
+    const vehicleBlacklistedFilter = await tollCollectionContract.filters.VehicleBlacklisted();
+    
+    eventFilters.set('VehicleRegistered', vehicleRegisteredFilter);
+    eventFilters.set('TollPaid', tollPaidFilter);
+    eventFilters.set('VehicleBlacklisted', vehicleBlacklistedFilter);
+    
+    console.log('Event filters recreated successfully');
+  } catch (error) {
+    console.error('Error recreating filters:', error);
+  }
+}
+
+function stopEventPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+  isPolling = false;
+  eventFilters.clear();
+  console.log('Event polling stopped');
 }
 
 export async function verifyAnonAadhaarProof(proof: string, publicInputs: number[], userAddress: string): Promise<boolean> {
@@ -197,4 +311,9 @@ export function getTollCollectionContract(): Contract {
 
 export function getAnonAadhaarVerifierContract(): Contract {
   return anonAadhaarVerifierContract;
+}
+
+export function cleanupBlockchainConnection() {
+  console.log('Cleaning up blockchain connection...');
+  stopEventPolling();
 }
