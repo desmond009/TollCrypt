@@ -326,7 +326,7 @@ function AppContent() {
           {currentStep === 'payment' && (
             <div className="card">
               <h2 className="text-xl font-bold text-white mb-4">Step 5: Contactless Toll Payment</h2>
-              <TollPayment />
+              <TollPayment onNavigateToDashboard={() => setCurrentStep('dashboard')} />
               <div className="mt-4">
                 <button
                   onClick={() => setCurrentStep('dashboard')}
@@ -379,7 +379,7 @@ function AppContent() {
           )}
 
           {currentStep === 'profile' && (
-            <UserProfile />
+            <UserProfile onNavigate={setCurrentStep} />
           )}
 
           {currentStep === 'toll-deduction' && (

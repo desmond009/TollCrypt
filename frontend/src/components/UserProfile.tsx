@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useSession, VehicleInfo } from '../services/sessionManager';
 
-export const UserProfile: React.FC = () => {
+type AppStep = 'wallet' | 'auth' | 'register' | 'topup' | 'payment' | 'dashboard' | 'profile' | 'toll-deduction';
+
+interface UserProfileProps {
+  onNavigate?: (step: AppStep) => void;
+}
+
+export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
   const { 
@@ -48,6 +54,10 @@ export const UserProfile: React.FC = () => {
   const handleDisconnect = () => {
     clearSession();
     disconnect();
+    // Force a page reload to reset the entire app state
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const formatDate = (dateString: string) => {
@@ -59,8 +69,30 @@ export const UserProfile: React.FC = () => {
       <div className="card">
         <h2 className="text-xl font-bold text-white mb-4">User Profile</h2>
         <div className="text-center py-8">
+          <div className="w-16 h-16 bg-yellow-400 rounded-xl mx-auto mb-4 flex items-center justify-center">
+            <span className="text-black font-bold text-xl">TC</span>
+          </div>
           <p className="text-gray-400 mb-4">No active session found</p>
-          <p className="text-sm text-gray-500">Please connect your wallet and authenticate to view your profile.</p>
+          <p className="text-sm text-gray-500 mb-6">Please authenticate with Aadhaar to access your profile and manage your vehicles.</p>
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                // Navigate to auth step
+                onNavigate?.('auth');
+              }}
+              className="btn-primary w-full"
+            >
+              🔐 Start Aadhaar Authentication
+            </button>
+            
+            <button
+              onClick={handleDisconnect}
+              className="btn-secondary w-full"
+            >
+              🔌 Disconnect Wallet
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -86,12 +118,26 @@ export const UserProfile: React.FC = () => {
               )}
             </div>
           </div>
-          <button
-            onClick={handleDisconnect}
-            className="btn-secondary"
-          >
-            Disconnect
-          </button>
+          <div className="space-x-2">
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to clear your session data? This will require you to authenticate again.')) {
+                  clearSession();
+                  setSession(getSession());
+                  setSessionStatus(getSessionStatus());
+                }
+              }}
+              className="btn-secondary"
+            >
+              Clear Session
+            </button>
+            <button
+              onClick={handleDisconnect}
+              className="btn-secondary"
+            >
+              Disconnect
+            </button>
+          </div>
         </div>
 
         {/* Wallet Info */}

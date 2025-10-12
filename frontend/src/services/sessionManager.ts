@@ -1,4 +1,5 @@
 import { useAccount } from 'wagmi';
+import { useCallback } from 'react';
 
 export interface UserSession {
   walletAddress: string;
@@ -220,24 +221,23 @@ class SessionManager {
 
 // Export singleton instance
 export const sessionManager = new SessionManager();
-
 // Hook for using session manager
 export const useSession = () => {
   const { address } = useAccount();
   
-  const getSession = () => sessionManager.getSession();
-  const createSession = (authProof?: string) => {
+  const getSession = useCallback(() => sessionManager.getSession(), []);
+  const createSession = useCallback((authProof?: string) => {
     if (!address) return null;
     return sessionManager.createSession(address, authProof);
-  };
-  const updateAuth = (authProof: string) => sessionManager.updateSessionAuth(authProof);
-  const addVehicle = (vehicle: VehicleInfo) => sessionManager.addVehicle(vehicle);
-  const removeVehicle = (vehicleId: string) => sessionManager.removeVehicle(vehicleId);
-  const updateVehicle = (vehicleId: string, updates: Partial<VehicleInfo>) => 
-    sessionManager.updateVehicle(vehicleId, updates);
-  const clearSession = () => sessionManager.clearSession();
-  const getSessionStatus = () => sessionManager.getSessionStatus();
-  const isAuthValid = () => sessionManager.isAuthValid();
+  }, [address]);
+  const updateAuth = useCallback((authProof: string) => sessionManager.updateSessionAuth(authProof), []);
+  const addVehicle = useCallback((vehicle: VehicleInfo) => sessionManager.addVehicle(vehicle), []);
+  const removeVehicle = useCallback((vehicleId: string) => sessionManager.removeVehicle(vehicleId), []);
+  const updateVehicle = useCallback((vehicleId: string, updates: Partial<VehicleInfo>) => 
+    sessionManager.updateVehicle(vehicleId, updates), []);
+  const clearSession = useCallback(() => sessionManager.clearSession(), []);
+  const getSessionStatus = useCallback(() => sessionManager.getSessionStatus(), []);
+  const isAuthValid = useCallback(() => sessionManager.isAuthValid(), []);
 
   return {
     getSession,

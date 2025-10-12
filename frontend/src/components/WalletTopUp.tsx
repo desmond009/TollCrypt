@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 
-// USDC Contract (Polygon Mumbai Testnet)
-const USDC_ADDRESS = '0x2058A9D7613eEE744279e3856E0C1Ff86d77c2C1' as const;
+// USDC Contract (Polygon Mumbai Testnet) - Valid contract address
+const USDC_ADDRESS = '0x0FA8781a83E46826621b3DC094Fa0e9C4C8d9Cc6' as const;
 
 const USDC_ABI = [
   {

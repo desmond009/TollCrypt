@@ -63,10 +63,15 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                 <div className="text-xs text-gray-400">Base Sepolia</div>
                 {/* Session Status Indicators */}
                 <div className="flex items-center space-x-2 mt-1">
-                  {sessionStatus.isAuthenticated && (
+                  {sessionStatus.isAuthenticated ? (
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-blue-400 rounded-full mr-1"></div>
                       <span className="text-xs text-blue-400">Auth</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full mr-1"></div>
+                      <span className="text-xs text-yellow-400">Need Auth</span>
                     </div>
                   )}
                   {sessionStatus.hasVehicles && (

@@ -3,7 +3,7 @@ import { useAccount, useReadContract, useWriteContract, useWaitForTransactionRec
 
 // Contract addresses from deployment
 const TOLL_COLLECTION_ADDRESS = '0x824c0fac2b80f9de4cb0ee6aa51c96694323c2e4' as const;
-const USDC_ADDRESS = '0xbe87ff9ff7a44f1aece33ba0623741faf49720ed' as const;
+const USDC_ADDRESS = '0x0FA8781a83E46826621b3DC094Fa0e9C4C8d9Cc6' as const;
 
 const TOLL_COLLECTION_ABI = [
   {
@@ -53,7 +53,19 @@ const TOLL_LOCATIONS: TollLocation[] = [
   { id: 'delhi-agra', name: 'Delhi-Agra Yamuna Expressway', amount: 25, distance: '200 km' },
 ];
 
-export const TollPayment: React.FC = () => {
+// RFID-based toll location detection
+const RFID_TOLL_MAPPING: { [key: string]: string } = {
+  'RFID_DELHI_MUMBAI': 'delhi-mumbai',
+  'RFID_BANGALORE_CHENNAI': 'bangalore-chennai', 
+  'RFID_MUMBAI_PUNE': 'mumbai-pune',
+  'RFID_DELHI_AGRA': 'delhi-agra',
+};
+
+interface TollPaymentProps {
+  onNavigateToDashboard?: () => void;
+}
+
+export const TollPayment: React.FC<TollPaymentProps> = ({ onNavigateToDashboard }) => {
   const { address } = useAccount();
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<TollLocation | null>(null);
@@ -81,15 +93,26 @@ export const TollPayment: React.FC = () => {
     hash: usdcHash,
   });
 
-  // Simulate RFID detection
+  // Simulate RFID detection with automatic toll location selection
   useEffect(() => {
     const interval = setInterval(() => {
       // Simulate random RFID detection
       if (Math.random() > 0.7) {
         setRfidDetected(true);
-        setTimeout(() => setRfidDetected(false), 3000);
+        
+        // Automatically select toll location based on RFID detection
+        const rfidKeys = Object.keys(RFID_TOLL_MAPPING);
+        const randomRfid = rfidKeys[Math.floor(Math.random() * rfidKeys.length)];
+        const tollLocationId = RFID_TOLL_MAPPING[randomRfid];
+        const detectedLocation = TOLL_LOCATIONS.find(loc => loc.id === tollLocationId);
+        
+        if (detectedLocation) {
+          setSelectedLocation(detectedLocation);
+        }
+        
+        setTimeout(() => setRfidDetected(false), 5000);
       }
-    }, 5000);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, []);
@@ -171,6 +194,21 @@ export const TollPayment: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Dashboard Navigation Button */}
+      {onNavigateToDashboard && (
+        <div className="flex justify-end">
+          <button
+            onClick={onNavigateToDashboard}
+            className="btn-secondary px-4 py-2 text-sm"
+          >
+            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+            </svg>
+            View Dashboard
+          </button>
+        </div>
+      )}
+
       {/* RFID Detection Status */}
       {rfidDetected && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-4">
@@ -191,8 +229,8 @@ export const TollPayment: React.FC = () => {
         <div className="flex justify-between items-center">
           <div>
             <p className="text-sm opacity-80">FASTag Balance</p>
-            <p className="text-2xl font-bold">₹{formatBalance(usdcBalance)}</p>
-            <p className="text-sm opacity-80 mt-1">USDC</p>
+            <p className="text-2xl font-bold">{formatBalance(usdcBalance)} USDC</p>
+            <p className="text-sm opacity-80 mt-1">≈ ₹{formatBalance(usdcBalance)}</p>
           </div>
           <div className="bg-white bg-opacity-20 rounded-lg p-3">
             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
@@ -226,33 +264,34 @@ export const TollPayment: React.FC = () => {
         {/* Toll Location Selection */}
         <div>
           <label className="block text-sm font-medium text-white mb-3">
-            Select Toll Location
+            {selectedLocation ? 'Detected Toll Location' : 'Waiting for RFID Detection'}
           </label>
-          <div className="space-y-2">
-            {TOLL_LOCATIONS.map((location) => (
-              <button
-                key={location.id}
-                type="button"
-                onClick={() => setSelectedLocation(location)}
-                className={`w-full text-left p-4 rounded-lg border transition-colors ${
-                  selectedLocation?.id === location.id
-                    ? 'bg-blue-900 border-blue-600 text-blue-300'
-                    : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">{location.name}</p>
-                    <p className="text-sm opacity-80">{location.distance}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold">₹{location.amount}</p>
-                    <p className="text-xs opacity-80">Toll Fee</p>
-                  </div>
+          {selectedLocation ? (
+            <div className="bg-green-900 border border-green-700 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-green-300">{selectedLocation.name}</p>
+                  <p className="text-sm text-green-400">{selectedLocation.distance}</p>
                 </div>
-              </button>
-            ))}
-          </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-green-300">{selectedLocation.amount} USDC</p>
+                  <p className="text-xs text-green-400">≈ ₹{selectedLocation.amount}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4">
+              <div className="flex items-center">
+                <svg className="w-6 h-6 text-yellow-400 mr-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                </svg>
+                <div>
+                  <p className="text-yellow-300 font-semibold">Waiting for RFID Detection</p>
+                  <p className="text-yellow-400 text-sm">Drive through toll plaza to auto-detect location</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Transaction Type */}
@@ -315,7 +354,7 @@ export const TollPayment: React.FC = () => {
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd"/>
               </svg>
-              Pay ₹{selectedLocation?.amount || 0} Toll Fee
+              Pay {selectedLocation?.amount || 0} USDC Toll Fee
             </>
           )}
         </button>
