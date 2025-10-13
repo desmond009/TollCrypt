@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./TopUpWallet.sol";
+import "./TopUpWalletFactory.sol";
 
 /**
  * @title TollCollection
@@ -27,6 +29,14 @@ contract TollCollection is ReentrancyGuard, Ownable, Pausable {
     event VehicleBlacklisted(string vehicleId, bool isBlacklisted, uint256 timestamp);
     event TollRateUpdated(uint256 newRate, uint256 timestamp);
     event RevenueWithdrawn(address indexed to, uint256 amount, uint256 timestamp);
+    event TopUpWalletPaymentProcessed(
+        address indexed topUpWallet,
+        string vehicleId,
+        uint256 amount,
+        uint256 tollId,
+        bytes32 zkProofHash,
+        uint256 timestamp
+    );
 
     // Structs
     struct Vehicle {
@@ -56,10 +66,12 @@ contract TollCollection is ReentrancyGuard, Ownable, Pausable {
     mapping(uint256 => TollTransaction) public tollTransactions;
     mapping(string => bool) public blacklistedVehicles;
     mapping(address => bool) public authorizedOperators;
+    mapping(address => bool) public authorizedTopUpWallets;
 
     uint256 public tollRate; // in wei
     uint256 public totalRevenue;
     IERC20 public paymentToken;
+    TopUpWalletFactory public topUpWalletFactory;
 
     // Modifiers
     modifier onlyAuthorizedOperator() {
@@ -77,13 +89,20 @@ contract TollCollection is ReentrancyGuard, Ownable, Pausable {
         _;
     }
 
+    modifier onlyAuthorizedTopUpWallet() {
+        require(authorizedTopUpWallets[msg.sender], "Not an authorized top-up wallet");
+        _;
+    }
+
     // Constructor
     constructor(
         address _paymentToken,
-        uint256 _initialTollRate
+        uint256 _initialTollRate,
+        address _topUpWalletFactory
     ) Ownable(msg.sender) {
         paymentToken = IERC20(_paymentToken);
         tollRate = _initialTollRate;
+        topUpWalletFactory = TopUpWalletFactory(_topUpWalletFactory);
         authorizedOperators[msg.sender] = true;
     }
 
@@ -200,6 +219,54 @@ contract TollCollection is ReentrancyGuard, Ownable, Pausable {
     }
 
     /**
+     * @dev Process toll payment from a top-up wallet
+     * @param vehicleId Vehicle identifier
+     * @param zkProofHash Hash of the zero-knowledge proof
+     * @param amount Payment amount
+     */
+    function processTollPaymentFromTopUpWallet(
+        string memory vehicleId,
+        bytes32 zkProofHash,
+        uint256 amount
+    ) external 
+        nonReentrant 
+        whenNotPaused 
+        vehicleExists(vehicleId) 
+        vehicleNotBlacklisted(vehicleId) 
+        onlyAuthorizedTopUpWallet
+    {
+        require(vehicles[vehicleId].isActive, "Vehicle not active");
+        require(amount >= tollRate, "Insufficient payment amount");
+        require(zkProofHash != bytes32(0), "Invalid ZK proof");
+
+        // Verify that the top-up wallet has sufficient balance
+        TopUpWallet topUpWallet = TopUpWallet(payable(msg.sender));
+        require(topUpWallet.getBalance() >= amount, "Insufficient top-up wallet balance");
+
+        // Process payment from top-up wallet
+        topUpWallet.processTollPayment(amount, vehicleId, zkProofHash);
+
+        // Create toll transaction record
+        uint256 tollId = _tollIdCounter;
+        _tollIdCounter++;
+
+        tollTransactions[tollId] = TollTransaction({
+            payer: msg.sender, // Top-up wallet address
+            vehicleId: vehicleId,
+            amount: amount,
+            zkProofHash: zkProofHash,
+            timestamp: block.timestamp,
+            isProcessed: true
+        });
+
+        // Update vehicle last toll time
+        vehicles[vehicleId].lastTollTime = block.timestamp;
+        totalRevenue += amount;
+
+        emit TopUpWalletPaymentProcessed(msg.sender, vehicleId, amount, tollId, zkProofHash, block.timestamp);
+    }
+
+    /**
      * @dev Blacklist or whitelist a vehicle
      * @param vehicleId Vehicle identifier
      * @param isBlacklisted Blacklist status
@@ -235,6 +302,29 @@ contract TollCollection is ReentrancyGuard, Ownable, Pausable {
     ) external onlyOwner {
         require(operator != address(0), "Invalid operator address");
         authorizedOperators[operator] = isAuthorized;
+    }
+
+    /**
+     * @dev Add or remove authorized top-up wallets
+     * @param topUpWallet Top-up wallet address
+     * @param isAuthorized Authorization status
+     */
+    function setTopUpWalletAuthorization(
+        address topUpWallet,
+        bool isAuthorized
+    ) external onlyOwner {
+        require(topUpWallet != address(0), "Invalid top-up wallet address");
+        authorizedTopUpWallets[topUpWallet] = isAuthorized;
+    }
+
+    /**
+     * @dev Authorize top-up wallet from factory
+     * @param topUpWallet Top-up wallet address
+     */
+    function authorizeTopUpWalletFromFactory(address topUpWallet) external {
+        require(msg.sender == address(topUpWalletFactory), "Only factory can authorize");
+        require(topUpWallet != address(0), "Invalid top-up wallet address");
+        authorizedTopUpWallets[topUpWallet] = true;
     }
 
     /**
@@ -311,6 +401,46 @@ contract TollCollection is ReentrancyGuard, Ownable, Pausable {
      */
     function getTotalTransactions() external view returns (uint256) {
         return _tollIdCounter;
+    }
+
+    /**
+     * @dev Get user's top-up wallet address
+     * @param user User address
+     * @return walletAddress Top-up wallet address
+     */
+    function getUserTopUpWallet(address user) external view returns (address walletAddress) {
+        return topUpWalletFactory.getUserTopUpWallet(user);
+    }
+
+    /**
+     * @dev Check if user has a top-up wallet
+     * @param user User address
+     * @return hasWallet True if user has a wallet
+     */
+    function hasUserTopUpWallet(address user) external view returns (bool hasWallet) {
+        return topUpWalletFactory.hasTopUpWallet(user);
+    }
+
+    /**
+     * @dev Get top-up wallet balance for a user
+     * @param user User address
+     * @return balance Top-up wallet balance
+     */
+    function getUserTopUpWalletBalance(address user) external view returns (uint256 balance) {
+        address walletAddress = topUpWalletFactory.getUserTopUpWallet(user);
+        if (walletAddress != address(0)) {
+            TopUpWallet wallet = TopUpWallet(payable(walletAddress));
+            balance = wallet.getBalance();
+        }
+    }
+
+    /**
+     * @dev Check if a top-up wallet is authorized
+     * @param topUpWallet Top-up wallet address
+     * @return isAuthorized Authorization status
+     */
+    function isTopUpWalletAuthorized(address topUpWallet) external view returns (bool isAuthorized) {
+        return authorizedTopUpWallets[topUpWallet];
     }
 
     /**

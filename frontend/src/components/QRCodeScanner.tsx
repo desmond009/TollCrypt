@@ -87,7 +87,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     setTimeout(() => {
       // For demo, we'll use a mock QR code data
       const mockQRData = {
-        walletAddress: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
+        walletAddress: process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291',
         vehicleId: 'MH12AB1234',
         vehicleType: 'car',
         timestamp: Date.now(),

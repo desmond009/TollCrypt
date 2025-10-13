@@ -40,7 +40,7 @@ contract TollCollectionTest is Test {
         
         // Deploy toll collection contract
         vm.prank(owner);
-        tollCollection = new TollCollection(address(token), initialTollRate);
+        tollCollection = new TollCollection(address(token), initialTollRate, address(0));
         
         // Set up test accounts
         vm.startPrank(owner);

@@ -33,7 +33,7 @@ contract DeployScript is Script {
 
         // Deploy TollCollection contract
         uint256 initialTollRate = 1 * 10**6; // 1 USDC (6 decimals)
-        TollCollection tollCollection = new TollCollection(address(usdc), initialTollRate);
+        TollCollection tollCollection = new TollCollection(address(usdc), initialTollRate, address(0));
         console.log("TollCollection deployed at:", address(tollCollection));
 
         // Set up initial operators

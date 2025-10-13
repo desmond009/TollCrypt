@@ -34,7 +34,7 @@ contract DeployTestnetScript is Script {
 
         // Deploy TollCollection contract with lower toll rate for testnet
         uint256 initialTollRate = 0.1 * 10**6; // 0.1 USDC (6 decimals) - lower for testing
-        TollCollection tollCollection = new TollCollection(address(usdc), initialTollRate);
+        TollCollection tollCollection = new TollCollection(address(usdc), initialTollRate, address(0));
         console.log("TollCollection deployed at:", address(tollCollection));
 
         // Set up initial operators
