@@ -317,3 +317,16 @@ export function cleanupBlockchainConnection() {
   console.log('Cleaning up blockchain connection...');
   stopEventPolling();
 }
+
+// Default export for the blockchain service
+const blockchainService = {
+  connectToBlockchain,
+  verifyAnonAadhaarProof,
+  getContractBalance,
+  getProvider,
+  getTollCollectionContract,
+  getAnonAadhaarVerifierContract,
+  cleanupBlockchainConnection
+};
+
+export default blockchainService;

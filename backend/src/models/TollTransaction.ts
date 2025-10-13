@@ -15,6 +15,7 @@ export interface ITollTransaction extends Document {
   gasUsed?: number;
   gasPrice?: number;
   timestamp: Date;
+  processedAt?: Date;
   metadata?: {
     tollBoothId?: string;
     location?: {
@@ -91,6 +92,9 @@ const TollTransactionSchema = new Schema<ITollTransaction>({
   timestamp: {
     type: Date,
     default: Date.now
+  },
+  processedAt: {
+    type: Date
   },
   metadata: {
     tollBoothId: String,

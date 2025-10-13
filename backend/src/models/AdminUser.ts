@@ -7,6 +7,7 @@ export interface IAdminUser extends Document {
   name: string;
   role: 'super_admin' | 'admin' | 'operator' | 'viewer';
   isActive: boolean;
+  tollPlaza?: string;
   lastLogin?: Date;
   passwordResetToken?: string;
   passwordResetExpires?: Date;
@@ -48,6 +49,9 @@ const AdminUserSchema = new Schema<IAdminUser>({
   isActive: {
     type: Boolean,
     default: true
+  },
+  tollPlaza: {
+    type: String
   },
   lastLogin: {
     type: Date

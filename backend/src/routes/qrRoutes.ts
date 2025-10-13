@@ -3,7 +3,7 @@ import { Vehicle } from '../models/Vehicle';
 import { TollTransaction } from '../models/TollTransaction';
 import { AdminUser } from '../models/AdminUser';
 import { authenticateAdmin } from '../middleware/auth';
-import { blockchainService } from '../services/blockchainService';
+import blockchainService from '../services/blockchainService';
 
 const router = express.Router();
 

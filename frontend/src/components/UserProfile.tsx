@@ -143,7 +143,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
         {/* Wallet Info */}
         <div className="bg-gray-800 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-semibold text-white mb-3">Wallet Information</h3>
-          <div className="space-y-2">
+          <div className="space-y-2 mb-4">
             <div className="flex justify-between">
               <span className="text-gray-400">Address:</span>
               <span className="text-white font-mono text-sm">
@@ -164,6 +164,19 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                 </span>
               </div>
             )}
+          </div>
+          
+          {/* Top-up Button */}
+          <div className="border-t border-gray-700 pt-4">
+            <button
+              onClick={() => onNavigate?.('topup')}
+              className="btn-primary w-full flex items-center justify-center space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span>Top-up Wallet</span>
+            </button>
           </div>
         </div>
 

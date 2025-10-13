@@ -51,9 +51,33 @@ export class TopUpWalletService {
     factoryPrivateKey: string,
     tollCollectionPrivateKey: string
   ) {
+    // Validate inputs
+    if (!factoryAddress || factoryAddress === '') {
+      throw new Error('Factory address is required');
+    }
+    if (!tollCollectionAddress || tollCollectionAddress === '') {
+      throw new Error('Toll collection address is required');
+    }
+    if (!factoryPrivateKey || factoryPrivateKey === '') {
+      throw new Error('Factory private key is required');
+    }
+    if (!tollCollectionPrivateKey || tollCollectionPrivateKey === '') {
+      throw new Error('Toll collection private key is required');
+    }
+
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.factoryWallet = new ethers.Wallet(factoryPrivateKey, this.provider);
-    this.tollCollectionWallet = new ethers.Wallet(tollCollectionPrivateKey, this.provider);
+    
+    try {
+      this.factoryWallet = new ethers.Wallet(factoryPrivateKey, this.provider);
+    } catch (error) {
+      throw new Error(`Invalid factory private key: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
+    try {
+      this.tollCollectionWallet = new ethers.Wallet(tollCollectionPrivateKey, this.provider);
+    } catch (error) {
+      throw new Error(`Invalid toll collection private key: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
     
     this.factoryContract = new ethers.Contract(
       factoryAddress,
@@ -93,7 +117,7 @@ export class TopUpWalletService {
       }
 
       // Get the deployed wallet address from events
-      const event = receipt.logs.find(log => {
+      const event = receipt.logs.find((log: any) => {
         try {
           const parsed = this.factoryContract.interface.parseLog(log);
           return parsed?.name === 'TopUpWalletCreated';
@@ -378,19 +402,19 @@ export class TopUpWalletService {
    * @param privateKey User's private key
    * @returns Signature
    */
-  createTopUpSignature(
+  async createTopUpSignature(
     userAddress: string,
     amount: string,
     nonce: number,
     privateKey: string
-  ): string {
+  ): Promise<string> {
     const message = ethers.solidityPackedKeccak256(
       ['address', 'uint256', 'uint256'],
       [userAddress, ethers.parseEther(amount), nonce]
     );
     
     const wallet = new ethers.Wallet(privateKey);
-    return wallet.signMessage(ethers.getBytes(message));
+    return await wallet.signMessage(ethers.getBytes(message));
   }
 
   /**
@@ -401,18 +425,18 @@ export class TopUpWalletService {
    * @param privateKey User's private key
    * @returns Signature
    */
-  createWithdrawalSignature(
+  async createWithdrawalSignature(
     userAddress: string,
     amount: string,
     nonce: number,
     privateKey: string
-  ): string {
+  ): Promise<string> {
     const message = ethers.solidityPackedKeccak256(
       ['address', 'uint256', 'uint256'],
       [userAddress, ethers.parseEther(amount), nonce]
     );
     
     const wallet = new ethers.Wallet(privateKey);
-    return wallet.signMessage(ethers.getBytes(message));
+    return await wallet.signMessage(ethers.getBytes(message));
   }
 }

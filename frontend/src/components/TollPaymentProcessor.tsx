@@ -119,7 +119,7 @@ export const TollPaymentProcessor: React.FC<TollPaymentProcessorProps> = ({
     try {
       // Send transaction to smart contract
       await sendTransaction({
-        to: process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291', // Contract address
+        to: (process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291') as `0x${string}`, // Contract address
         value: BigInt(Math.floor(qrData.tollRate * 1e18)), // Convert to wei
         data: '0x' // Contract call data would go here
       });

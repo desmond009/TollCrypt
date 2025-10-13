@@ -1,4 +1,5 @@
-import { ethers } from 'ethers';
+import { encodePacked, parseEther, hexToBytes, verifyMessage, keccak256 } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 
 export interface TopUpWalletInfo {
   walletAddress: string;
@@ -34,10 +35,16 @@ export class TopUpWalletAPIService {
   ): Promise<T> {
     const url = `${this.baseURL}/api/topup-wallet${endpoint}`;
     
+    // Get session token and user address from localStorage
+    const sessionToken = localStorage.getItem('sessionToken');
+    const userAddress = localStorage.getItem('userAddress');
+    
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(sessionToken && { 'X-Session-Token': sessionToken }),
+        ...(userAddress && { 'X-User-Address': userAddress }),
         ...options.headers,
       },
       credentials: 'include',
@@ -156,37 +163,41 @@ export class SignatureUtils {
   /**
    * Create signature for top-up authorization
    */
-  static createTopUpSignature(
+  static async createTopUpSignature(
     userAddress: string,
     amount: string,
     nonce: number,
     privateKey: string
-  ): string {
-    const message = ethers.solidityPackedKeccak256(
+  ): Promise<string> {
+    const packed = encodePacked(
       ['address', 'uint256', 'uint256'],
-      [userAddress, ethers.parseEther(amount), nonce]
+      [userAddress as `0x${string}`, parseEther(amount), BigInt(nonce)]
     );
+    const message = keccak256(packed);
     
-    const wallet = new ethers.Wallet(privateKey);
-    return wallet.signMessage(ethers.getBytes(message));
+    const account = privateKeyToAccount(privateKey as `0x${string}`);
+    const signature = await account.signMessage({ message: { raw: hexToBytes(message) } });
+    return signature;
   }
 
   /**
    * Create signature for withdrawal authorization
    */
-  static createWithdrawalSignature(
+  static async createWithdrawalSignature(
     userAddress: string,
     amount: string,
     nonce: number,
     privateKey: string
-  ): string {
-    const message = ethers.solidityPackedKeccak256(
+  ): Promise<string> {
+    const packed = encodePacked(
       ['address', 'uint256', 'uint256'],
-      [userAddress, ethers.parseEther(amount), nonce]
+      [userAddress as `0x${string}`, parseEther(amount), BigInt(nonce)]
     );
+    const message = keccak256(packed);
     
-    const wallet = new ethers.Wallet(privateKey);
-    return wallet.signMessage(ethers.getBytes(message));
+    const account = privateKeyToAccount(privateKey as `0x${string}`);
+    const signature = await account.signMessage({ message: { raw: hexToBytes(message) } });
+    return signature;
   }
 
   /**
@@ -199,14 +210,18 @@ export class SignatureUtils {
   /**
    * Verify signature (for testing purposes)
    */
-  static verifySignature(
+  static async verifySignature(
     message: string,
     signature: string,
     expectedAddress: string
-  ): boolean {
+  ): Promise<boolean> {
     try {
-      const recoveredAddress = ethers.verifyMessage(message, signature);
-      return recoveredAddress.toLowerCase() === expectedAddress.toLowerCase();
+      const isValid = await verifyMessage({
+        address: expectedAddress as `0x${string}`,
+        message: { raw: hexToBytes(message as `0x${string}`) },
+        signature: signature as `0x${string}`
+      });
+      return isValid;
     } catch {
       return false;
     }

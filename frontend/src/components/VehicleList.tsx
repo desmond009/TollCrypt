@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 
 // Contract addresses from deployment
-const TOLL_COLLECTION_ADDRESS = process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291' as const;
+const TOLL_COLLECTION_ADDRESS = (process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291') as `0x${string}`;
 
 const TOLL_COLLECTION_ABI = [
   {

@@ -161,7 +161,7 @@ export const WalletTopUp: React.FC = () => {
 
         // Create signature for top-up authorization
         const nonce = SignatureUtils.generateNonce();
-        const signature = SignatureUtils.createTopUpSignature(address, amount, nonce, privateKey);
+        const signature = await SignatureUtils.createTopUpSignature(address, amount, nonce, privateKey);
 
         // Process top-up through smart contract wallet
         const result = await topUpWalletAPI.processTopUp(amount, signature);

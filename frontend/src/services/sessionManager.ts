@@ -169,12 +169,21 @@ class SessionManager {
   // Clear session
   clearSession(): void {
     localStorage.removeItem(this.storageKey);
+    localStorage.removeItem('sessionToken');
+    localStorage.removeItem('userAddress');
   }
 
   // Save session to localStorage
   private saveSession(session: UserSession): void {
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(session));
+      // Also store session token and user address separately for API access
+      if (session.sessionToken) {
+        localStorage.setItem('sessionToken', session.sessionToken);
+      }
+      if (session.walletAddress) {
+        localStorage.setItem('userAddress', session.walletAddress);
+      }
     } catch (error) {
       console.error('Error saving session:', error);
     }
@@ -182,7 +191,7 @@ class SessionManager {
 
   // Generate a simple session token
   private generateSessionToken(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   // Get vehicles for current session

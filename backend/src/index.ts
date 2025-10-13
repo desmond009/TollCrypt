@@ -30,7 +30,12 @@ const io = new Server(server, {
       "http://127.0.0.1:3000"
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type", 
+      "Authorization",
+      "X-Session-Token",
+      "X-User-Address"
+    ],
     credentials: true
   },
   allowEIO3: true
@@ -53,7 +58,13 @@ app.options('*', cors({
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  allowedHeaders: [
+    "Content-Type", 
+    "Authorization", 
+    "X-Requested-With",
+    "X-Session-Token",
+    "X-User-Address"
+  ]
 }));
 
 app.use(cors({
@@ -64,7 +75,13 @@ app.use(cors({
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  allowedHeaders: [
+    "Content-Type", 
+    "Authorization", 
+    "X-Requested-With",
+    "X-Session-Token",
+    "X-User-Address"
+  ]
 }));
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
