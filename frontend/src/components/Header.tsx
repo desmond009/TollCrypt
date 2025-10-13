@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                 <div className="text-sm text-white">
                   {balance ? `${parseFloat(balance.formatted).toFixed(4)} ${balance.symbol}` : '0 ETH'}
                 </div>
-                <div className="text-xs text-gray-400">Base Sepolia</div>
+                <div className="text-xs text-gray-400">Sepolia</div>
                 {/* Session Status Indicators */}
                 <div className="flex items-center space-x-2 mt-1">
                   {sessionStatus.isAuthenticated ? (

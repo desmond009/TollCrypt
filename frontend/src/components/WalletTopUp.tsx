@@ -1,38 +1,6 @@
-import React, { useState } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-
-// USDC Contract (Polygon Mumbai Testnet) - Valid contract address
-const USDC_ADDRESS = '0x0FA8781a83E46826621b3DC094Fa0e9C4C8d9Cc6' as const;
-
-const USDC_ABI = [
-  {
-    "inputs": [{"name": "account", "type": "address"}],
-    "name": "balanceOf",
-    "outputs": [{"name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"name": "to", "type": "address"},
-      {"name": "amount", "type": "uint256"}
-    ],
-    "name": "transfer",
-    "outputs": [{"name": "", "type": "bool"}],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"name": "spender", "type": "address"},
-      {"name": "amount", "type": "uint256"}
-    ],
-    "name": "approve",
-    "outputs": [{"name": "", "type": "bool"}],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-] as const;
+import React, { useState, useEffect } from 'react';
+import { useAccount, useBalance, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther, formatEther } from 'viem';
 
 interface TopUpOption {
   amount: string;
@@ -41,15 +9,15 @@ interface TopUpOption {
 }
 
 const TOP_UP_OPTIONS: TopUpOption[] = [
-  { amount: '10', label: '₹10', description: 'Quick top-up' },
-  { amount: '50', label: '₹50', description: 'Small trip' },
-  { amount: '100', label: '₹100', description: 'City travel' },
-  { amount: '500', label: '₹500', description: 'Long journey' },
-  { amount: '1000', label: '₹1000', description: 'Monthly pass' },
+  { amount: '0.01', label: '0.01 ETH', description: 'Quick top-up' },
+  { amount: '0.05', label: '0.05 ETH', description: 'Small trip' },
+  { amount: '0.1', label: '0.1 ETH', description: 'City travel' },
+  { amount: '0.5', label: '0.5 ETH', description: 'Long journey' },
+  { amount: '1.0', label: '1.0 ETH', description: 'Monthly pass' },
 ];
 
 const formatCryptoAmount = (amount: string) => {
-  return `${amount} USDC`;
+  return `${amount} ETH`;
 };
 
 export const WalletTopUp: React.FC = () => {
@@ -58,63 +26,95 @@ export const WalletTopUp: React.FC = () => {
   const [customAmount, setCustomAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'fiat' | 'crypto'>('crypto');
+  const [fastagBalance, setFastagBalance] = useState<string>('0');
 
-  // Get USDC balance
-  const { data: usdcBalance } = useReadContract({
-    address: USDC_ADDRESS,
-    abi: USDC_ABI,
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
+  // Get main wallet ETH balance
+  const { data: ethBalance } = useBalance({
+    address: address,
   });
 
-  const { writeContract, data: hash, error, isPending } = useWriteContract();
+  const { sendTransaction, data: hash, error, isPending } = useSendTransaction();
   
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
-  const formatBalance = (balance: bigint | undefined) => {
-    if (!balance) return '0.00';
-    return (Number(balance) / 1e6).toFixed(2); // USDC has 6 decimals
+  // Load FASTag wallet balance from localStorage on component mount
+  useEffect(() => {
+    if (address) {
+      const savedBalance = localStorage.getItem(`fastag-balance-${address}`);
+      if (savedBalance) {
+        setFastagBalance(savedBalance);
+      } else {
+        setFastagBalance('0');
+      }
+    }
+  }, [address]);
+
+  // Save FASTag wallet balance to localStorage whenever it changes
+  useEffect(() => {
+    if (address) {
+      localStorage.setItem(`fastag-balance-${address}`, fastagBalance);
+    }
+  }, [fastagBalance, address]);
+
+  // Handle successful crypto transaction
+  useEffect(() => {
+    if (isSuccess && paymentMethod === 'crypto' && selectedAmount) {
+      // Add the topped up amount to FASTag wallet balance
+      const newBalance = (parseFloat(fastagBalance) + parseFloat(selectedAmount)).toString();
+      setFastagBalance(newBalance);
+      setSelectedAmount(''); // Reset selected amount
+      setIsProcessing(false);
+    }
+  }, [isSuccess, paymentMethod, selectedAmount, fastagBalance]);
+
+  const formatBalance = (balance: string) => {
+    return parseFloat(balance).toFixed(6);
   };
 
   const handleTopUp = async (amount: string) => {
     if (!address || !amount) return;
 
+    setSelectedAmount(amount); // Track the amount being topped up
     setIsProcessing(true);
     
     try {
       if (paymentMethod === 'crypto') {
-        // Convert amount to USDC (6 decimals)
-        const amountInUSDC = BigInt(Math.floor(parseFloat(amount) * 1e6));
+        // Convert amount to ETH (wei)
+        const amountInWei = parseEther(amount);
         
-        // Check if user has enough USDC balance
-        if (usdcBalance && usdcBalance < amountInUSDC) {
-          alert(`Insufficient USDC balance. You have ${formatBalance(usdcBalance)} USDC but need ${amount} USDC.`);
+        // Check if user has enough ETH balance in their main wallet
+        if (ethBalance && ethBalance.value < amountInWei) {
+          alert(`Insufficient ETH balance. You have ${formatEther(ethBalance.value)} ETH in your main wallet but need ${amount} ETH.`);
           setIsProcessing(false);
+          setSelectedAmount('');
           return;
         }
 
-        // Transfer USDC to the FASTag contract
-        // Note: In a real implementation, you would transfer to a specific FASTag contract address
-        // For now, we'll simulate the transfer
-        writeContract({
-          address: USDC_ADDRESS,
-          abi: USDC_ABI,
-          functionName: 'transfer',
-          args: [address, amountInUSDC], // Transfer to self for demo
+        // Send ETH from main wallet to FASTag wallet
+        // Note: In a real implementation, you would send to a specific FASTag contract address
+        // For now, we'll simulate the transfer by updating the FASTag balance
+        sendTransaction({
+          to: address, // Send to self for demo (simulating FASTag contract)
+          value: amountInWei,
         });
         
       } else {
         // Fiat payment simulation
         await new Promise(resolve => setTimeout(resolve, 2000));
-        alert(`Successfully topped up ₹${amount} to your FASTag wallet!`);
+        // Add amount to FASTag wallet balance
+        const newBalance = (parseFloat(fastagBalance) + parseFloat(amount)).toString();
+        setFastagBalance(newBalance);
+        alert(`Successfully topped up ${amount} ETH equivalent to your FASTag wallet!`);
         setIsProcessing(false);
+        setSelectedAmount('');
       }
       
     } catch (err) {
       console.error('Error topping up wallet:', err);
       setIsProcessing(false);
+      setSelectedAmount('');
     }
   };
 
@@ -139,9 +139,9 @@ export const WalletTopUp: React.FC = () => {
         <div className="flex justify-between items-center">
           <div>
             <p className="text-sm opacity-80">FASTag Balance</p>
-            <p className="text-2xl font-bold">₹{formatBalance(usdcBalance)}</p>
-            <p className="text-sm opacity-80 mt-1">USDC</p>
-            <p className="text-xs opacity-60 mt-1">Your Wallet USDC: {formatBalance(usdcBalance)} USDC</p>
+            <p className="text-2xl font-bold">{formatBalance(fastagBalance)} ETH</p>
+            <p className="text-sm opacity-80 mt-1">Sepolia ETH</p>
+            <p className="text-xs opacity-60 mt-1">Your Main Wallet ETH: {ethBalance ? formatEther(ethBalance.value) : '0'} ETH</p>
           </div>
           <div className="bg-white bg-opacity-20 rounded-lg p-3">
             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
@@ -171,7 +171,7 @@ export const WalletTopUp: React.FC = () => {
               </div>
               <div className="text-left">
                 <p className="font-medium">Crypto Wallet</p>
-                <p className="text-sm opacity-80">USDC</p>
+                <p className="text-sm opacity-80">ETH</p>
               </div>
             </div>
           </button>
@@ -216,9 +216,6 @@ export const WalletTopUp: React.FC = () => {
                     {paymentMethod === 'crypto' ? formatCryptoAmount(option.amount) : option.label}
                   </p>
                   <p className="text-gray-400 text-sm">{option.description}</p>
-                  {paymentMethod === 'crypto' && (
-                    <p className="text-gray-500 text-xs mt-1">≈ {option.label}</p>
-                  )}
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"/>
@@ -236,7 +233,7 @@ export const WalletTopUp: React.FC = () => {
           <div className="flex">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                {paymentMethod === 'crypto' ? 'USDC' : '₹'}
+                {paymentMethod === 'crypto' ? 'ETH' : '₹'}
               </span>
               <input
                 type="number"
@@ -244,8 +241,8 @@ export const WalletTopUp: React.FC = () => {
                 onChange={(e) => setCustomAmount(e.target.value)}
                 placeholder="Enter amount"
                 className="input-field w-full pl-12"
-                min="1"
-                step="0.01"
+                min="0.001"
+                step="0.001"
               />
             </div>
             <button
@@ -257,13 +254,8 @@ export const WalletTopUp: React.FC = () => {
             </button>
           </div>
           <p className="text-gray-500 text-sm">
-            Minimum top-up amount: {paymentMethod === 'crypto' ? '1 USDC' : '₹1.00'}
+            Minimum top-up amount: {paymentMethod === 'crypto' ? '0.001 ETH' : '₹1.00'}
           </p>
-          {paymentMethod === 'crypto' && customAmount && (
-            <p className="text-gray-400 text-sm">
-              ≈ ₹{customAmount} (1 USDC = ₹1)
-            </p>
-          )}
         </div>
       </div>
 
@@ -281,7 +273,7 @@ export const WalletTopUp: React.FC = () => {
               </div>
               <div>
                 <p className="text-white font-medium">Crypto Wallet</p>
-                <p className="text-gray-400 text-sm">USDC, Direct Transfer</p>
+                <p className="text-gray-400 text-sm">ETH, Direct Transfer</p>
               </div>
             </div>
             <div className="flex items-center">
