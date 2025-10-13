@@ -13,6 +13,7 @@ import { vehicleRoutes } from './routes/vehicleRoutes';
 import { tollRoutes } from './routes/tollRoutes';
 import { adminRoutes } from './routes/adminRoutes';
 import { hardwareRoutes } from './routes/hardwareRoutes';
+import qrRoutes from './routes/qrRoutes';
 import authRoutes from './routes/authRoutes';
 
 // Load environment variables
@@ -74,6 +75,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/tolls', tollRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hardware', hardwareRoutes);
+app.use('/api/qr', qrRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

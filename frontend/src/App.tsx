@@ -17,7 +17,7 @@ import { useSession } from './services/sessionManager';
 
 const queryClient = new QueryClient();
 
-type AppStep = 'wallet' | 'auth' | 'register' | 'topup' | 'payment' | 'dashboard' | 'profile' | 'toll-deduction';
+type AppStep = 'wallet' | 'auth' | 'register' | 'topup' | 'payment' | 'qr-payment' | 'dashboard' | 'profile' | 'toll-deduction';
 
 function AppContent() {
   const { isConnected, address } = useAccount();
@@ -326,7 +326,28 @@ function AppContent() {
           {currentStep === 'payment' && (
             <div className="card">
               <h2 className="text-xl font-bold text-white mb-4">Step 5: Contactless Toll Payment</h2>
-              <TollPayment onNavigateToDashboard={() => setCurrentStep('dashboard')} />
+              <TollPayment />
+              <div className="mt-4">
+                <button
+                  onClick={() => setCurrentStep('qr-payment')}
+                  className="btn-primary w-full"
+                >
+                  QR Code Payment (Recommended)
+                </button>
+                <button
+                  onClick={() => setCurrentStep('dashboard')}
+                  className="btn-secondary w-full mt-2"
+                >
+                  View Dashboard
+                </button>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 'qr-payment' && (
+            <div className="card">
+              <h2 className="text-xl font-bold text-white mb-4">Step 6: QR Code-Based Toll Payment</h2>
+              <TollPayment />
               <div className="mt-4">
                 <button
                   onClick={() => setCurrentStep('dashboard')}
