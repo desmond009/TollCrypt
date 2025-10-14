@@ -15,6 +15,6 @@ declare global {
 export declare const authenticateToken: (req: Request, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined;
 export declare const requireRole: (roles: string[]) => (req: Request, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined;
 export declare const authenticateAdmin: (req: Request, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined;
-export declare const authenticateSession: (req: Request, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined;
+export declare const authenticateSession: (req: Request, res: Response, next: NextFunction) => void | Response<any, Record<string, any>>;
 export {};
 //# sourceMappingURL=auth.d.ts.map

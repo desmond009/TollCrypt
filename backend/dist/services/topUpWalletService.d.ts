@@ -21,6 +21,10 @@ export declare class TopUpWalletService {
     private isMockMode;
     constructor(rpcUrl: string, factoryAddress: string, tollCollectionAddress: string, factoryPrivateKey: string, tollCollectionPrivateKey: string);
     /**
+     * Create a mock contract for development/testing
+     */
+    private createMockContract;
+    /**
      * Create a new top-up wallet for a user
      * @param userAddress User's wallet address
      * @returns Wallet creation result

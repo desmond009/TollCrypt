@@ -28,7 +28,7 @@ class TopUpWalletService {
             console.log('⚠️  TopUpWalletService running in mock mode');
             // Initialize with mock values
             this.provider = {};
-            this.factoryContract = {};
+            this.factoryContract = this.createMockContract();
             this.tollCollectionContract = {};
             this.factoryWallet = {};
             this.tollCollectionWallet = {};
@@ -62,6 +62,25 @@ class TopUpWalletService {
         }
         this.factoryContract = new ethers_1.ethers.Contract(factoryAddress, TOPUP_WALLET_FACTORY_ABI, this.factoryWallet);
         this.tollCollectionContract = new ethers_1.ethers.Contract(tollCollectionAddress, TOLL_COLLECTION_TOPUP_ABI, this.tollCollectionWallet);
+    }
+    /**
+     * Create a mock contract for development/testing
+     */
+    createMockContract() {
+        return {
+            getUserTopUpWallet: async (userAddress) => {
+                // Return a mock wallet address for any user
+                return '0x' + userAddress.slice(2).padStart(40, '0');
+            },
+            hasUserTopUpWallet: async (userAddress) => {
+                // Always return true in mock mode
+                return true;
+            },
+            deployTopUpWallet: async (userAddress) => {
+                // Return a mock wallet address
+                return '0x' + userAddress.slice(2).padStart(40, '0');
+            }
+        };
     }
     /**
      * Create a new top-up wallet for a user
@@ -142,6 +161,17 @@ class TopUpWalletService {
      */
     async getTopUpWalletInfo(userAddress) {
         try {
+            if (this.isMockMode) {
+                // Mock implementation for development
+                const mockWalletAddress = '0x' + userAddress.slice(2).padStart(40, '0');
+                return {
+                    walletAddress: mockWalletAddress,
+                    privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
+                    publicKey: '0x' + 'mock_public_key_' + userAddress.slice(2, 10),
+                    balance: '0.0',
+                    isInitialized: true
+                };
+            }
             const walletAddress = await this.factoryContract.getUserTopUpWallet(userAddress);
             if (walletAddress === ethers_1.ethers.ZeroAddress) {
                 return null;
@@ -172,11 +202,10 @@ class TopUpWalletService {
     async hasTopUpWallet(userAddress) {
         try {
             if (this.isMockMode) {
-                // Mock implementation - return false for now (no wallet exists)
-                console.log(`⚠️  Mock hasTopUpWallet for ${userAddress}: false`);
-                return false;
+                // Mock implementation for development
+                return true;
             }
-            return await this.factoryContract.hasTopUpWallet(userAddress);
+            return await this.factoryContract.hasUserTopUpWallet(userAddress);
         }
         catch (error) {
             console.error('Error checking top-up wallet:', error);
@@ -212,6 +241,11 @@ class TopUpWalletService {
      */
     async processTopUp(userAddress, amount, signature) {
         try {
+            if (this.isMockMode) {
+                // Mock implementation for development
+                console.log(`Mock top-up: ${amount} ETH for user ${userAddress}`);
+                return '0x' + 'mock_tx_hash_' + Date.now().toString(16);
+            }
             const walletAddress = await this.factoryContract.getUserTopUpWallet(userAddress);
             if (walletAddress === ethers_1.ethers.ZeroAddress) {
                 throw new Error('User does not have a top-up wallet');

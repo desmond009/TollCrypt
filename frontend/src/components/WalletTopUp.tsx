@@ -160,6 +160,23 @@ export const WalletTopUp: React.FC = () => {
     setErrorMessage('');
 
     try {
+      // Ensure session token and user address are set
+      let sessionToken = localStorage.getItem('sessionToken');
+      let userAddress = localStorage.getItem('userAddress');
+      
+      if (!sessionToken || !userAddress) {
+        // Generate session token if not exists
+        if (!sessionToken) {
+          sessionToken = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          localStorage.setItem('sessionToken', sessionToken);
+        }
+        
+        // Set user address if not exists
+        if (!userAddress) {
+          localStorage.setItem('userAddress', address);
+        }
+      }
+
       const walletInfo = await topUpWalletAPI.createTopUpWallet();
       setTopUpWalletInfo(walletInfo);
       setHasTopUpWallet(true);

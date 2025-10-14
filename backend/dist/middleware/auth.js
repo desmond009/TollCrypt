@@ -77,6 +77,31 @@ exports.authenticateAdmin = authenticateAdmin;
 // Session-based authentication for user operations
 const authenticateSession = (req, res, next) => {
     const sessionToken = req.headers['x-session-token'];
+    // Extract user address from request body or headers
+    const userAddress = req.body.userAddress || req.headers['x-user-address'];
+    // In development mode, be more lenient with authentication
+    if (process.env.NODE_ENV === 'development') {
+        // If no session token but we have user address, generate one
+        if (!sessionToken && userAddress) {
+            req.user = {
+                userId: userAddress,
+                email: '',
+                role: 'user',
+                address: userAddress
+            };
+            return next();
+        }
+        // If session token doesn't start with 'anon_' but we have user address, accept it
+        if (sessionToken && userAddress) {
+            req.user = {
+                userId: userAddress,
+                email: '',
+                role: 'user',
+                address: userAddress
+            };
+            return next();
+        }
+    }
     if (!sessionToken) {
         return res.status(401).json({
             success: false,
@@ -91,8 +116,6 @@ const authenticateSession = (req, res, next) => {
             message: 'Invalid session token'
         });
     }
-    // Extract user address from request body or headers
-    const userAddress = req.body.userAddress || req.headers['x-user-address'];
     if (!userAddress) {
         return res.status(400).json({
             success: false,

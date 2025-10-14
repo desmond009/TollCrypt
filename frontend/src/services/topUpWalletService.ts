@@ -36,16 +36,43 @@ export class TopUpWalletAPIService {
     const url = `${this.baseURL}/api/topup-wallet${endpoint}`;
     
     // Get session token and user address from localStorage
-    const sessionToken = localStorage.getItem('sessionToken');
-    const userAddress = localStorage.getItem('userAddress');
+    let sessionToken = localStorage.getItem('sessionToken');
+    let userAddress = localStorage.getItem('userAddress');
     
+    // If session token or user address is not available, try to get from wallet connection
+    if (!sessionToken || !userAddress) {
+      // Try to get from window.ethereum or wagmi
+      if (typeof window !== 'undefined' && (window as any).ethereum) {
+        try {
+          const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+          if (accounts && accounts.length > 0) {
+            userAddress = accounts[0];
+            // Generate a temporary session token if none exists
+            if (!sessionToken) {
+              sessionToken = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              localStorage.setItem('sessionToken', sessionToken);
+            }
+            if (!localStorage.getItem('userAddress') && userAddress) {
+              localStorage.setItem('userAddress', userAddress);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not get wallet address:', error);
+        }
+      }
+    }
+    
+    // If still no session token or user address, throw an error
+    if (!sessionToken || !userAddress) {
+      throw new Error('Wallet not connected or session not initialized. Please connect your wallet and try again.');
+    }
     
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...(sessionToken && { 'X-Session-Token': sessionToken }),
-        ...(userAddress && { 'X-User-Address': userAddress }),
+        'X-Session-Token': sessionToken,
+        'X-User-Address': userAddress,
         ...options.headers,
       },
       credentials: 'include',
