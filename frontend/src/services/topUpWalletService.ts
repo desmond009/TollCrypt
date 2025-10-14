@@ -25,7 +25,7 @@ export interface TopUpResult {
 export class TopUpWalletAPIService {
   private baseURL: string;
 
-  constructor(baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:3003') {
+  constructor(baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:3001') {
     this.baseURL = baseURL;
   }
 
@@ -38,6 +38,7 @@ export class TopUpWalletAPIService {
     // Get session token and user address from localStorage
     const sessionToken = localStorage.getItem('sessionToken');
     const userAddress = localStorage.getItem('userAddress');
+    
     
     const response = await fetch(url, {
       ...options,

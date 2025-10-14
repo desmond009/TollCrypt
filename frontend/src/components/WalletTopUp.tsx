@@ -75,6 +75,16 @@ export const WalletTopUp: React.FC = () => {
     const checkAndCreateTopUpWallet = async () => {
       if (!address) return;
 
+      // Check if user is authenticated (has session token and user address)
+      const sessionToken = localStorage.getItem('sessionToken');
+      const userAddress = localStorage.getItem('userAddress');
+      
+      if (!sessionToken || !userAddress) {
+        console.log('User not authenticated, skipping top-up wallet operations');
+        setErrorMessage('Please complete authentication first');
+        return;
+      }
+
       try {
         const existsResponse = await topUpWalletAPI.hasTopUpWallet();
         
