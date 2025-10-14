@@ -17,7 +17,9 @@ const vehicleRoutes_1 = require("./routes/vehicleRoutes");
 const tollRoutes_1 = require("./routes/tollRoutes");
 const adminRoutes_1 = require("./routes/adminRoutes");
 const hardwareRoutes_1 = require("./routes/hardwareRoutes");
+const qrRoutes_1 = __importDefault(require("./routes/qrRoutes"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
+const topUpWalletRoutes_1 = __importDefault(require("./routes/topUpWalletRoutes"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -30,12 +32,17 @@ const io = new socket_io_1.Server(server, {
             "http://127.0.0.1:3000"
         ],
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization",
+            "X-Session-Token",
+            "X-User-Address"
+        ],
         credentials: true
     },
     allowEIO3: true
 });
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001 || 3003 || 3004;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tollchain';
 // Middleware
 app.use((0, helmet_1.default)({
@@ -50,7 +57,13 @@ app.options('*', (0, cors_1.default)({
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "X-Session-Token",
+        "X-User-Address"
+    ]
 }));
 app.use((0, cors_1.default)({
     origin: [
@@ -60,7 +73,13 @@ app.use((0, cors_1.default)({
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "X-Session-Token",
+        "X-User-Address"
+    ]
 }));
 app.use((0, morgan_1.default)('combined'));
 app.use(express_1.default.json({ limit: '10mb' }));
@@ -71,6 +90,8 @@ app.use('/api/vehicles', vehicleRoutes_1.vehicleRoutes);
 app.use('/api/tolls', tollRoutes_1.tollRoutes);
 app.use('/api/admin', adminRoutes_1.adminRoutes);
 app.use('/api/hardware', hardwareRoutes_1.hardwareRoutes);
+app.use('/api/qr', qrRoutes_1.default);
+app.use('/api/topup-wallet', topUpWalletRoutes_1.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({
@@ -127,6 +148,7 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
+    (0, blockchainService_1.cleanupBlockchainConnection)();
     server.close(() => {
         mongoose_1.default.connection.close();
         process.exit(0);
@@ -134,6 +156,7 @@ process.on('SIGTERM', () => {
 });
 process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully');
+    (0, blockchainService_1.cleanupBlockchainConnection)();
     server.close(() => {
         mongoose_1.default.connection.close();
         process.exit(0);

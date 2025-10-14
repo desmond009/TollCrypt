@@ -266,6 +266,13 @@ function stopEventPolling() {
 
 export async function verifyAnonAadhaarProof(proof: string, publicInputs: number[], userAddress: string): Promise<boolean> {
   try {
+    // Mock implementation for development/testing
+    if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
+      console.log('⚠️  Using mock anon-Aadhaar verification');
+      // Accept any proof that starts with '0x' and has valid format
+      return proof.startsWith('0x') && proof.length >= 10 && publicInputs.length >= 2;
+    }
+    
     if (!anonAadhaarVerifierContract) {
       throw new Error('Anon-Aadhaar verifier contract not initialized');
     }

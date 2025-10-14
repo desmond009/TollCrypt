@@ -35,6 +35,31 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Vehicle = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
+const VehicleDocumentSchema = new mongoose_1.Schema({
+    type: {
+        type: String,
+        enum: ['rc', 'insurance', 'pollution'],
+        required: true
+    },
+    name: {
+        type: String,
+        required: true
+    },
+    uploadedAt: {
+        type: Date,
+        default: Date.now
+    },
+    verified: {
+        type: Boolean,
+        default: false
+    },
+    verifiedAt: {
+        type: Date
+    },
+    verifiedBy: {
+        type: String
+    }
+});
 const VehicleSchema = new mongoose_1.Schema({
     vehicleId: {
         type: String,
@@ -42,11 +67,17 @@ const VehicleSchema = new mongoose_1.Schema({
         unique: true,
         index: true
     },
+    vehicleType: {
+        type: String,
+        required: true,
+        enum: ['car', 'truck', 'bus', 'motorcycle', 'commercial']
+    },
     owner: {
         type: String,
         required: true,
         index: true
     },
+    documents: [VehicleDocumentSchema],
     isActive: {
         type: Boolean,
         default: true
@@ -62,11 +93,17 @@ const VehicleSchema = new mongoose_1.Schema({
     lastTollTime: {
         type: Date
     },
+    fastagWalletAddress: {
+        type: String,
+        index: true
+    },
     metadata: {
         make: String,
         model: String,
         year: Number,
-        color: String
+        color: String,
+        engineNumber: String,
+        chassisNumber: String
     }
 }, {
     timestamps: true
@@ -74,5 +111,7 @@ const VehicleSchema = new mongoose_1.Schema({
 // Indexes for better query performance
 VehicleSchema.index({ vehicleId: 1, owner: 1 });
 VehicleSchema.index({ isActive: 1, isBlacklisted: 1 });
+VehicleSchema.index({ vehicleType: 1 });
+VehicleSchema.index({ fastagWalletAddress: 1 });
 exports.Vehicle = mongoose_1.default.model('Vehicle', VehicleSchema);
 //# sourceMappingURL=Vehicle.js.map

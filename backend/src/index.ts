@@ -41,7 +41,7 @@ const io = new Server(server, {
   allowEIO3: true
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001 || 3003 || 3004;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tollchain';
 
 // Middleware

@@ -6,11 +6,15 @@ export interface ITollTransaction extends Document {
     amount: number;
     currency: string;
     zkProofHash: string;
+    tollLocation: string;
+    useGaslessTransaction: boolean;
     status: 'pending' | 'confirmed' | 'failed' | 'disputed';
     blockchainTxHash?: string;
     blockNumber?: number;
     gasUsed?: number;
+    gasPrice?: number;
     timestamp: Date;
+    processedAt?: Date;
     metadata?: {
         tollBoothId?: string;
         location?: {
@@ -19,6 +23,11 @@ export interface ITollTransaction extends Document {
         };
         vehicleType?: string;
         discountApplied?: number;
+        rfidDetected?: boolean;
+        processedAt?: Date;
+        gaslessTransaction?: boolean;
+        paymasterAddress?: string;
+        accountAbstractionWallet?: string;
     };
     createdAt: Date;
     updatedAt: Date;

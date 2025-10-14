@@ -6,6 +6,7 @@ exports.getContractBalance = getContractBalance;
 exports.getProvider = getProvider;
 exports.getTollCollectionContract = getTollCollectionContract;
 exports.getAnonAadhaarVerifierContract = getAnonAadhaarVerifierContract;
+exports.cleanupBlockchainConnection = cleanupBlockchainConnection;
 const ethers_1 = require("ethers");
 const TollTransaction_1 = require("../models/TollTransaction");
 const Vehicle_1 = require("../models/Vehicle");
@@ -29,6 +30,10 @@ const ANON_AADHAAR_VERIFIER_ABI = [
 let provider;
 let tollCollectionContract;
 let anonAadhaarVerifierContract;
+// Filter management
+let eventFilters = new Map();
+let pollingInterval = null;
+let isPolling = false;
 async function connectToBlockchain() {
     try {
         // Check if running in mock mode first
@@ -69,61 +74,167 @@ async function connectToBlockchain() {
         throw error;
     }
 }
-function setupEventListeners() {
-    // Listen for vehicle registration events
-    tollCollectionContract.on('VehicleRegistered', async (owner, vehicleId, timestamp, event) => {
-        console.log(`Vehicle registered: ${vehicleId} by ${owner}`);
+async function setupEventListeners() {
+    try {
+        // Create filters for each event type
+        const vehicleRegisteredFilter = await tollCollectionContract.filters.VehicleRegistered();
+        const tollPaidFilter = await tollCollectionContract.filters.TollPaid();
+        const vehicleBlacklistedFilter = await tollCollectionContract.filters.VehicleBlacklisted();
+        // Store filters for cleanup
+        eventFilters.set('VehicleRegistered', vehicleRegisteredFilter);
+        eventFilters.set('TollPaid', tollPaidFilter);
+        eventFilters.set('VehicleBlacklisted', vehicleBlacklistedFilter);
+        // Start polling for events
+        startEventPolling();
+        console.log('Event listeners setup with manual polling');
+    }
+    catch (error) {
+        console.error('Error setting up event listeners:', error);
+        throw error;
+    }
+}
+async function startEventPolling() {
+    if (isPolling) {
+        return; // Already polling
+    }
+    isPolling = true;
+    console.log('Starting event polling...');
+    // Poll every 5 seconds
+    pollingInterval = setInterval(async () => {
         try {
-            // Update local database
-            await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, {
-                vehicleId,
-                owner,
-                isActive: true,
-                isBlacklisted: false,
-                registrationTime: new Date(Number(timestamp) * 1000)
-            }, { upsert: true, new: true });
+            await pollForEvents();
         }
         catch (error) {
-            console.error('Error updating vehicle in database:', error);
+            console.error('Error during event polling:', error);
+            // If we get filter errors, recreate the filters
+            if (error instanceof Error && error.message.includes('filter not found')) {
+                console.log('Recreating filters due to filter not found error...');
+                await recreateFilters();
+            }
         }
-    });
-    // Listen for toll payment events
-    tollCollectionContract.on('TollPaid', async (payer, vehicleId, amount, tollId, zkProofHash, timestamp, event) => {
-        console.log(`Toll paid: ${amount} by ${payer} for vehicle ${vehicleId}`);
+    }, 5000);
+}
+async function pollForEvents() {
+    for (const [eventName, filter] of eventFilters) {
         try {
-            // Create transaction record
-            const transaction = new TollTransaction_1.TollTransaction({
-                transactionId: `toll_${tollId}`,
-                vehicleId,
-                payer,
-                amount: Number(ethers_1.ethers.formatEther(amount)),
-                zkProofHash,
-                status: 'confirmed',
-                blockchainTxHash: event.transactionHash,
-                blockNumber: event.blockNumber,
-                timestamp: new Date(Number(timestamp) * 1000)
-            });
-            await transaction.save();
-            // Update vehicle's last toll time
-            await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, { lastTollTime: new Date(Number(timestamp) * 1000) });
+            const events = await tollCollectionContract.queryFilter(filter);
+            for (const event of events) {
+                await processEvent(eventName, event);
+            }
         }
         catch (error) {
-            console.error('Error processing toll payment event:', error);
+            // Handle filter not found errors gracefully
+            if (error instanceof Error && error.message.includes('filter not found')) {
+                console.log(`Filter for ${eventName} not found, will recreate on next cycle`);
+                eventFilters.delete(eventName);
+            }
+            else {
+                console.error(`Error polling ${eventName} events:`, error);
+            }
         }
-    });
-    // Listen for vehicle blacklist events
-    tollCollectionContract.on('VehicleBlacklisted', async (vehicleId, isBlacklisted, timestamp, event) => {
-        console.log(`Vehicle ${vehicleId} blacklist status: ${isBlacklisted}`);
-        try {
-            await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, { isBlacklisted });
+    }
+}
+async function processEvent(eventName, event) {
+    try {
+        switch (eventName) {
+            case 'VehicleRegistered':
+                await handleVehicleRegistered(event);
+                break;
+            case 'TollPaid':
+                await handleTollPaid(event);
+                break;
+            case 'VehicleBlacklisted':
+                await handleVehicleBlacklisted(event);
+                break;
         }
-        catch (error) {
-            console.error('Error updating vehicle blacklist status:', error);
-        }
-    });
+    }
+    catch (error) {
+        console.error(`Error processing ${eventName} event:`, error);
+    }
+}
+async function handleVehicleRegistered(event) {
+    const [owner, vehicleId, timestamp] = event.args;
+    console.log(`Vehicle registered: ${vehicleId} by ${owner}`);
+    try {
+        await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, {
+            vehicleId,
+            owner,
+            isActive: true,
+            isBlacklisted: false,
+            registrationTime: new Date(Number(timestamp) * 1000)
+        }, { upsert: true, new: true });
+    }
+    catch (error) {
+        console.error('Error updating vehicle in database:', error);
+    }
+}
+async function handleTollPaid(event) {
+    const [payer, vehicleId, amount, tollId, zkProofHash, timestamp] = event.args;
+    console.log(`Toll paid: ${amount} by ${payer} for vehicle ${vehicleId}`);
+    try {
+        const transaction = new TollTransaction_1.TollTransaction({
+            transactionId: `toll_${tollId}`,
+            vehicleId,
+            payer,
+            amount: Number(ethers_1.ethers.formatEther(amount)),
+            zkProofHash,
+            status: 'confirmed',
+            blockchainTxHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            timestamp: new Date(Number(timestamp) * 1000)
+        });
+        await transaction.save();
+        await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, { lastTollTime: new Date(Number(timestamp) * 1000) });
+    }
+    catch (error) {
+        console.error('Error processing toll payment event:', error);
+    }
+}
+async function handleVehicleBlacklisted(event) {
+    const [vehicleId, isBlacklisted, timestamp] = event.args;
+    console.log(`Vehicle ${vehicleId} blacklist status: ${isBlacklisted}`);
+    try {
+        await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, { isBlacklisted });
+    }
+    catch (error) {
+        console.error('Error updating vehicle blacklist status:', error);
+    }
+}
+async function recreateFilters() {
+    try {
+        console.log('Recreating event filters...');
+        // Clear existing filters
+        eventFilters.clear();
+        // Recreate filters
+        const vehicleRegisteredFilter = await tollCollectionContract.filters.VehicleRegistered();
+        const tollPaidFilter = await tollCollectionContract.filters.TollPaid();
+        const vehicleBlacklistedFilter = await tollCollectionContract.filters.VehicleBlacklisted();
+        eventFilters.set('VehicleRegistered', vehicleRegisteredFilter);
+        eventFilters.set('TollPaid', tollPaidFilter);
+        eventFilters.set('VehicleBlacklisted', vehicleBlacklistedFilter);
+        console.log('Event filters recreated successfully');
+    }
+    catch (error) {
+        console.error('Error recreating filters:', error);
+    }
+}
+function stopEventPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+    isPolling = false;
+    eventFilters.clear();
+    console.log('Event polling stopped');
 }
 async function verifyAnonAadhaarProof(proof, publicInputs, userAddress) {
     try {
+        // Mock implementation for development/testing
+        if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
+            console.log('⚠️  Using mock anon-Aadhaar verification');
+            // Accept any proof that starts with '0x' and has valid format
+            return proof.startsWith('0x') && proof.length >= 10 && publicInputs.length >= 2;
+        }
         if (!anonAadhaarVerifierContract) {
             throw new Error('Anon-Aadhaar verifier contract not initialized');
         }
@@ -160,4 +271,19 @@ function getTollCollectionContract() {
 function getAnonAadhaarVerifierContract() {
     return anonAadhaarVerifierContract;
 }
+function cleanupBlockchainConnection() {
+    console.log('Cleaning up blockchain connection...');
+    stopEventPolling();
+}
+// Default export for the blockchain service
+const blockchainService = {
+    connectToBlockchain,
+    verifyAnonAadhaarProof,
+    getContractBalance,
+    getProvider,
+    getTollCollectionContract,
+    getAnonAadhaarVerifierContract,
+    cleanupBlockchainConnection
+};
+exports.default = blockchainService;
 //# sourceMappingURL=blockchainService.js.map

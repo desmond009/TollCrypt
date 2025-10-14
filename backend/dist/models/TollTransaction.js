@@ -64,6 +64,14 @@ const TollTransactionSchema = new mongoose_1.Schema({
         type: String,
         required: true
     },
+    tollLocation: {
+        type: String,
+        required: true
+    },
+    useGaslessTransaction: {
+        type: Boolean,
+        default: false
+    },
     status: {
         type: String,
         enum: ['pending', 'confirmed', 'failed', 'disputed'],
@@ -79,9 +87,15 @@ const TollTransactionSchema = new mongoose_1.Schema({
     gasUsed: {
         type: Number
     },
+    gasPrice: {
+        type: Number
+    },
     timestamp: {
         type: Date,
         default: Date.now
+    },
+    processedAt: {
+        type: Date
     },
     metadata: {
         tollBoothId: String,
@@ -90,7 +104,15 @@ const TollTransactionSchema = new mongoose_1.Schema({
             longitude: Number
         },
         vehicleType: String,
-        discountApplied: Number
+        discountApplied: Number,
+        rfidDetected: {
+            type: Boolean,
+            default: false
+        },
+        processedAt: Date,
+        gaslessTransaction: Boolean,
+        paymasterAddress: String,
+        accountAbstractionWallet: String
     }
 }, {
     timestamps: true
@@ -100,5 +122,7 @@ TollTransactionSchema.index({ vehicleId: 1, timestamp: -1 });
 TollTransactionSchema.index({ payer: 1, timestamp: -1 });
 TollTransactionSchema.index({ status: 1, timestamp: -1 });
 TollTransactionSchema.index({ zkProofHash: 1 });
+TollTransactionSchema.index({ tollLocation: 1 });
+TollTransactionSchema.index({ useGaslessTransaction: 1 });
 exports.TollTransaction = mongoose_1.default.model('TollTransaction', TollTransactionSchema);
 //# sourceMappingURL=TollTransaction.js.map

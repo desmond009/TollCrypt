@@ -25,7 +25,7 @@ export interface TopUpResult {
 export class TopUpWalletAPIService {
   private baseURL: string;
 
-  constructor(baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:3001') {
+  constructor(baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:3003') {
     this.baseURL = baseURL;
   }
 

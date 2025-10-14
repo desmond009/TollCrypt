@@ -5,6 +5,7 @@ export interface IAdminUser extends Document {
     name: string;
     role: 'super_admin' | 'admin' | 'operator' | 'viewer';
     isActive: boolean;
+    tollPlaza?: string;
     lastLogin?: Date;
     passwordResetToken?: string;
     passwordResetExpires?: Date;

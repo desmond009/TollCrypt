@@ -14,23 +14,37 @@ try {
   const factoryPrivateKey = process.env.FACTORY_PRIVATE_KEY;
   const tollCollectionPrivateKey = process.env.TOLL_COLLECTION_PRIVATE_KEY;
 
-  // Validate required environment variables
-  if (!factoryAddress || !tollCollectionAddress || !factoryPrivateKey || !tollCollectionPrivateKey) {
-    console.warn('⚠️  TopUp Wallet Service not initialized - missing required environment variables:');
-    if (!factoryAddress) console.warn('  - TOPUP_WALLET_FACTORY_ADDRESS');
-    if (!tollCollectionAddress) console.warn('  - TOPUP_TOLL_COLLECTION_CONTRACT_ADDRESS');
-    if (!factoryPrivateKey) console.warn('  - FACTORY_PRIVATE_KEY');
-    if (!tollCollectionPrivateKey) console.warn('  - TOLL_COLLECTION_PRIVATE_KEY');
-    console.warn('  TopUp Wallet routes will be disabled.');
-  } else {
-    topUpWalletService! = new TopUpWalletService(
+  // Check if running in mock mode
+  if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
+    console.log('⚠️  TopUp Wallet Service running in mock mode');
+    // Create a mock service that doesn't require blockchain contracts
+    topUpWalletService = new TopUpWalletService(
       rpcUrl,
-      factoryAddress,
-      tollCollectionAddress,
-      factoryPrivateKey,
-      tollCollectionPrivateKey
+      '0x0000000000000000000000000000000000000000', // Mock factory address
+      '0x0000000000000000000000000000000000000000', // Mock toll collection address
+      '0x0000000000000000000000000000000000000000000000000000000000000000', // Mock private key
+      '0x0000000000000000000000000000000000000000000000000000000000000000'  // Mock private key
     );
-    console.log('✅ TopUp Wallet Service initialized successfully');
+    console.log('✅ TopUp Wallet Service initialized in mock mode');
+  } else {
+    // Validate required environment variables for production
+    if (!factoryAddress || !tollCollectionAddress || !factoryPrivateKey || !tollCollectionPrivateKey) {
+      console.warn('⚠️  TopUp Wallet Service not initialized - missing required environment variables:');
+      if (!factoryAddress) console.warn('  - TOPUP_WALLET_FACTORY_ADDRESS');
+      if (!tollCollectionAddress) console.warn('  - TOPUP_TOLL_COLLECTION_CONTRACT_ADDRESS');
+      if (!factoryPrivateKey) console.warn('  - FACTORY_PRIVATE_KEY');
+      if (!tollCollectionPrivateKey) console.warn('  - TOLL_COLLECTION_PRIVATE_KEY');
+      console.warn('  TopUp Wallet routes will be disabled.');
+    } else {
+      topUpWalletService = new TopUpWalletService(
+        rpcUrl,
+        factoryAddress,
+        tollCollectionAddress,
+        factoryPrivateKey,
+        tollCollectionPrivateKey
+      );
+      console.log('✅ TopUp Wallet Service initialized successfully');
+    }
   }
 } catch (error) {
   console.error('❌ Failed to initialize TopUp Wallet Service:', error);

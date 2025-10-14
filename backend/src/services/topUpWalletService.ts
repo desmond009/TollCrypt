@@ -43,6 +43,7 @@ export class TopUpWalletService {
   private tollCollectionContract: ethers.Contract;
   private factoryWallet: ethers.Wallet;
   private tollCollectionWallet: ethers.Wallet;
+  private isMockMode: boolean;
 
   constructor(
     rpcUrl: string,
@@ -51,7 +52,21 @@ export class TopUpWalletService {
     factoryPrivateKey: string,
     tollCollectionPrivateKey: string
   ) {
-    // Validate inputs
+    // Check if running in mock mode
+    this.isMockMode = process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true';
+    
+    if (this.isMockMode) {
+      console.log('⚠️  TopUpWalletService running in mock mode');
+      // Initialize with mock values
+      this.provider = {} as ethers.Provider;
+      this.factoryContract = {} as ethers.Contract;
+      this.tollCollectionContract = {} as ethers.Contract;
+      this.factoryWallet = {} as ethers.Wallet;
+      this.tollCollectionWallet = {} as ethers.Wallet;
+      return;
+    }
+
+    // Validate inputs for production mode
     if (!factoryAddress || factoryAddress === '') {
       throw new Error('Factory address is required');
     }
@@ -99,6 +114,20 @@ export class TopUpWalletService {
    */
   async createTopUpWallet(userAddress: string): Promise<WalletCreationResult> {
     try {
+      if (this.isMockMode) {
+        // Mock implementation - create a fake wallet
+        console.log(`⚠️  Mock createTopUpWallet for ${userAddress}`);
+        const mockWallet = ethers.Wallet.createRandom();
+        const mockWalletAddress = mockWallet.address;
+        
+        return {
+          success: true,
+          walletAddress: mockWalletAddress,
+          privateKey: mockWallet.privateKey,
+          publicKey: mockWallet.publicKey
+        };
+      }
+
       // Check if user already has a wallet
       const existingWallet = await this.factoryContract.getUserTopUpWallet(userAddress);
       if (existingWallet !== ethers.ZeroAddress) {
@@ -202,6 +231,11 @@ export class TopUpWalletService {
    */
   async hasTopUpWallet(userAddress: string): Promise<boolean> {
     try {
+      if (this.isMockMode) {
+        // Mock implementation - return false for now (no wallet exists)
+        console.log(`⚠️  Mock hasTopUpWallet for ${userAddress}: false`);
+        return false;
+      }
       return await this.factoryContract.hasTopUpWallet(userAddress);
     } catch (error) {
       console.error('Error checking top-up wallet:', error);

@@ -65,6 +65,9 @@ const AdminUserSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true
     },
+    tollPlaza: {
+        type: String
+    },
     lastLogin: {
         type: Date
     },

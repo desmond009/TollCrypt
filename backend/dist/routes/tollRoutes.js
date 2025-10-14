@@ -8,69 +8,164 @@ const express_1 = __importDefault(require("express"));
 const TollTransaction_1 = require("../models/TollTransaction");
 const Vehicle_1 = require("../models/Vehicle");
 const blockchainService_1 = require("../services/blockchainService");
-const socketService_1 = require("../services/socketService");
 const router = express_1.default.Router();
 exports.tollRoutes = router;
-// Get toll transactions for a user
-router.get('/user/:address', async (req, res) => {
+// Anon-Aadhaar authentication endpoint
+router.post('/auth/anon-aadhaar', async (req, res) => {
     try {
-        const { address } = req.params;
-        const { page = 1, limit = 10, status } = req.query;
-        const query = { payer: address };
-        if (status)
-            query.status = status;
-        const transactions = await TollTransaction_1.TollTransaction.find(query)
-            .sort({ timestamp: -1 })
-            .limit(Number(limit) * 1)
-            .skip((Number(page) - 1) * Number(limit));
-        const total = await TollTransaction_1.TollTransaction.countDocuments(query);
+        const { aadhaarNumber, proof, publicInputs, userAddress } = req.body;
+        if (!aadhaarNumber || !proof || !publicInputs || !userAddress) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+        // Verify the anon-Aadhaar proof
+        const isValidProof = await (0, blockchainService_1.verifyAnonAadhaarProof)(proof, publicInputs, userAddress);
+        if (!isValidProof) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid anon-Aadhaar proof'
+            });
+        }
+        // Generate a session token for the authenticated user
+        const sessionToken = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         res.json({
-            transactions,
-            totalPages: Math.ceil(total / Number(limit)),
-            currentPage: Number(page),
-            total
+            success: true,
+            message: 'Anonymous Aadhaar authentication successful',
+            data: {
+                sessionToken,
+                userAddress,
+                authenticatedAt: new Date(),
+                proofHash: proof // In production, this would be a hash
+            }
         });
     }
     catch (error) {
-        console.error('Error fetching toll transactions:', error);
-        res.status(500).json({ error: 'Failed to fetch toll transactions' });
+        console.error('Anon-Aadhaar authentication error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Authentication failed'
+        });
     }
 });
-// Get toll transactions for a vehicle
-router.get('/vehicle/:vehicleId', async (req, res) => {
+// Vehicle registration with document verification
+router.post('/vehicle/register', async (req, res) => {
     try {
-        const { vehicleId } = req.params;
-        const { page = 1, limit = 10 } = req.query;
-        const transactions = await TollTransaction_1.TollTransaction.find({ vehicleId })
-            .sort({ timestamp: -1 })
-            .limit(Number(limit) * 1)
-            .skip((Number(page) - 1) * Number(limit));
-        const total = await TollTransaction_1.TollTransaction.countDocuments({ vehicleId });
-        res.json({
-            transactions,
-            totalPages: Math.ceil(total / Number(limit)),
-            currentPage: Number(page),
-            total
+        const { vehicleId, vehicleType, ownerAddress, documents, sessionToken } = req.body;
+        if (!vehicleId || !vehicleType || !ownerAddress || !documents || !sessionToken) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+        // Check if vehicle already exists
+        const existingVehicle = await Vehicle_1.Vehicle.findOne({ vehicleId });
+        if (existingVehicle) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vehicle already registered'
+            });
+        }
+        // Create new vehicle record
+        const vehicle = new Vehicle_1.Vehicle({
+            vehicleId,
+            vehicleType,
+            owner: ownerAddress,
+            documents: documents.map((doc) => ({
+                type: doc.type,
+                name: doc.name,
+                uploadedAt: new Date(),
+                verified: false // Would be verified by admin in production
+            })),
+            isActive: true,
+            isBlacklisted: false,
+            registrationTime: new Date(),
+            lastTollTime: null
+        });
+        await vehicle.save();
+        // Emit real-time update
+        emitVehicleRegistrationUpdate(req.app.get('io'), vehicle);
+        res.status(201).json({
+            success: true,
+            message: 'Vehicle registered successfully',
+            data: vehicle
         });
     }
     catch (error) {
-        console.error('Error fetching vehicle toll transactions:', error);
-        res.status(500).json({ error: 'Failed to fetch vehicle toll transactions' });
+        console.error('Vehicle registration error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Registration failed'
+        });
     }
 });
-// Process toll payment
+// Wallet top-up endpoint
+router.post('/wallet/topup', async (req, res) => {
+    try {
+        const { userAddress, amount, paymentMethod, sessionToken } = req.body;
+        if (!userAddress || !amount || !paymentMethod || !sessionToken) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+        // Validate amount
+        if (amount < 1 || amount > 10000) {
+            return res.status(400).json({
+                success: false,
+                message: 'Amount must be between ₹1 and ₹10,000'
+            });
+        }
+        // Generate transaction ID
+        const transactionId = `topup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // In a real implementation, this would integrate with payment gateways
+        // For now, we'll simulate a successful top-up
+        const topUpTransaction = {
+            transactionId,
+            userAddress,
+            amount,
+            currency: 'INR',
+            paymentMethod,
+            status: 'completed',
+            timestamp: new Date(),
+            blockchainTxHash: null // Would be set after blockchain transaction
+        };
+        // Emit real-time update
+        emitWalletTopUpUpdate(req.app.get('io'), topUpTransaction);
+        res.json({
+            success: true,
+            message: 'Wallet topped up successfully',
+            data: topUpTransaction
+        });
+    }
+    catch (error) {
+        console.error('Wallet top-up error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Top-up failed'
+        });
+    }
+});
+// Enhanced toll payment processing
 router.post('/pay', async (req, res) => {
     try {
-        const { vehicleId, payer, amount, zkProof, publicInputs, metadata } = req.body;
+        const { vehicleId, payer, amount, zkProof, publicInputs, tollLocation, useGasless, metadata } = req.body;
         // Verify ZK proof
         const isValidProof = await (0, blockchainService_1.verifyAnonAadhaarProof)(zkProof, publicInputs, payer);
         if (!isValidProof) {
-            return res.status(400).json({ error: 'Invalid ZK proof' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid ZK proof'
+            });
         }
         // Check if vehicle exists and is active
         const vehicle = await Vehicle_1.Vehicle.findOne({ vehicleId, isActive: true, isBlacklisted: false });
         if (!vehicle) {
-            return res.status(400).json({ error: 'Vehicle not found or not eligible for toll payment' });
+            return res.status(400).json({
+                success: false,
+                message: 'Vehicle not found or not eligible for toll payment'
+            });
         }
         // Generate transaction ID
         const transactionId = `toll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -81,49 +176,49 @@ router.post('/pay', async (req, res) => {
             payer,
             amount,
             currency: 'USDC',
-            zkProofHash: zkProof, // In production, this would be a hash of the proof
+            zkProofHash: zkProof,
+            tollLocation: tollLocation || 'Unknown',
+            useGaslessTransaction: useGasless || false,
             status: 'pending',
-            metadata
+            metadata: {
+                ...metadata,
+                processedAt: new Date(),
+                gaslessTransaction: useGasless
+            }
         });
         await transaction.save();
         // Emit real-time update
-        (0, socketService_1.emitTollPaymentUpdate)(req.app.get('io'), transaction);
-        res.status(201).json(transaction);
+        emitTollPaymentUpdate(req.app.get('io'), transaction);
+        res.status(201).json({
+            success: true,
+            message: 'Toll payment processed successfully',
+            data: transaction
+        });
     }
     catch (error) {
         console.error('Error processing toll payment:', error);
-        res.status(500).json({ error: 'Failed to process toll payment' });
+        res.status(500).json({
+            success: false,
+            message: 'Failed to process toll payment'
+        });
     }
 });
-// Get toll statistics
+// Get toll statistics for a user
 router.get('/stats/:address', async (req, res) => {
     try {
         const { address } = req.params;
-        const { period = '30d' } = req.query;
-        let startDate = new Date();
-        switch (period) {
-            case '7d':
-                startDate.setDate(startDate.getDate() - 7);
-                break;
-            case '30d':
-                startDate.setDate(startDate.getDate() - 30);
-                break;
-            case '90d':
-                startDate.setDate(startDate.getDate() - 90);
-                break;
-            case '1y':
-                startDate.setFullYear(startDate.getFullYear() - 1);
-                break;
-        }
+        // Get user's vehicles
+        const vehicles = await Vehicle_1.Vehicle.find({ owner: address, isActive: true });
+        const vehicleIds = vehicles.map(v => v.vehicleId);
+        // Get transaction statistics
         const totalTransactions = await TollTransaction_1.TollTransaction.countDocuments({
             payer: address,
-            timestamp: { $gte: startDate }
+            status: 'confirmed'
         });
-        const totalAmount = await TollTransaction_1.TollTransaction.aggregate([
+        const totalSpent = await TollTransaction_1.TollTransaction.aggregate([
             {
                 $match: {
                     payer: address,
-                    timestamp: { $gte: startDate },
                     status: 'confirmed'
                 }
             },
@@ -134,54 +229,140 @@ router.get('/stats/:address', async (req, res) => {
                 }
             }
         ]);
-        const statusBreakdown = await TollTransaction_1.TollTransaction.aggregate([
-            {
-                $match: {
-                    payer: address,
-                    timestamp: { $gte: startDate }
-                }
-            },
-            {
-                $group: {
-                    _id: '$status',
-                    count: { $sum: 1 }
-                }
-            }
-        ]);
+        const recentTransactions = await TollTransaction_1.TollTransaction.find({
+            payer: address
+        })
+            .sort({ timestamp: -1 })
+            .limit(10)
+            .select('transactionId vehicleId amount status timestamp tollLocation');
         res.json({
-            totalTransactions,
-            totalAmount: totalAmount[0]?.total || 0,
-            statusBreakdown: statusBreakdown.reduce((acc, item) => {
-                acc[item._id] = item.count;
-                return acc;
-            }, {})
+            success: true,
+            data: {
+                totalTransactions,
+                totalSpent: totalSpent[0]?.total || 0,
+                totalVehicles: vehicles.length,
+                recentTransactions
+            }
         });
     }
     catch (error) {
         console.error('Error fetching toll statistics:', error);
-        res.status(500).json({ error: 'Failed to fetch toll statistics' });
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch statistics'
+        });
     }
 });
-// Update transaction status (admin only)
-router.put('/:transactionId/status', async (req, res) => {
+// Get available toll locations
+router.get('/locations', async (req, res) => {
     try {
-        const { transactionId } = req.params;
-        const { status } = req.body;
-        const validStatuses = ['pending', 'confirmed', 'failed', 'disputed'];
-        if (!validStatuses.includes(status)) {
-            return res.status(400).json({ error: 'Invalid status' });
-        }
-        const transaction = await TollTransaction_1.TollTransaction.findOneAndUpdate({ transactionId }, { status }, { new: true });
-        if (!transaction) {
-            return res.status(404).json({ error: 'Transaction not found' });
-        }
-        // Emit real-time update
-        (0, socketService_1.emitTollPaymentUpdate)(req.app.get('io'), transaction);
-        res.json(transaction);
+        const tollLocations = [
+            {
+                id: 'delhi-mumbai',
+                name: 'Delhi-Mumbai Expressway',
+                amount: 150,
+                distance: '1,400 km',
+                coordinates: { lat: 28.6139, lng: 77.2090 }
+            },
+            {
+                id: 'bangalore-chennai',
+                name: 'Bangalore-Chennai Highway',
+                amount: 75,
+                distance: '350 km',
+                coordinates: { lat: 12.9716, lng: 77.5946 }
+            },
+            {
+                id: 'mumbai-pune',
+                name: 'Mumbai-Pune Expressway',
+                amount: 50,
+                distance: '150 km',
+                coordinates: { lat: 19.0760, lng: 72.8777 }
+            },
+            {
+                id: 'delhi-agra',
+                name: 'Delhi-Agra Yamuna Expressway',
+                amount: 25,
+                distance: '200 km',
+                coordinates: { lat: 28.6139, lng: 77.2090 }
+            }
+        ];
+        res.json({
+            success: true,
+            data: tollLocations
+        });
     }
     catch (error) {
-        console.error('Error updating transaction status:', error);
-        res.status(500).json({ error: 'Failed to update transaction status' });
+        console.error('Error fetching toll locations:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch toll locations'
+        });
     }
 });
+// RFID detection simulation endpoint
+router.post('/rfid/detect', async (req, res) => {
+    try {
+        const { vehicleId, tollBoothId, timestamp } = req.body;
+        // Simulate RFID detection
+        const detection = {
+            vehicleId,
+            tollBoothId,
+            timestamp: timestamp || new Date(),
+            detected: true,
+            signalStrength: Math.floor(Math.random() * 100),
+            distance: Math.floor(Math.random() * 50) + 10 // 10-60 meters
+        };
+        // Emit real-time RFID detection
+        emitRfidDetectionUpdate(req.app.get('io'), detection);
+        res.json({
+            success: true,
+            message: 'RFID detection recorded',
+            data: detection
+        });
+    }
+    catch (error) {
+        console.error('Error processing RFID detection:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to process RFID detection'
+        });
+    }
+});
+// Helper functions for real-time updates
+function emitTollPaymentUpdate(io, transaction) {
+    if (io) {
+        io.emit('toll_payment_update', {
+            type: 'toll_payment',
+            data: transaction,
+            timestamp: new Date()
+        });
+    }
+}
+function emitVehicleRegistrationUpdate(io, vehicle) {
+    if (io) {
+        io.emit('vehicle_registration_update', {
+            type: 'vehicle_registration',
+            data: vehicle,
+            timestamp: new Date()
+        });
+    }
+}
+function emitWalletTopUpUpdate(io, topUp) {
+    if (io) {
+        io.emit('wallet_topup_update', {
+            type: 'wallet_topup',
+            data: topUp,
+            timestamp: new Date()
+        });
+    }
+}
+function emitRfidDetectionUpdate(io, detection) {
+    if (io) {
+        io.emit('rfid_detection_update', {
+            type: 'rfid_detection',
+            data: detection,
+            timestamp: new Date()
+        });
+    }
+}
 //# sourceMappingURL=tollRoutes.js.map

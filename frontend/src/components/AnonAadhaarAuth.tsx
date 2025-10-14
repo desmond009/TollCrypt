@@ -47,10 +47,42 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
 
     try {
       const { proof, publicInputs } = await generateAnonAadhaarProof();
-      setIsAuthenticated(true);
-      onAuthSuccess(proof, publicInputs);
+      
+      // Send the proof to backend to get session token
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3003'}/api/tolls/auth/anon-aadhaar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          aadhaarNumber: aadhaarNumber,
+          proof: proof,
+          publicInputs: publicInputs,
+          userAddress: address
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Authentication failed' }));
+        onAuthError(errorData.message || 'Authentication failed');
+        return;
+      }
+
+      const authData = await response.json();
+      
+      if (authData.success) {
+        // Store the session token and user address for API calls
+        localStorage.setItem('sessionToken', authData.data.sessionToken);
+        localStorage.setItem('userAddress', authData.data.userAddress);
+        
+        setIsAuthenticated(true);
+        onAuthSuccess(proof, publicInputs);
+      } else {
+        onAuthError(authData.message || 'Authentication failed');
+      }
     } catch (error) {
-      onAuthError('Failed to generate anonymous Aadhaar proof');
+      console.error('Authentication error:', error);
+      onAuthError('Failed to authenticate with backend');
     }
   };
 
