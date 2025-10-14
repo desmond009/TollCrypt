@@ -1,83 +1,63 @@
 import { Router, Request, Response } from 'express';
-import { TopUpWalletService } from '../services/topUpWalletService';
+import { TopUpWalletService, getGlobalMockWallets, setGlobalMockWallet, hasGlobalMockWallet } from '../services/topUpWalletService';
 import { authenticateToken, authenticateSession } from '../middleware/auth';
 
 const router = Router();
 
-// Initialize the service with proper validation
-let topUpWalletService: TopUpWalletService | null = null;
-
-// Function to initialize the service
-function initializeService() {
-  if (topUpWalletService) return; // Already initialized
-  
+// Function to get the service instance
+function getService(): TopUpWalletService | null {
   try {
+    console.log('Getting service instance...');
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('MOCK_BLOCKCHAIN:', process.env.MOCK_BLOCKCHAIN);
+    
     const rpcUrl = process.env.RPC_URL || 'http://localhost:8545';
     const factoryAddress = process.env.TOPUP_WALLET_FACTORY_ADDRESS;
     const tollCollectionAddress = process.env.TOPUP_TOLL_COLLECTION_CONTRACT_ADDRESS;
     const factoryPrivateKey = process.env.FACTORY_PRIVATE_KEY;
     const tollCollectionPrivateKey = process.env.TOLL_COLLECTION_PRIVATE_KEY;
 
-    console.log('🔧 Environment variables:');
-    console.log('  NODE_ENV:', process.env.NODE_ENV);
-    console.log('  MOCK_BLOCKCHAIN:', process.env.MOCK_BLOCKCHAIN);
-    console.log('  RPC_URL:', rpcUrl);
-    console.log('  FACTORY_ADDRESS:', factoryAddress);
-    console.log('  TOLL_COLLECTION_ADDRESS:', tollCollectionAddress);
-
     // Check if running in mock mode
     if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
       console.log('⚠️  TopUp Wallet Service running in mock mode');
-      // Create a mock service that doesn't require blockchain contracts
-      topUpWalletService = new TopUpWalletService(
+      return TopUpWalletService.getInstance(
         rpcUrl,
         '0x0000000000000000000000000000000000000000', // Mock factory address
         '0x0000000000000000000000000000000000000000', // Mock toll collection address
         '0x0000000000000000000000000000000000000000000000000000000000000000', // Mock private key
         '0x0000000000000000000000000000000000000000000000000000000000000000'  // Mock private key
       );
-      console.log('✅ TopUp Wallet Service initialized in mock mode');
     } else {
-      console.log('🔧 Running in production mode');
       // Validate required environment variables for production
       if (!factoryAddress || !tollCollectionAddress || !factoryPrivateKey || !tollCollectionPrivateKey) {
-        console.warn('⚠️  TopUp Wallet Service not initialized - missing required environment variables:');
-        if (!factoryAddress) console.warn('  - TOPUP_WALLET_FACTORY_ADDRESS');
-        if (!tollCollectionAddress) console.warn('  - TOPUP_TOLL_COLLECTION_CONTRACT_ADDRESS');
-        if (!factoryPrivateKey) console.warn('  - FACTORY_PRIVATE_KEY');
-        if (!tollCollectionPrivateKey) console.warn('  - TOLL_COLLECTION_PRIVATE_KEY');
-        console.warn('  TopUp Wallet routes will be disabled.');
-      } else {
-        console.log('🔧 Creating production service...');
-        topUpWalletService = new TopUpWalletService(
-          rpcUrl,
-          factoryAddress,
-          tollCollectionAddress,
-          factoryPrivateKey,
-          tollCollectionPrivateKey
-        );
-        console.log('✅ TopUp Wallet Service initialized successfully');
+        console.warn('⚠️  TopUp Wallet Service not initialized - missing required environment variables');
+        return null;
       }
+      return TopUpWalletService.getInstance(
+        rpcUrl,
+        factoryAddress,
+        tollCollectionAddress,
+        factoryPrivateKey,
+        tollCollectionPrivateKey
+      );
     }
   } catch (error) {
     console.error('❌ Failed to initialize TopUp Wallet Service:', error);
-    console.error('❌ Error details:', error);
-    console.warn('  TopUp Wallet routes will be disabled.');
+    return null;
   }
 }
 
 // Helper function to check if service is available
-const checkServiceAvailable = (res: Response): boolean => {
-  // Initialize service if not already done
-  initializeService();
+const checkServiceAvailable = (res: Response): TopUpWalletService | null => {
+  const service = getService();
   
-  if (!topUpWalletService!) {
+  if (!service) {
     res.status(503).json({ 
       error: 'TopUp Wallet Service is not available. Please check configuration.' 
     });
-    return false;
+    return null;
   }
-  return true;
+  return service;
 };
 
 /**
@@ -87,7 +67,8 @@ const checkServiceAvailable = (res: Response): boolean => {
  */
 router.post('/create', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     
@@ -95,10 +76,22 @@ router.post('/create', authenticateSession, async (req: Request, res: Response) 
       return res.status(400).json({ error: 'User address not found' });
     }
 
-    const result = await topUpWalletService!!.createTopUpWallet(userAddress);
+    // Check if user already has a wallet in mock mode
+    if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
+      if (hasGlobalMockWallet(userAddress)) {
+        return res.status(400).json({ error: 'User already has a top-up wallet' });
+      }
+    }
+
+    const result = await service.createTopUpWallet(userAddress);
     
     if (!result.success) {
       return res.status(400).json({ error: result.error });
+    }
+
+    // Store the wallet in global storage for mock mode
+    if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true' && result.walletAddress) {
+      setGlobalMockWallet(userAddress, result.walletAddress);
     }
 
     res.json({
@@ -121,7 +114,8 @@ router.post('/create', authenticateSession, async (req: Request, res: Response) 
  */
 router.get('/info', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     
@@ -129,7 +123,7 @@ router.get('/info', authenticateSession, async (req: Request, res: Response) => 
       return res.status(400).json({ error: 'User address not found' });
     }
 
-    const walletInfo = await topUpWalletService!.getTopUpWalletInfo(userAddress);
+    const walletInfo = await service.getTopUpWalletInfo(userAddress);
     
     if (!walletInfo) {
       return res.status(404).json({ error: 'Top-up wallet not found' });
@@ -150,7 +144,8 @@ router.get('/info', authenticateSession, async (req: Request, res: Response) => 
  */
 router.get('/balance', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     
@@ -158,7 +153,7 @@ router.get('/balance', authenticateSession, async (req: Request, res: Response) 
       return res.status(400).json({ error: 'User address not found' });
     }
 
-    const balance = await topUpWalletService!.getTopUpWalletBalance(userAddress);
+    const balance = await service.getTopUpWalletBalance(userAddress);
     
     res.json({ balance });
 
@@ -175,7 +170,8 @@ router.get('/balance', authenticateSession, async (req: Request, res: Response) 
  */
 router.post('/topup', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     const { amount, signature } = req.body;
@@ -188,7 +184,7 @@ router.post('/topup', authenticateSession, async (req: Request, res: Response) =
       return res.status(400).json({ error: 'Amount and signature are required' });
     }
 
-    const txHash = await topUpWalletService!.processTopUp(userAddress, amount, signature);
+    const txHash = await service.processTopUp(userAddress, amount, signature);
     
     res.json({ success: true, transactionHash: txHash });
 
@@ -205,7 +201,8 @@ router.post('/topup', authenticateSession, async (req: Request, res: Response) =
  */
 router.post('/payment', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     const { vehicleId, amount, zkProofHash } = req.body;
@@ -218,7 +215,7 @@ router.post('/payment', authenticateSession, async (req: Request, res: Response)
       return res.status(400).json({ error: 'Vehicle ID, amount, and ZK proof hash are required' });
     }
 
-    const txHash = await topUpWalletService!.processTollPayment(
+    const txHash = await service.processTollPayment(
       userAddress,
       vehicleId,
       amount,
@@ -240,7 +237,8 @@ router.post('/payment', authenticateSession, async (req: Request, res: Response)
  */
 router.post('/withdraw', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     const { amount, signature } = req.body;
@@ -253,7 +251,7 @@ router.post('/withdraw', authenticateSession, async (req: Request, res: Response
       return res.status(400).json({ error: 'Amount and signature are required' });
     }
 
-    const txHash = await topUpWalletService!.withdrawFromTopUpWallet(userAddress, amount, signature);
+    const txHash = await service.withdrawFromTopUpWallet(userAddress, amount, signature);
     
     res.json({ success: true, transactionHash: txHash });
 
@@ -270,7 +268,8 @@ router.post('/withdraw', authenticateSession, async (req: Request, res: Response
  */
 router.get('/stats', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     
@@ -278,7 +277,7 @@ router.get('/stats', authenticateSession, async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'User address not found' });
     }
 
-    const stats = await topUpWalletService!.getWalletStats(userAddress);
+    const stats = await service.getWalletStats(userAddress);
     
     if (!stats) {
       return res.status(404).json({ error: 'Top-up wallet not found' });
@@ -299,7 +298,8 @@ router.get('/stats', authenticateSession, async (req: Request, res: Response) =>
  */
 router.get('/exists', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     
@@ -307,7 +307,16 @@ router.get('/exists', authenticateSession, async (req: Request, res: Response) =
       return res.status(400).json({ error: 'User address not found' });
     }
 
-    const exists = await topUpWalletService!.hasTopUpWallet(userAddress);
+    // Use global mock wallet storage for mock mode
+    if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
+      const exists = hasGlobalMockWallet(userAddress);
+      console.log(`Checking wallet existence for ${userAddress}: ${exists}`);
+      console.log('Global mock wallets:', Array.from(getGlobalMockWallets().entries()));
+      res.json({ exists });
+      return;
+    }
+
+    const exists = await service.hasTopUpWallet(userAddress);
     
     res.json({ exists });
 
@@ -324,7 +333,8 @@ router.get('/exists', authenticateSession, async (req: Request, res: Response) =
  */
 router.post('/signature/topup', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     const { amount, nonce, privateKey } = req.body;
@@ -337,7 +347,7 @@ router.post('/signature/topup', authenticateSession, async (req: Request, res: R
       return res.status(400).json({ error: 'Amount, nonce, and private key are required' });
     }
 
-    const signature = topUpWalletService!.createTopUpSignature(userAddress, amount, nonce, privateKey);
+    const signature = service.createTopUpSignature(userAddress, amount, nonce, privateKey);
     
     res.json({ signature });
 
@@ -354,7 +364,8 @@ router.post('/signature/topup', authenticateSession, async (req: Request, res: R
  */
 router.post('/signature/withdraw', authenticateSession, async (req: Request, res: Response) => {
   try {
-    if (!checkServiceAvailable(res)) return;
+    const service = checkServiceAvailable(res);
+    if (!service) return;
     
     const userAddress = req.user?.address;
     const { amount, nonce, privateKey } = req.body;
@@ -367,7 +378,7 @@ router.post('/signature/withdraw', authenticateSession, async (req: Request, res
       return res.status(400).json({ error: 'Amount, nonce, and private key are required' });
     }
 
-    const signature = topUpWalletService!.createWithdrawalSignature(userAddress, amount, nonce, privateKey);
+    const signature = service.createWithdrawalSignature(userAddress, amount, nonce, privateKey);
     
     res.json({ signature });
 

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./TopUpWallet.sol";
+import "./TollCollection.sol";
 
 /**
  * @title TopUpWalletFactory
@@ -69,6 +70,10 @@ contract TopUpWalletFactory is ReentrancyGuard, Ownable, Pausable {
         // Transfer ownership to the user
         newWallet.transferOwnership(user);
 
+        // Authorize the wallet in the toll collection contract
+        TollCollection tollCollection = TollCollection(tollCollectionContract);
+        tollCollection.authorizeTopUpWalletFromFactory(walletAddress);
+
         // Update mappings and arrays
         userToWallet[user] = walletAddress;
         isDeployedWallet[walletAddress] = true;
@@ -111,6 +116,10 @@ contract TopUpWalletFactory is ReentrancyGuard, Ownable, Pausable {
 
             // Transfer ownership to the user
             newWallet.transferOwnership(user);
+
+            // Authorize the wallet in the toll collection contract
+            TollCollection tollCollection = TollCollection(tollCollectionContract);
+            tollCollection.authorizeTopUpWalletFromFactory(walletAddress);
 
             // Update mappings and arrays
             userToWallet[user] = walletAddress;

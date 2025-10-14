@@ -1,1 +1,68 @@
+# Environment variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.example
+.env.bak
+
+# Foundry build artifacts
+out/
+cache/
+broadcast/
+
+# Dependencies
+lib/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary folders
+tmp/
+temp/
+
+# Backup files
+*.backup
+*.bak
+
+# Solidity
+*.sol.bak
+
+# Hardhat
+artifacts/
+typechain/
+typechain-types/
+
+# Truffle
+build/
+
+# Coverage reports
+coverage/
+coverage.json
+
+# Gas reports
+gas-report.txt
+
+# Deployment artifacts
+deployments/
+deployments.json
+
+# Test artifacts
+test-failures

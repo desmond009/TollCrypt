@@ -19,6 +19,9 @@ dist/
 build/
 out/
 
+# TypeScript
+*.tsbuildinfo
+
 # IDE and editor files
 .vscode/
 .idea/
@@ -52,9 +55,6 @@ coverage/
 # nyc test coverage
 .nyc_output
 
-# Dependency directories
-jspm_packages/
-
 # Optional npm cache directory
 .npm
 
@@ -70,30 +70,9 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
-
 # Temporary folders
 tmp/
 temp/
-
-# Docker
-.dockerignore
 
 # Database
 *.db
@@ -104,6 +83,14 @@ temp/
 *.backup
 *.bak
 
-# Hardware specific files
-*.hex
-*.bin
+# PM2
+.pm2/
+
+# Docker
+.dockerignore
+Dockerfile.dev
+
+# Testing
+test-results/
+playwright-report/
+playwright/.cache/

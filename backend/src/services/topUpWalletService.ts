@@ -18,7 +18,8 @@ const TOPUP_WALLET_ABI = [
 ];
 
 const TOLL_COLLECTION_TOPUP_ABI = [
-  "function authorizeTopUpWalletFromFactory(address topUpWallet) external"
+  "function authorizeTopUpWalletFromFactory(address topUpWallet) external",
+  "function setTopUpWalletAuthorization(address topUpWallet, bool isAuthorized) external"
 ];
 
 export interface TopUpWalletInfo {
@@ -35,6 +36,25 @@ export interface WalletCreationResult {
   privateKey?: string;
   publicKey?: string;
   error?: string;
+}
+
+// Global mock wallet storage to persist across service instances
+const globalMockWallets: Map<string, string> = new Map();
+
+// Global service instance
+let globalServiceInstance: TopUpWalletService | null = null;
+
+// Helper functions for global mock wallet management
+export function getGlobalMockWallets(): Map<string, string> {
+  return globalMockWallets;
+}
+
+export function setGlobalMockWallet(userAddress: string, walletAddress: string): void {
+  globalMockWallets.set(userAddress, walletAddress);
+}
+
+export function hasGlobalMockWallet(userAddress: string): boolean {
+  return globalMockWallets.has(userAddress);
 }
 
 export class TopUpWalletService {
@@ -113,21 +133,56 @@ export class TopUpWalletService {
   }
 
   /**
+   * Get singleton instance of TopUpWalletService
+   */
+  static getInstance(
+    rpcUrl?: string,
+    factoryAddress?: string,
+    tollCollectionAddress?: string,
+    factoryPrivateKey?: string,
+    tollCollectionPrivateKey?: string
+  ): TopUpWalletService {
+    if (!globalServiceInstance) {
+      console.log('Creating new TopUpWalletService instance');
+      if (!rpcUrl || !factoryAddress || !tollCollectionAddress || !factoryPrivateKey || !tollCollectionPrivateKey) {
+        throw new Error('Service parameters required for first initialization');
+      }
+      globalServiceInstance = new TopUpWalletService(
+        rpcUrl,
+        factoryAddress,
+        tollCollectionAddress,
+        factoryPrivateKey,
+        tollCollectionPrivateKey
+      );
+    } else {
+      console.log('Using existing TopUpWalletService instance');
+    }
+    return globalServiceInstance;
+  }
+
+  /**
    * Create a mock contract for development/testing
    */
   private createMockContract(): any {
     return {
       getUserTopUpWallet: async (userAddress: string) => {
-        // Return a mock wallet address for any user
-        return '0x' + userAddress.slice(2).padStart(40, '0');
+        // Check if user has a wallet in global storage for mock mode
+        return globalMockWallets.get(userAddress) || '0x0000000000000000000000000000000000000000';
       },
       hasUserTopUpWallet: async (userAddress: string) => {
-        // Always return true in mock mode
-        return true;
+        // Check global storage for mock wallet existence
+        const exists = globalMockWallets.has(userAddress);
+        console.log(`Checking wallet existence for ${userAddress}: ${exists}`);
+        console.log('Global mock wallets:', Array.from(globalMockWallets.entries()));
+        return exists;
       },
       deployTopUpWallet: async (userAddress: string) => {
-        // Return a mock wallet address
-        return '0x' + userAddress.slice(2).padStart(40, '0');
+        // Generate a mock wallet address and store it in global storage
+        const mockWalletAddress = '0x' + userAddress.slice(2).padStart(40, '0') + Math.random().toString(16).slice(2, 8);
+        globalMockWallets.set(userAddress, mockWalletAddress);
+        console.log(`Created mock wallet for ${userAddress}: ${mockWalletAddress}`);
+        console.log('Global mock wallets after creation:', Array.from(globalMockWallets.entries()));
+        return mockWalletAddress;
       }
     };
   }
@@ -196,7 +251,8 @@ export class TopUpWalletService {
       const privateKey = wallet.privateKey;
       const publicKey = wallet.publicKey;
 
-      // Authorize the wallet in toll collection contract
+      // Manually authorize the wallet in the toll collection contract
+      // This is needed because the factory address in the contract is incorrect
       await this.authorizeTopUpWallet(walletAddress);
 
       return {
@@ -224,7 +280,10 @@ export class TopUpWalletService {
     try {
       if (this.isMockMode) {
         // Mock implementation for development
-        const mockWalletAddress = '0x' + userAddress.slice(2).padStart(40, '0');
+        const mockWalletAddress = globalMockWallets.get(userAddress);
+        if (!mockWalletAddress) {
+          return null;
+        }
         return {
           walletAddress: mockWalletAddress,
           privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
@@ -270,7 +329,7 @@ export class TopUpWalletService {
     try {
       if (this.isMockMode) {
         // Mock implementation for development
-        return true;
+        return globalMockWallets.has(userAddress);
       }
       return await this.factoryContract.hasUserTopUpWallet(userAddress);
     } catch (error) {
@@ -286,6 +345,16 @@ export class TopUpWalletService {
    */
   async getTopUpWalletBalance(userAddress: string): Promise<string> {
     try {
+      if (this.isMockMode) {
+        // Mock implementation for development
+        const mockWalletAddress = globalMockWallets.get(userAddress);
+        if (!mockWalletAddress) {
+          return '0';
+        }
+        // Return a mock balance
+        return '0.0';
+      }
+
       const walletAddress = await this.factoryContract.getUserTopUpWallet(userAddress);
       
       if (walletAddress === ethers.ZeroAddress) {
@@ -319,6 +388,8 @@ export class TopUpWalletService {
       if (this.isMockMode) {
         // Mock implementation for development
         console.log(`Mock top-up: ${amount} ETH for user ${userAddress}`);
+        // In mock mode, we'll simulate a successful top-up
+        // The actual balance update should be handled by the frontend
         return '0x' + 'mock_tx_hash_' + Date.now().toString(16);
       }
 
@@ -428,7 +499,7 @@ export class TopUpWalletService {
    */
   private async authorizeTopUpWallet(walletAddress: string): Promise<void> {
     try {
-      const tx = await this.tollCollectionContract.authorizeTopUpWalletFromFactory(walletAddress);
+      const tx = await this.tollCollectionContract.setTopUpWalletAuthorization(walletAddress, true);
       await tx.wait();
     } catch (error) {
       console.error('Error authorizing top-up wallet:', error);
