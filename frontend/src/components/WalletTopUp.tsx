@@ -33,6 +33,7 @@ export const WalletTopUp: React.FC = () => {
   const [isCreatingWallet, setIsCreatingWallet] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [walletCreatedMessage, setWalletCreatedMessage] = useState<string>('');
+  const [copySuccess, setCopySuccess] = useState<string>('');
 
   // Get main wallet ETH balance
   const { data: ethBalance } = useBalance({
@@ -59,20 +60,77 @@ export const WalletTopUp: React.FC = () => {
 
   // Function to refresh balance from blockchain
   const refreshBalance = useCallback(async () => {
-    if (!address || !hasTopUpWallet) return;
+    if (!address || !hasTopUpWallet || !topUpWalletInfo) return;
     
     try {
+      // Try to get balance from blockchain first
+      if (topUpWalletInfo.walletAddress && topUpWalletInfo.walletAddress !== '0x0000000000000000000000000000000000000000') {
+        // Try multiple RPC endpoints for better reliability
+        const rpcEndpoints = [
+          process.env.REACT_APP_SEPOLIA_RPC_URL , // Public Infura endpoint
+        ];
+        
+        for (const rpcUrl of rpcEndpoints) {
+          try {
+            // Add timeout to prevent hanging requests
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
+            const response = await fetch(rpcUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'eth_getBalance',
+                params: [topUpWalletInfo.walletAddress, 'latest'],
+                id: 1
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+              const data = await response.json();
+              
+              if (data && data.result && !data.error) {
+                const balanceInWei = parseInt(data.result, 16);
+                const balanceInEth = balanceInWei / Math.pow(10, 18);
+                setFastagBalance(balanceInEth.toString());
+                console.log('Balance refreshed from blockchain:', balanceInEth, 'ETH');
+                return;
+              }
+            }
+          } catch (rpcError) {
+            console.warn(`RPC endpoint ${rpcUrl} failed:`, rpcError);
+            continue; // Try next endpoint
+          }
+        }
+        
+        console.warn('All RPC endpoints failed, falling back to API');
+      }
+      
+      // Fallback to API
       const balanceResponse = await topUpWalletAPI.getTopUpWalletBalance();
       setFastagBalance(balanceResponse.balance);
+      console.log('Balance refreshed from API:', balanceResponse.balance, 'ETH');
     } catch (error) {
       console.error('Error refreshing balance:', error);
+      // Fallback to API on error
+      try {
+        const balanceResponse = await topUpWalletAPI.getTopUpWalletBalance();
+        setFastagBalance(balanceResponse.balance);
+        console.log('Balance refreshed from API (fallback):', balanceResponse.balance, 'ETH');
+      } catch (apiError) {
+        console.error('API fallback also failed:', apiError);
+      }
     }
-  }, [address, hasTopUpWallet]);
+  }, [address, hasTopUpWallet, topUpWalletInfo]);
 
   // Check if user has a top-up wallet and load wallet info
-  // If no wallet exists, automatically create one for first-time users
+  // Only create wallet if user explicitly requests it
   useEffect(() => {
-    const checkAndCreateTopUpWallet = async () => {
+    const checkTopUpWallet = async () => {
       if (!address) return;
 
       // Check if user is authenticated (has session token and user address)
@@ -95,28 +153,10 @@ export const WalletTopUp: React.FC = () => {
           setTopUpWalletInfo(walletInfo);
           setFastagBalance(walletInfo.balance);
         } else {
-          // First-time user - automatically create wallet
-          console.log('First-time user detected, creating top-up wallet automatically...');
-          setIsCreatingWallet(true);
-          setErrorMessage('');
-          
-          try {
-            const walletInfo = await topUpWalletAPI.createTopUpWallet();
-            setTopUpWalletInfo(walletInfo);
-            setHasTopUpWallet(true);
-            setFastagBalance(walletInfo.balance);
-            
-            // Store private key securely (in a real app, you'd use a secure key management system)
-            localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
-            
-            console.log('Top-up wallet created successfully for first-time user');
-            setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
-          } catch (createError) {
-            console.error('Error creating top-up wallet for first-time user:', createError);
-            setErrorMessage(createError instanceof Error ? createError.message : 'Failed to create top-up wallet');
-          } finally {
-            setIsCreatingWallet(false);
-          }
+          // First-time user - show create wallet option but don't auto-create
+          setHasTopUpWallet(false);
+          setTopUpWalletInfo(null);
+          setFastagBalance('0');
         }
       } catch (error) {
         console.error('Error checking top-up wallet:', error);
@@ -124,7 +164,7 @@ export const WalletTopUp: React.FC = () => {
       }
     };
 
-    checkAndCreateTopUpWallet();
+    checkTopUpWallet();
   }, [address]);
 
   // Periodic balance refresh for existing users
@@ -141,13 +181,12 @@ export const WalletTopUp: React.FC = () => {
   // Handle successful crypto transaction
   useEffect(() => {
     if (isSuccess && paymentMethod === 'crypto' && selectedAmount) {
-      // Add the topped up amount to FASTag wallet balance
-      const newBalance = (parseFloat(fastagBalance) + parseFloat(selectedAmount)).toString();
-      setFastagBalance(newBalance);
+      // Refresh balance from blockchain after successful transaction
+      refreshBalance();
       setSelectedAmount(''); // Reset selected amount
       setIsProcessing(false);
     }
-  }, [isSuccess, paymentMethod, selectedAmount, fastagBalance]);
+  }, [isSuccess, paymentMethod, selectedAmount, refreshBalance]);
 
   const formatBalance = (balance: string) => {
     return parseFloat(balance).toFixed(6);
@@ -228,31 +267,22 @@ export const WalletTopUp: React.FC = () => {
           return;
         }
 
-        // For mock mode, we'll simulate the top-up by updating the local balance
-        // In production, this would be handled by the smart contract
+        // Real blockchain transaction - send ETH from user's wallet to top-up wallet
         try {
-          const result = await topUpWalletAPI.processTopUp(amount, 'mock_signature');
+          // Send transaction from user's wallet to top-up wallet
+          await sendTransaction({
+            to: topUpWalletInfo!.walletAddress as `0x${string}`,
+            value: parseEther(amount),
+          });
           
-          if (result.success) {
-            // Update the local balance to simulate the top-up
-            const newBalance = (parseFloat(fastagBalance) + parseFloat(amount)).toString();
-            setFastagBalance(newBalance);
-            localStorage.setItem(`fastag-balance-${address}`, newBalance);
-            
-            setSelectedAmount('');
-            alert(`Successfully topped up ${amount} ETH to your smart contract wallet!`);
-          } else {
-            setErrorMessage(result.error || 'Top-up failed');
-          }
+          // Transaction will be handled by the useEffect that watches for isSuccess
+          // No need to manually update balance here as it will be refreshed from blockchain
+          
         } catch (error) {
-          // If the API call fails, still update the local balance for mock mode
-          console.log('API call failed, updating local balance for mock mode');
-          const newBalance = (parseFloat(fastagBalance) + parseFloat(amount)).toString();
-          setFastagBalance(newBalance);
-          localStorage.setItem(`fastag-balance-${address}`, newBalance);
-          
+          console.error('Transaction failed:', error);
+          setErrorMessage(error instanceof Error ? error.message : 'Transaction failed');
+          setIsProcessing(false);
           setSelectedAmount('');
-          alert(`Successfully topped up ${amount} ETH to your smart contract wallet!`);
         }
         
       } else {
@@ -276,6 +306,18 @@ export const WalletTopUp: React.FC = () => {
   const handleCustomTopUp = () => {
     if (customAmount && parseFloat(customAmount) > 0) {
       handleTopUp(customAmount);
+    }
+  };
+
+  const copyToClipboard = async (text: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(`${type} copied to clipboard!`);
+      setTimeout(() => setCopySuccess(''), 3000);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      setCopySuccess('Failed to copy');
+      setTimeout(() => setCopySuccess(''), 3000);
     }
   };
 
@@ -330,14 +372,41 @@ export const WalletTopUp: React.FC = () => {
       {hasTopUpWallet && topUpWalletInfo && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-4">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <h3 className="text-lg font-semibold text-white mb-2">Smart Contract Wallet</h3>
-              <p className="text-green-200 text-sm">
-                Address: {topUpWalletInfo.walletAddress.slice(0, 10)}...{topUpWalletInfo.walletAddress.slice(-8)}
-              </p>
-              <p className="text-green-200 text-sm">
-                Status: {topUpWalletInfo.isInitialized ? 'Initialized' : 'Not Initialized'}
-              </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-green-200 text-sm">Address:</p>
+                  <code className="text-green-300 text-xs bg-green-800 px-2 py-1 rounded">
+                    {topUpWalletInfo.walletAddress.slice(0, 10)}...{topUpWalletInfo.walletAddress.slice(-8)}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(topUpWalletInfo.walletAddress, 'Wallet address')}
+                    className="text-green-400 hover:text-green-300 text-xs"
+                    title="Copy full address"
+                  >
+                    📋
+                  </button>
+                </div>
+                {topUpWalletInfo.publicKey && (
+                  <div className="flex items-center gap-2">
+                    <p className="text-green-200 text-sm">Public Key:</p>
+                    <code className="text-green-300 text-xs bg-green-800 px-2 py-1 rounded">
+                      {topUpWalletInfo.publicKey.slice(0, 10)}...{topUpWalletInfo.publicKey.slice(-8)}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(topUpWalletInfo.publicKey, 'Public key')}
+                      className="text-green-400 hover:text-green-300 text-xs"
+                      title="Copy full public key"
+                    >
+                      📋
+                    </button>
+                  </div>
+                )}
+                <p className="text-green-200 text-sm">
+                  Status: {topUpWalletInfo.isInitialized ? 'Initialized' : 'Not Initialized'}
+                </p>
+              </div>
             </div>
             <div className="bg-green-800 rounded-lg p-3">
               <svg className="w-8 h-8 text-green-400" fill="currentColor" viewBox="0 0 20 20">
@@ -356,6 +425,18 @@ export const WalletTopUp: React.FC = () => {
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
             </svg>
             <p className="text-green-300">{walletCreatedMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Copy Success Message */}
+      {copySuccess && (
+        <div className="bg-blue-900 border border-blue-700 rounded-lg p-4">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 text-blue-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+            </svg>
+            <p className="text-blue-300">{copySuccess}</p>
           </div>
         </div>
       )}
@@ -385,12 +466,17 @@ export const WalletTopUp: React.FC = () => {
               )}
             </div>
             <p className="text-2xl font-bold">{formatBalance(fastagBalance)} ETH</p>
-            <p className="text-sm opacity-80 mt-1">Sepolia ETH {hasTopUpWallet && '(On-Chain)'}</p>
-            <p className="text-xs opacity-60 mt-1">Your Main Wallet ETH: {ethBalance ? formatEther(ethBalance.value) : '0'} ETH</p>
+            <p className="text-sm opacity-80 mt-1">
+              Sepolia ETH {hasTopUpWallet && '(Real Blockchain)'}
+            </p>
+            <p className="text-xs opacity-60 mt-1">
+              Your Main Wallet ETH: {ethBalance ? formatEther(ethBalance.value) : '0'} ETH
+            </p>
             {hasTopUpWallet && topUpWalletInfo && (
-              <p className="text-xs opacity-60 mt-1">
-                Wallet Address: {topUpWalletInfo.walletAddress.slice(0, 6)}...{topUpWalletInfo.walletAddress.slice(-4)}
-              </p>
+              <div className="text-xs opacity-60 mt-1">
+                <p>Smart Contract: {topUpWalletInfo.walletAddress.slice(0, 6)}...{topUpWalletInfo.walletAddress.slice(-4)}</p>
+                <p className="text-green-300">✓ Connected to Sepolia Testnet</p>
+              </div>
             )}
           </div>
           <div className="bg-white bg-opacity-20 rounded-lg p-3">
@@ -597,7 +683,7 @@ export const WalletTopUp: React.FC = () => {
             </svg>
             <p className="text-blue-300">
               {paymentMethod === 'crypto' 
-                ? (hasTopUpWallet ? 'Processing smart contract wallet transaction...' : 'Processing crypto transaction...')
+                ? 'Signing transaction with MetaMask...'
                 : 'Processing payment...'
               }
             </p>
@@ -619,7 +705,7 @@ export const WalletTopUp: React.FC = () => {
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
             </svg>
             <p className="text-green-300">
-              {hasTopUpWallet ? 'Smart contract wallet top-up successful!' : 'Crypto top-up successful!'}
+              Transaction confirmed! ETH sent to your smart contract wallet on Sepolia testnet.
             </p>
           </div>
         </div>
