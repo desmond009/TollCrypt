@@ -67,10 +67,11 @@ export const WalletTopUp: React.FC = () => {
       if (topUpWalletInfo.walletAddress && topUpWalletInfo.walletAddress !== '0x0000000000000000000000000000000000000000') {
         // Try multiple RPC endpoints for better reliability
         const rpcEndpoints = [
-          process.env.REACT_APP_SEPOLIA_RPC_URL , // Public Infura endpoint
-        ];
+          process.env.REACT_APP_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+          'https://rpc.ankr.com/eth_sepolia'
+        ].filter(Boolean); // Remove any undefined values
         
-        for (const rpcUrl of rpcEndpoints) {
+        for (const rpcUrl of rpcEndpoints as string[]) {
           try {
             // Add timeout to prevent hanging requests
             const controller = new AbortController();
