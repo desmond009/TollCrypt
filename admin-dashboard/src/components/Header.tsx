@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BellIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { WalletConnector } from './WalletConnector';
 
 interface User {
   id: string;
@@ -42,6 +43,9 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications })
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* Wallet Connector */}
+            <WalletConnector />
+
             {/* Notifications */}
             <div className="relative">
               <button

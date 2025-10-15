@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config } from './config/wagmi';
+import './config/appkit'; // Initialize Web3Modal
 import { Dashboard } from './components/Dashboard';
 import { VehicleManagement } from './components/VehicleManagement';
 import { TransactionMonitoring } from './components/TransactionMonitoring';
@@ -11,18 +15,23 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
 import { useAuth } from './hooks/useAuth';
-import { useMetaMask } from './hooks/useMetaMask';
+import { useAccount } from 'wagmi';
 
-interface User {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-}
+// User interface is now defined in types/auth.ts
 
-function App() {
+const queryClient = new QueryClient();
+
+function AppContent() {
   const { user, isAuthenticated, logout } = useAuth();
-  const { account } = useMetaMask();
+  const { address } = useAccount();
+  
+  console.log('AppContent - isAuthenticated:', isAuthenticated, 'user:', user);
+  
+  // Monitor authentication state changes
+  useEffect(() => {
+    console.log('Authentication state changed:', { isAuthenticated, user: user?.email });
+  }, [isAuthenticated, user]);
+  
   const [socket, setSocket] = useState<Socket | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -106,7 +115,11 @@ function App() {
   };
 
   if (!isAuthenticated || !user) {
-    return <Login onLogin={() => {}} />;
+    return <Login onLogin={(userData) => {
+      // The useAuth hook should handle this automatically
+      // This callback is mainly for any additional logic if needed
+      console.log('Login successful:', userData);
+    }} />;
   }
 
   const renderContent = () => {
@@ -138,7 +151,7 @@ function App() {
           onTransactionComplete={handleTransactionComplete}
           onTransactionError={handleTransactionError}
           onCancel={handleCancelTransaction}
-          adminWallet={account?.address || ''}
+          adminWallet={address || ''}
         />
       );
     }
@@ -188,6 +201,16 @@ function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <AppContent />
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
 

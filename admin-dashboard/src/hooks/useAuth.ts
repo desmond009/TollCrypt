@@ -34,17 +34,25 @@ export const useAuth = () => {
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
+      console.log('useAuth login called with:', credentials);
       const response = await api.post('/auth/login', credentials);
+      console.log('API response:', response.data);
+      
       const { token, user: userData, expiresIn } = response.data.data;
       
       localStorage.setItem('authToken', token);
       localStorage.setItem('userData', JSON.stringify(userData));
       
+      console.log('Setting user data:', userData);
       setUser(userData);
       setIsAuthenticated(true);
       
+      // Force a small delay to ensure state updates
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       return response.data;
     } catch (error: any) {
+      console.error('Login error in useAuth:', error);
       throw new Error(error.response?.data?.message || 'Login failed');
     }
   }, []);

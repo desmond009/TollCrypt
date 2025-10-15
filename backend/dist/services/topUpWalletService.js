@@ -1,6 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TopUpWalletService = void 0;
+exports.getGlobalMockWallets = getGlobalMockWallets;
+exports.setGlobalMockWallet = setGlobalMockWallet;
+exports.hasGlobalMockWallet = hasGlobalMockWallet;
 const ethers_1 = require("ethers");
 // Contract ABIs for TopUp Wallet system
 const TOPUP_WALLET_FACTORY_ABI = [
@@ -18,12 +21,31 @@ const TOPUP_WALLET_ABI = [
     "function getWalletStats() external view returns (uint256 totalTopUps, uint256 totalTollPayments, uint256 totalWithdrawals, uint256 currentBalance)"
 ];
 const TOLL_COLLECTION_TOPUP_ABI = [
-    "function authorizeTopUpWalletFromFactory(address topUpWallet) external"
+    "function authorizeTopUpWalletFromFactory(address topUpWallet) external",
+    "function setTopUpWalletAuthorization(address topUpWallet, bool isAuthorized) external"
 ];
+// Global mock wallet storage to persist across service instances
+const globalMockWallets = new Map();
+// Global service instance
+let globalServiceInstance = null;
+// Helper functions for global mock wallet management
+function getGlobalMockWallets() {
+    return globalMockWallets;
+}
+function setGlobalMockWallet(userAddress, walletAddress) {
+    globalMockWallets.set(userAddress, walletAddress);
+}
+function hasGlobalMockWallet(userAddress) {
+    return globalMockWallets.has(userAddress);
+}
 class TopUpWalletService {
     constructor(rpcUrl, factoryAddress, tollCollectionAddress, factoryPrivateKey, tollCollectionPrivateKey) {
-        // Check if running in mock mode
-        this.isMockMode = process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true';
+        // Check if running in mock mode - be more flexible with detection
+        const isMockMode = process.env.NODE_ENV === 'development' &&
+            (process.env.MOCK_BLOCKCHAIN === 'true' ||
+                factoryAddress === '0x0000000000000000000000000000000000000000' ||
+                factoryPrivateKey === '0x0000000000000000000000000000000000000000000000000000000000000000');
+        this.isMockMode = isMockMode;
         if (this.isMockMode) {
             console.log('⚠️  TopUpWalletService running in mock mode');
             // Initialize with mock values
@@ -64,21 +86,44 @@ class TopUpWalletService {
         this.tollCollectionContract = new ethers_1.ethers.Contract(tollCollectionAddress, TOLL_COLLECTION_TOPUP_ABI, this.tollCollectionWallet);
     }
     /**
+     * Get singleton instance of TopUpWalletService
+     */
+    static getInstance(rpcUrl, factoryAddress, tollCollectionAddress, factoryPrivateKey, tollCollectionPrivateKey) {
+        if (!globalServiceInstance) {
+            console.log('Creating new TopUpWalletService instance');
+            if (!rpcUrl || !factoryAddress || !tollCollectionAddress || !factoryPrivateKey || !tollCollectionPrivateKey) {
+                throw new Error('Service parameters required for first initialization');
+            }
+            globalServiceInstance = new TopUpWalletService(rpcUrl, factoryAddress, tollCollectionAddress, factoryPrivateKey, tollCollectionPrivateKey);
+        }
+        else {
+            console.log('Using existing TopUpWalletService instance');
+        }
+        return globalServiceInstance;
+    }
+    /**
      * Create a mock contract for development/testing
      */
     createMockContract() {
         return {
             getUserTopUpWallet: async (userAddress) => {
-                // Return a mock wallet address for any user
-                return '0x' + userAddress.slice(2).padStart(40, '0');
+                // Check if user has a wallet in global storage for mock mode
+                return globalMockWallets.get(userAddress) || '0x0000000000000000000000000000000000000000';
             },
             hasUserTopUpWallet: async (userAddress) => {
-                // Always return true in mock mode
-                return true;
+                // Check global storage for mock wallet existence
+                const exists = globalMockWallets.has(userAddress);
+                console.log(`Checking wallet existence for ${userAddress}: ${exists}`);
+                console.log('Global mock wallets:', Array.from(globalMockWallets.entries()));
+                return exists;
             },
             deployTopUpWallet: async (userAddress) => {
-                // Return a mock wallet address
-                return '0x' + userAddress.slice(2).padStart(40, '0');
+                // Generate a mock wallet address and store it in global storage
+                const mockWalletAddress = '0x' + userAddress.slice(2).padStart(40, '0') + Math.random().toString(16).slice(2, 8);
+                globalMockWallets.set(userAddress, mockWalletAddress);
+                console.log(`Created mock wallet for ${userAddress}: ${mockWalletAddress}`);
+                console.log('Global mock wallets after creation:', Array.from(globalMockWallets.entries()));
+                return mockWalletAddress;
             }
         };
     }
@@ -137,7 +182,8 @@ class TopUpWalletService {
             const wallet = ethers_1.ethers.Wallet.createRandom();
             const privateKey = wallet.privateKey;
             const publicKey = wallet.publicKey;
-            // Authorize the wallet in toll collection contract
+            // Manually authorize the wallet in the toll collection contract
+            // This is needed because the factory address in the contract is incorrect
             await this.authorizeTopUpWallet(walletAddress);
             return {
                 success: true,
@@ -163,7 +209,10 @@ class TopUpWalletService {
         try {
             if (this.isMockMode) {
                 // Mock implementation for development
-                const mockWalletAddress = '0x' + userAddress.slice(2).padStart(40, '0');
+                const mockWalletAddress = globalMockWallets.get(userAddress);
+                if (!mockWalletAddress) {
+                    return null;
+                }
                 return {
                     walletAddress: mockWalletAddress,
                     privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
@@ -203,7 +252,7 @@ class TopUpWalletService {
         try {
             if (this.isMockMode) {
                 // Mock implementation for development
-                return true;
+                return globalMockWallets.has(userAddress);
             }
             return await this.factoryContract.hasUserTopUpWallet(userAddress);
         }
@@ -219,6 +268,15 @@ class TopUpWalletService {
      */
     async getTopUpWalletBalance(userAddress) {
         try {
+            if (this.isMockMode) {
+                // Mock implementation for development
+                const mockWalletAddress = globalMockWallets.get(userAddress);
+                if (!mockWalletAddress) {
+                    return '0';
+                }
+                // Return a mock balance
+                return '0.0';
+            }
             const walletAddress = await this.factoryContract.getUserTopUpWallet(userAddress);
             if (walletAddress === ethers_1.ethers.ZeroAddress) {
                 return '0';
@@ -244,6 +302,8 @@ class TopUpWalletService {
             if (this.isMockMode) {
                 // Mock implementation for development
                 console.log(`Mock top-up: ${amount} ETH for user ${userAddress}`);
+                // In mock mode, we'll simulate a successful top-up
+                // The actual balance update should be handled by the frontend
                 return '0x' + 'mock_tx_hash_' + Date.now().toString(16);
             }
             const walletAddress = await this.factoryContract.getUserTopUpWallet(userAddress);
@@ -321,7 +381,7 @@ class TopUpWalletService {
      */
     async authorizeTopUpWallet(walletAddress) {
         try {
-            const tx = await this.tollCollectionContract.authorizeTopUpWalletFromFactory(walletAddress);
+            const tx = await this.tollCollectionContract.setTopUpWalletAuthorization(walletAddress, true);
             await tx.wait();
         }
         catch (error) {

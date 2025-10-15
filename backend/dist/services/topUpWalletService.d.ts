@@ -12,6 +12,9 @@ export interface WalletCreationResult {
     publicKey?: string;
     error?: string;
 }
+export declare function getGlobalMockWallets(): Map<string, string>;
+export declare function setGlobalMockWallet(userAddress: string, walletAddress: string): void;
+export declare function hasGlobalMockWallet(userAddress: string): boolean;
 export declare class TopUpWalletService {
     private provider;
     private factoryContract;
@@ -20,6 +23,10 @@ export declare class TopUpWalletService {
     private tollCollectionWallet;
     private isMockMode;
     constructor(rpcUrl: string, factoryAddress: string, tollCollectionAddress: string, factoryPrivateKey: string, tollCollectionPrivateKey: string);
+    /**
+     * Get singleton instance of TopUpWalletService
+     */
+    static getInstance(rpcUrl?: string, factoryAddress?: string, tollCollectionAddress?: string, factoryPrivateKey?: string, tollCollectionPrivateKey?: string): TopUpWalletService;
     /**
      * Create a mock contract for development/testing
      */
