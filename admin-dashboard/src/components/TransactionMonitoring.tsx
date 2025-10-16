@@ -33,7 +33,7 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
       });
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/admin/transactions?${params}`
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/admin/transactions?${params}`
       );
       const data = await response.json();
       setTransactions(data.transactions);
@@ -52,7 +52,7 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
   const handleStatusUpdate = async (transactionId: string, newStatus: string) => {
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/tolls/${transactionId}/status`,
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/tolls/${transactionId}/status`,
         {
           method: 'PUT',
           headers: {

@@ -50,7 +50,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ socket }) => {
   const fetchAnalytics = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/admin/analytics?period=${period}`
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/admin/analytics?period=${period}`
       );
       const analyticsData = await response.json();
       setData(analyticsData);

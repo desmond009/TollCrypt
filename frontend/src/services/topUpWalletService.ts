@@ -33,7 +33,7 @@ export class TopUpWalletAPIService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseURL}/api/topup-wallet${endpoint}`;
+    const url = `${this.baseURL}/topup-wallet${endpoint}`;
     
     // Get session token and user address from localStorage
     let sessionToken = localStorage.getItem('sessionToken');
