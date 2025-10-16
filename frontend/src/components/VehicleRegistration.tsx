@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { vehicleAPIService, VehicleRegistrationData } from '../services/vehicleAPIService';
+import { topUpWalletAPI, TopUpWalletInfo } from '../services/topUpWalletService';
 
 // Contract addresses from deployment
 const TOLL_COLLECTION_ADDRESS = (process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291') as `0x${string}`;
@@ -33,6 +35,9 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
   const [vehicleType, setVehicleType] = useState('');
   const [documents, setDocuments] = useState<VehicleDocument[]>([]);
   const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+  const [isCreatingTopUpWallet, setIsCreatingTopUpWallet] = useState(false);
+  const [topUpWalletInfo, setTopUpWalletInfo] = useState<TopUpWalletInfo | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { writeContract, data: hash, error, isPending } = useWriteContract();
@@ -41,27 +46,90 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
     hash,
   });
 
-  // Reset form after successful registration and notify parent
+  // Reset form after successful registration and create top-up wallet
   useEffect(() => {
     if (isSuccess) {
-      const vehicleData = {
-        vehicleId,
-        vehicleType,
-        registrationDate: new Date().toISOString(),
-        documents: documents.map(doc => doc.name),
-        isActive: true
+      const createTopUpWallet = async () => {
+        setIsCreatingTopUpWallet(true);
+        setErrorMessage('');
+
+        try {
+          // Ensure session token and user address are set
+          let sessionToken = localStorage.getItem('sessionToken');
+          let userAddress = localStorage.getItem('userAddress');
+          
+          if (!sessionToken || !userAddress) {
+            // Generate session token if not exists
+            if (!sessionToken) {
+              sessionToken = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              localStorage.setItem('sessionToken', sessionToken);
+            }
+            
+            // Set user address if not exists
+            if (!userAddress) {
+              localStorage.setItem('userAddress', address!);
+            }
+          }
+
+          // Create top-up wallet
+          const walletInfo = await topUpWalletAPI.createTopUpWallet();
+          setTopUpWalletInfo(walletInfo);
+          
+          // Store private key securely
+          localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
+          
+          // Store vehicle data in backend database
+          const backendVehicleData: VehicleRegistrationData = {
+            vehicleId,
+            vehicleType,
+            owner: address!,
+            documents: documents.map(doc => ({
+              type: doc.type,
+              name: doc.name,
+              uploadedAt: new Date()
+            })),
+            metadata: {
+              // Add any additional metadata if needed
+            }
+          };
+
+          // Register vehicle in backend database
+          const response = await vehicleAPIService.registerVehicle(backendVehicleData);
+          if (response.success) {
+            console.log('Vehicle registered in database successfully');
+          } else {
+            console.error('Failed to register vehicle in database:', response.error);
+          }
+
+          const vehicleData = {
+            vehicleId,
+            vehicleType,
+            registrationDate: new Date().toISOString(),
+            documents: documents.map(doc => doc.name),
+            isActive: true,
+            topUpWalletAddress: walletInfo.walletAddress,
+            topUpWalletBalance: walletInfo.balance
+          };
+          
+          setVehicleId('');
+          setVehicleType('');
+          setDocuments([]);
+          
+          // Notify parent component about successful registration
+          if (onRegistrationSuccess) {
+            onRegistrationSuccess(vehicleData);
+          }
+        } catch (error) {
+          console.error('Error creating top-up wallet:', error);
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to create top-up wallet');
+        } finally {
+          setIsCreatingTopUpWallet(false);
+        }
       };
-      
-      setVehicleId('');
-      setVehicleType('');
-      setDocuments([]);
-      
-      // Notify parent component about successful registration
-      if (onRegistrationSuccess) {
-        onRegistrationSuccess(vehicleData);
-      }
+
+      createTopUpWallet();
     }
-  }, [isSuccess, onRegistrationSuccess, vehicleId, vehicleType, documents]);
+  }, [isSuccess, onRegistrationSuccess, vehicleId, vehicleType, documents, address]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -207,45 +275,46 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
         
         <button
           type="submit"
-          disabled={isPending || isConfirming || documents.length === 0}
+          disabled={isPending || isConfirming || isCreatingTopUpWallet || documents.length === 0}
           className="btn-primary w-full flex items-center justify-center"
         >
-          {isPending || isConfirming ? (
+          {isPending || isConfirming || isCreatingTopUpWallet ? (
             <>
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Creating FASTag Wallet...
+              {isCreatingTopUpWallet ? 'Creating Top-up Wallet...' : 'Registering Vehicle...'}
             </>
           ) : (
             <>
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd"/>
               </svg>
-              Generate FASTag Wallet
+              Register Vehicle & Create Top-up Wallet
             </>
           )}
         </button>
       </form>
 
-      {error && (
+      {(error || errorMessage) && (
         <div className="bg-red-900 border border-red-700 rounded-lg p-4">
           <p className="text-sm text-red-300">
-            Error: {error.message}
+            Error: {error?.message || errorMessage}
           </p>
         </div>
       )}
 
-      {isSuccess && (
+      {isSuccess && topUpWalletInfo && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-4">
           <div className="flex items-center">
             <svg className="w-6 h-6 text-green-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
             </svg>
             <div>
-              <p className="text-green-300 font-semibold">FASTag Wallet Created Successfully!</p>
+              <p className="text-green-300 font-semibold">Vehicle Registered & Top-up Wallet Created Successfully!</p>
               <p className="text-green-400 text-sm">Your vehicle is now registered and ready for contactless payments</p>
+              <p className="text-green-400 text-xs mt-1">Top-up Wallet: {topUpWalletInfo.walletAddress}</p>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import express from 'express';
 import { TollTransaction } from '../models/TollTransaction';
 import { Vehicle } from '../models/Vehicle';
 import { verifyAnonAadhaarProof } from '../services/blockchainService';
+import { getSocketService } from '../services/socketInstance';
 
 const router = express.Router();
 
@@ -90,8 +91,13 @@ router.post('/vehicle/register', async (req, res) => {
 
     await vehicle.save();
 
-    // Emit real-time update
-    emitVehicleRegistrationUpdate(req.app.get('io'), vehicle);
+    // Broadcast to admin dashboard
+    try {
+      const socketService = getSocketService();
+      await socketService.broadcastVehicleRegistration(vehicle);
+    } catch (socketError) {
+      console.error('Error broadcasting vehicle registration:', socketError);
+    }
 
     res.status(201).json({
       success: true,
@@ -208,8 +214,19 @@ router.post('/pay', async (req, res) => {
     
     await transaction.save();
     
-    // Emit real-time update
-    emitTollPaymentUpdate(req.app.get('io'), transaction);
+    // Update vehicle's last toll time
+    await Vehicle.findOneAndUpdate(
+      { vehicleId },
+      { lastTollTime: new Date() }
+    );
+    
+    // Broadcast to admin dashboard
+    try {
+      const socketService = getSocketService();
+      await socketService.broadcastNewTransaction(transaction);
+    } catch (socketError) {
+      console.error('Error broadcasting new transaction:', socketError);
+    }
     
     res.status(201).json({
       success: true,

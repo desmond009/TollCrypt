@@ -1,5 +1,6 @@
 import { useAccount } from 'wagmi';
 import { useCallback } from 'react';
+import { vehicleAPIService } from './vehicleAPIService';
 
 export interface UserSession {
   walletAddress: string;
@@ -108,6 +109,10 @@ class SessionManager {
 
     session.lastActivity = Date.now();
     this.saveSession(session);
+    
+    // Sync with backend database
+    this.syncWithBackend(session.walletAddress, session.vehicles);
+    
     return true;
   }
 
@@ -132,6 +137,10 @@ class SessionManager {
       session.vehicles[vehicleIndex] = { ...session.vehicles[vehicleIndex], ...updates };
       session.lastActivity = Date.now();
       this.saveSession(session);
+      
+      // Sync with backend database
+      this.syncWithBackend(session.walletAddress, session.vehicles);
+      
       return true;
     }
     return false;
@@ -192,6 +201,15 @@ class SessionManager {
   // Generate a simple session token
   private generateSessionToken(): string {
     return `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Sync session data with backend database
+  private async syncWithBackend(walletAddress: string, vehicles: VehicleInfo[]): Promise<void> {
+    try {
+      await vehicleAPIService.syncSessionWithBackend(walletAddress, vehicles);
+    } catch (error) {
+      console.error('Error syncing with backend:', error);
+    }
   }
 
   // Get vehicles for current session

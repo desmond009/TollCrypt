@@ -14,8 +14,10 @@ import { TransactionProcessor } from './components/TransactionProcessor';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
+import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { useAuth } from './hooks/useAuth';
 import { useAccount } from 'wagmi';
+import { useRealtime } from './hooks/useRealtime';
 
 // User interface is now defined in types/auth.ts
 
@@ -38,6 +40,9 @@ function AppContent() {
   const [isScanning, setIsScanning] = useState(false);
   const [scannedQRData, setScannedQRData] = useState<any>(null);
   const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
+
+  // Initialize real-time functionality
+  const { data: realtimeData, isConnected: isRealtimeConnected } = useRealtime(user?.id, user?.role);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -200,6 +205,11 @@ function AppContent() {
           {renderContent()}
         </main>
       </div>
+      
+      {/* Real-time Notifications */}
+      {isAuthenticated && user && (
+        <RealtimeNotifications adminId={user.id} role={user.role} />
+      )}
     </div>
   );
 }

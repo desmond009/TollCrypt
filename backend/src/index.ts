@@ -8,7 +8,8 @@ import { Server } from 'socket.io';
 import mongoose from 'mongoose';
 
 import { connectToBlockchain, cleanupBlockchainConnection } from './services/blockchainService';
-import { setupSocketHandlers } from './services/socketService';
+import SocketService from './services/socketService';
+import { setSocketService } from './services/socketInstance';
 import { vehicleRoutes } from './routes/vehicleRoutes';
 import { tollRoutes } from './routes/tollRoutes';
 import { adminRoutes } from './routes/adminRoutes';
@@ -22,26 +23,10 @@ dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: [
-      process.env.FRONTEND_URL || "http://localhost:3000",
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:3002",
-      "http://127.0.0.1:3002"
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type", 
-      "Authorization",
-      "X-Session-Token",
-      "X-User-Address"
-    ],
-    credentials: true
-  },
-  allowEIO3: true
-});
+
+// Initialize Socket.IO service
+const socketService = new SocketService(server);
+setSocketService(socketService);
 
 const PORT = process.env.PORT || 3001 || 3003 || 3004;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tollchain';
@@ -155,9 +140,7 @@ async function startServer() {
       }
     }
 
-    // Setup Socket.IO handlers
-    setupSocketHandlers(io);
-    console.log('Socket.IO handlers configured');
+    console.log('Socket.IO service initialized');
 
     // Start server
     server.listen(PORT, () => {

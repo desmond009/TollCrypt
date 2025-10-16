@@ -2,7 +2,12 @@ import express from 'express';
 import { TollTransaction } from '../models/TollTransaction';
 import { Vehicle } from '../models/Vehicle';
 import { AdminUser } from '../models/AdminUser';
+import { TollPlaza } from '../models/TollPlaza';
+import { Notification } from '../models/Notification';
+import { AuditLog } from '../models/AuditLog';
+import { Dispute } from '../models/Dispute';
 import { getContractBalance } from '../services/blockchainService';
+import { getSocketService } from '../services/socketInstance';
 
 const router = express.Router();
 
@@ -132,15 +137,47 @@ router.get('/vehicles', async (req, res) => {
     
     const total = await Vehicle.countDocuments(query);
     
+    // Transform vehicles data to match admin dashboard format
+    const transformedVehicles = vehicles.map(vehicle => {
+      // Calculate transaction stats for this vehicle
+      const totalTransactions = 0; // This would need to be calculated from TollTransaction model
+      const totalAmount = 0; // This would need to be calculated from TollTransaction model
+      const currentBalance = 0; // This would need to be calculated from wallet balance
+      
+      return {
+        id: (vehicle._id as any).toString(),
+        vehicleId: vehicle.vehicleId,
+        vehicleType: vehicle.vehicleType,
+        owner: vehicle.owner,
+        ownerHash: vehicle.owner.slice(0, 8) + '...' + vehicle.owner.slice(-8), // Simple hash for display
+        walletAddress: vehicle.fastagWalletAddress || vehicle.owner,
+        isActive: vehicle.isActive,
+        isBlacklisted: vehicle.isBlacklisted,
+        registrationDate: vehicle.registrationTime.toISOString(),
+        lastTransactionDate: vehicle.lastTollTime?.toISOString(),
+        totalTransactions,
+        totalAmount,
+        currentBalance,
+        status: vehicle.isBlacklisted ? 'blacklisted' : 
+                vehicle.isActive ? 'active' : 'inactive',
+        documents: vehicle.documents || [],
+        metadata: vehicle.metadata || {}
+      };
+    });
+    
     res.json({
-      vehicles,
+      success: true,
+      data: transformedVehicles,
       totalPages: Math.ceil(total / Number(limit)),
       currentPage: Number(page),
       total
     });
   } catch (error) {
     console.error('Error fetching vehicles:', error);
-    res.status(500).json({ error: 'Failed to fetch vehicles' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch vehicles' 
+    });
   }
 });
 
@@ -187,13 +224,23 @@ router.put('/vehicles/:vehicleId/blacklist', async (req, res) => {
     );
     
     if (!vehicle) {
-      return res.status(404).json({ error: 'Vehicle not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Vehicle not found' 
+      });
     }
     
-    res.json(vehicle);
+    res.json({
+      success: true,
+      data: vehicle,
+      message: `Vehicle ${isBlacklisted ? 'blacklisted' : 'removed from blacklist'} successfully`
+    });
   } catch (error) {
     console.error('Error updating vehicle blacklist status:', error);
-    res.status(500).json({ error: 'Failed to update vehicle blacklist status' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update vehicle blacklist status' 
+    });
   }
 });
 
@@ -281,6 +328,243 @@ router.get('/analytics', async (req, res) => {
   } catch (error) {
     console.error('Error fetching analytics:', error);
     res.status(500).json({ error: 'Failed to fetch analytics data' });
+  }
+});
+
+// Get all toll plazas
+router.get('/plazas', async (req, res) => {
+  try {
+    const plazas = await TollPlaza.find().sort({ createdAt: -1 });
+    res.json({
+      success: true,
+      data: plazas
+    });
+  } catch (error) {
+    console.error('Error fetching plazas:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch plazas' 
+    });
+  }
+});
+
+// Create new toll plaza
+router.post('/plazas', async (req, res) => {
+  try {
+    const { name, location, coordinates, tollRates, operatingHours, assignedOperators } = req.body;
+    
+    const plaza = new TollPlaza({
+      id: `plaza_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      location,
+      coordinates,
+      tollRates,
+      operatingHours,
+      assignedOperators: assignedOperators || []
+    });
+    
+    await plaza.save();
+    
+    // Broadcast to all admins
+    try {
+      const socketService = getSocketService();
+      socketService.emitToAdmins('plaza:created', plaza);
+    } catch (socketError) {
+      console.error('Error broadcasting plaza creation:', socketError);
+    }
+    
+    res.status(201).json({
+      success: true,
+      data: plaza,
+      message: 'Plaza created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating plaza:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to create plaza' 
+    });
+  }
+});
+
+// Get notifications
+router.get('/notifications', async (req, res) => {
+  try {
+    const { adminId, role, limit = 50, unreadOnly = false } = req.query;
+    
+    let query: any = {};
+    
+    if (adminId) {
+      query.$or = [
+        { recipientId: adminId },
+        { recipientRole: role }
+      ];
+    } else if (role) {
+      query.recipientRole = role;
+    }
+    
+    if (unreadOnly === 'true') {
+      query.isRead = false;
+    }
+    
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+    
+    res.json({
+      success: true,
+      data: notifications
+    });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch notifications' 
+    });
+  }
+});
+
+// Mark notification as read
+router.put('/notifications/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const notification = await Notification.findByIdAndUpdate(
+      id,
+      { isRead: true, readAt: new Date() },
+      { new: true }
+    );
+    
+    if (!notification) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Notification not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: notification,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to mark notification as read' 
+    });
+  }
+});
+
+// Get disputes
+router.get('/disputes', async (req, res) => {
+  try {
+    const { status, assignedTo, page = 1, limit = 20 } = req.query;
+    
+    let query: any = {};
+    if (status) query.status = status;
+    if (assignedTo) query.assignedTo = assignedTo;
+    
+    const disputes = await Dispute.find(query)
+      .sort({ createdAt: -1 })
+      .limit(Number(limit) * 1)
+      .skip((Number(page) - 1) * Number(limit))
+      .populate('transactionId', 'transactionId amount timestamp')
+      .populate('vehicleId', 'vehicleId vehicleType owner');
+    
+    const total = await Dispute.countDocuments(query);
+    
+    res.json({
+      success: true,
+      data: disputes,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching disputes:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch disputes' 
+    });
+  }
+});
+
+// Update dispute status
+router.put('/disputes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, resolution, assignedTo } = req.body;
+    
+    const updateData: any = { status };
+    if (resolution) updateData.resolution = resolution;
+    if (assignedTo) updateData.assignedTo = assignedTo;
+    if (status === 'resolved' || status === 'rejected') {
+      updateData.resolvedAt = new Date();
+    }
+    
+    const dispute = await Dispute.findByIdAndUpdate(id, updateData, { new: true });
+    
+    if (!dispute) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Dispute not found' 
+      });
+    }
+    
+    // Broadcast update to admins
+    try {
+      const socketService = getSocketService();
+      socketService.emitToAdmins('dispute:updated', dispute);
+    } catch (socketError) {
+      console.error('Error broadcasting dispute update:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      data: dispute,
+      message: 'Dispute updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating dispute:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update dispute' 
+    });
+  }
+});
+
+// Get audit logs
+router.get('/audit-logs', async (req, res) => {
+  try {
+    const { adminId, action, resource, page = 1, limit = 50 } = req.query;
+    
+    let query: any = {};
+    if (adminId) query.adminId = adminId;
+    if (action) query.action = action;
+    if (resource) query.resource = resource;
+    
+    const logs = await AuditLog.find(query)
+      .sort({ timestamp: -1 })
+      .limit(Number(limit) * 1)
+      .skip((Number(page) - 1) * Number(limit))
+      .populate('adminId', 'name email role');
+    
+    const total = await AuditLog.countDocuments(query);
+    
+    res.json({
+      success: true,
+      data: logs,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch audit logs' 
+    });
   }
 });
 
