@@ -195,9 +195,16 @@ async function handleTollPaid(event: any) {
   console.log(`Toll paid: ${amount} by ${payer} for vehicle ${vehicleId}`);
   
   try {
+    // Find the vehicle to get its ObjectId
+    const vehicle = await Vehicle.findOne({ vehicleId });
+    if (!vehicle) {
+      console.error(`Vehicle not found: ${vehicleId}`);
+      return;
+    }
+    
     const transaction = new TollTransaction({
       transactionId: `toll_${tollId}`,
-      vehicleId,
+      vehicleId: vehicle._id,
       payer,
       amount: Number(ethers.formatEther(amount)),
       zkProofHash,

@@ -1,8 +1,8 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface ITollTransaction extends Document {
   transactionId: string;
-  vehicleId: string;
+  vehicleId: Types.ObjectId;
   payer: string;
   amount: number;
   currency: string;
@@ -42,7 +42,8 @@ const TollTransactionSchema = new Schema<ITollTransaction>({
     index: true
   },
   vehicleId: {
-    type: String,
+    type: Schema.Types.ObjectId,
+    ref: 'Vehicle',
     required: true,
     index: true
   },

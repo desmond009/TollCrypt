@@ -119,7 +119,7 @@ export class SocketService {
       const notification = new Notification({
         type: 'transaction',
         title: 'New Toll Transaction',
-        message: `Vehicle ${populatedTransaction?.vehicleId?.vehicleId} paid ₹${transaction.amount}`,
+        message: `Vehicle ${(populatedTransaction?.vehicleId as any)?.vehicleId} paid ₹${transaction.amount}`,
         recipientRole: 'admin',
         priority: 'medium',
         metadata: {

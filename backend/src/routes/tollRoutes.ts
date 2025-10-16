@@ -197,7 +197,7 @@ router.post('/pay', async (req, res) => {
     // Create transaction record
     const transaction = new TollTransaction({
       transactionId,
-      vehicleId,
+      vehicleId: vehicle._id,
       payer,
       amount,
       currency: 'USDC',

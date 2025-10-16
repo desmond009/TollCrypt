@@ -95,7 +95,7 @@ async function seedDatabase() {
           start: '00:00',
           end: '23:59'
         },
-        assignedOperators: [createdAdmins[2]._id.toString()],
+        assignedOperators: [(createdAdmins[2] as any)._id.toString()],
         todayTransactions: 0,
         todayRevenue: 0
       },

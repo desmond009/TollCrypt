@@ -1,6 +1,6 @@
 import express from 'express';
 import { Vehicle } from '../models/Vehicle';
-import { emitSystemAlert } from '../services/socketService';
+import { getSocketService } from '../services/socketInstance';
 
 const router = express.Router();
 
@@ -22,11 +22,12 @@ router.post('/scan', async (req, res) => {
     
     if (!vehicle) {
       // Emit alert for unregistered vehicle
-      emitSystemAlert(req.app.get('io'), {
-        type: 'unregistered_vehicle',
-        message: `Unregistered vehicle detected: ${vehicleId}`,
-        severity: 'warning'
-      });
+      const socketService = getSocketService();
+      await socketService.broadcastSystemAlert(
+        'Unregistered Vehicle Detected',
+        `Unregistered vehicle detected: ${vehicleId}`,
+        'medium'
+      );
       
       return res.status(404).json({ 
         error: 'Vehicle not registered or not eligible',
@@ -97,11 +98,18 @@ router.post('/alert', async (req, res) => {
     const { type, message, severity, tollBoothId, metadata } = req.body;
     
     // Emit system alert
-    emitSystemAlert(req.app.get('io'), {
+    const socketService = getSocketService();
+    const priorityMap: { [key: string]: 'low' | 'medium' | 'high' | 'critical' } = {
+      'info': 'low',
+      'warning': 'medium',
+      'error': 'high',
+      'critical': 'critical'
+    };
+    await socketService.broadcastSystemAlert(
       type,
-      message: `${tollBoothId ? `[${tollBoothId}] ` : ''}${message}`,
-      severity: severity || 'info'
-    });
+      `${tollBoothId ? `[${tollBoothId}] ` : ''}${message}`,
+      priorityMap[severity] || 'medium'
+    );
     
     res.json({
       success: true,
