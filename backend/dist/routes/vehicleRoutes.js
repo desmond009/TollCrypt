@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.vehicleRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const Vehicle_1 = require("../models/Vehicle");
-const blockchainService_1 = require("../services/blockchainService");
+const socketInstance_1 = require("../services/socketInstance");
 const router = express_1.default.Router();
 exports.vehicleRoutes = router;
 // Get all vehicles for a user
@@ -39,12 +39,7 @@ router.get('/:vehicleId', async (req, res) => {
 // Register a new vehicle
 router.post('/register', async (req, res) => {
     try {
-        const { vehicleId, owner, zkProof, publicInputs } = req.body;
-        // Verify ZK proof
-        const isValidProof = await (0, blockchainService_1.verifyAnonAadhaarProof)(zkProof, publicInputs, owner);
-        if (!isValidProof) {
-            return res.status(400).json({ error: 'Invalid ZK proof' });
-        }
+        const { vehicleId, vehicleType, owner, documents, metadata } = req.body;
         // Check if vehicle already exists
         const existingVehicle = await Vehicle_1.Vehicle.findOne({ vehicleId });
         if (existingVehicle) {
@@ -53,17 +48,35 @@ router.post('/register', async (req, res) => {
         // Create new vehicle
         const vehicle = new Vehicle_1.Vehicle({
             vehicleId,
+            vehicleType,
             owner,
+            documents: documents || [],
+            metadata: metadata || {},
             isActive: true,
             isBlacklisted: false,
             registrationTime: new Date()
         });
         await vehicle.save();
-        res.status(201).json(vehicle);
+        // Broadcast to admin dashboard
+        try {
+            const socketService = (0, socketInstance_1.getSocketService)();
+            await socketService.broadcastVehicleRegistration(vehicle);
+        }
+        catch (socketError) {
+            console.error('Error broadcasting vehicle registration:', socketError);
+        }
+        res.status(201).json({
+            success: true,
+            data: vehicle,
+            message: 'Vehicle registered successfully'
+        });
     }
     catch (error) {
         console.error('Error registering vehicle:', error);
-        res.status(500).json({ error: 'Failed to register vehicle' });
+        res.status(500).json({
+            success: false,
+            error: 'Failed to register vehicle'
+        });
     }
 });
 // Update vehicle information
@@ -110,14 +123,82 @@ router.get('/stats/:address', async (req, res) => {
         const activeVehicles = await Vehicle_1.Vehicle.countDocuments({ owner: address, isActive: true });
         const blacklistedVehicles = await Vehicle_1.Vehicle.countDocuments({ owner: address, isBlacklisted: true });
         res.json({
-            totalVehicles,
-            activeVehicles,
-            blacklistedVehicles
+            success: true,
+            data: {
+                totalVehicles,
+                activeVehicles,
+                blacklistedVehicles
+            }
         });
     }
     catch (error) {
         console.error('Error fetching vehicle stats:', error);
-        res.status(500).json({ error: 'Failed to fetch vehicle statistics' });
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch vehicle statistics'
+        });
+    }
+});
+// Sync session data with backend
+router.post('/sync', async (req, res) => {
+    try {
+        const { userAddress, vehicles } = req.body;
+        if (!userAddress || !vehicles || !Array.isArray(vehicles)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid request data'
+            });
+        }
+        const syncedVehicles = [];
+        for (const vehicle of vehicles) {
+            try {
+                // Check if vehicle exists
+                const existingVehicle = await Vehicle_1.Vehicle.findOne({ vehicleId: vehicle.vehicleId });
+                if (existingVehicle) {
+                    // Update existing vehicle
+                    const updatedVehicle = await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId: vehicle.vehicleId }, {
+                        vehicleType: vehicle.vehicleType,
+                        isActive: vehicle.isActive,
+                        lastActivity: new Date()
+                    }, { new: true });
+                    syncedVehicles.push(updatedVehicle);
+                }
+                else {
+                    // Create new vehicle
+                    const newVehicle = new Vehicle_1.Vehicle({
+                        vehicleId: vehicle.vehicleId,
+                        vehicleType: vehicle.vehicleType,
+                        owner: userAddress,
+                        documents: vehicle.documents ? vehicle.documents.map((doc) => ({
+                            type: 'rc',
+                            name: doc,
+                            uploadedAt: new Date(),
+                            verified: false
+                        })) : [],
+                        isActive: vehicle.isActive || true,
+                        isBlacklisted: false,
+                        registrationTime: new Date(vehicle.registrationDate || Date.now())
+                    });
+                    await newVehicle.save();
+                    syncedVehicles.push(newVehicle);
+                }
+            }
+            catch (vehicleError) {
+                console.error(`Error syncing vehicle ${vehicle.vehicleId}:`, vehicleError);
+            }
+        }
+        res.json({
+            success: true,
+            data: syncedVehicles,
+            message: `Synced ${syncedVehicles.length} vehicles`
+        });
+    }
+    catch (error) {
+        console.error('Error syncing vehicles:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to sync vehicles'
+        });
     }
 });
 //# sourceMappingURL=vehicleRoutes.js.map

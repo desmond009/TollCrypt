@@ -2,6 +2,7 @@ import express from 'express';
 import { TollTransaction } from '../models/TollTransaction';
 import { Vehicle } from '../models/Vehicle';
 import { verifyAnonAadhaarProof } from '../services/blockchainService';
+import { anonAadhaarService } from '../services/anonAadhaarService';
 import { getSocketService } from '../services/socketInstance';
 
 const router = express.Router();
@@ -18,18 +19,30 @@ router.post('/auth/anon-aadhaar', async (req, res) => {
       });
     }
 
-    // Verify the anon-Aadhaar proof
-    const isValidProof = await verifyAnonAadhaarProof(proof, publicInputs, userAddress);
+    // Verify the anon-Aadhaar proof using the new service
+    const verificationResult = await anonAadhaarService.verifyProof(proof, publicInputs, userAddress);
     
-    if (!isValidProof) {
+    if (!verificationResult.isValid) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Invalid anon-Aadhaar proof' 
+        message: verificationResult.error || 'Invalid anon-Aadhaar proof' 
       });
     }
 
     // Generate a session token for the authenticated user
     const sessionToken = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create or update user record
+    try {
+      await anonAadhaarService.createOrUpdateUser(
+        userAddress, 
+        verificationResult.aadhaarHash, 
+        sessionToken
+      );
+    } catch (userError) {
+      console.error('Error creating/updating user:', userError);
+      // Continue with authentication even if user creation fails
+    }
     
     res.json({
       success: true,
@@ -38,7 +51,7 @@ router.post('/auth/anon-aadhaar', async (req, res) => {
         sessionToken,
         userAddress,
         authenticatedAt: new Date(),
-        proofHash: proof // In production, this would be a hash
+        aadhaarHash: verificationResult.aadhaarHash
       }
     });
 

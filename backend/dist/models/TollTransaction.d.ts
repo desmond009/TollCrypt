@@ -1,7 +1,7 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose, { Document, Types } from 'mongoose';
 export interface ITollTransaction extends Document {
     transactionId: string;
-    vehicleId: string;
+    vehicleId: Types.ObjectId;
     payer: string;
     amount: number;
     currency: string;

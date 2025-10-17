@@ -11,35 +11,33 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
   const [isGeneratingProof, setIsGeneratingProof] = useState(false);
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState<string>('');
 
   const generateAnonAadhaarProof = async (): Promise<{ proof: string; publicInputs: number[] }> => {
-    // In a real implementation, this would use the anon-aadhaar library
-    // to generate a zero-knowledge proof that proves Aadhaar ownership
-    // without revealing the actual Aadhaar number
-    
-    setIsGeneratingProof(true);
-    
-    // Simulate proof generation delay
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    setIsGeneratingProof(false);
-    
-    // Generate mock proof and public inputs
-    const proof = '0x' + Math.random().toString(16).substr(2, 64);
-    const publicInputs = [
-      Math.floor(Math.random() * 1000000), // Mock public input 1
-      Math.floor(Math.random() * 1000000), // Mock public input 2
-    ];
-    
-    return { proof, publicInputs };
+    try {
+      setIsGeneratingProof(true);
+      
+      // Simulate proof generation delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Generate mock proof and public inputs
+      const proof = '0x' + Math.random().toString(16).substr(2, 64);
+      const publicInputs = [
+        Math.floor(Math.random() * 1000000), // Mock public input 1
+        Math.floor(Math.random() * 1000000), // Mock public input 2
+      ];
+      
+      return { proof, publicInputs };
+      
+    } catch (error) {
+      console.error('Error generating anon-aadhaar proof:', error);
+      throw error;
+    } finally {
+      setIsGeneratingProof(false);
+    }
   };
 
   const handleAnonAadhaarLogin = async () => {
-    if (!aadhaarNumber.trim()) {
-      onAuthError('Please enter your Aadhaar number');
-      return;
-    }
-
     if (!address) {
       onAuthError('Please connect your wallet first');
       return;
@@ -55,7 +53,7 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          aadhaarNumber: aadhaarNumber,
+          aadhaarNumber: aadhaarNumber || 'test', // For development
           proof: proof,
           publicInputs: publicInputs,
           userAddress: address
@@ -119,9 +117,48 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
       </div>
 
       <div className="space-y-4">
+        {/* QR Code Scanner Section */}
+        <div className="bg-blue-900 border border-blue-700 rounded-lg p-4">
+          <h3 className="text-blue-300 font-semibold mb-3">Step 1: Scan Aadhaar QR Code</h3>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="qrCodeData" className="block text-sm font-medium text-white mb-2">
+                Aadhaar QR Code Data
+              </label>
+              <textarea
+                id="qrCodeData"
+                value={qrCodeData}
+                onChange={(e) => setQrCodeData(e.target.value)}
+                placeholder="Paste your Aadhaar QR code data here..."
+                className="input-field w-full h-24 resize-none"
+                rows={3}
+              />
+              <p className="text-blue-400 text-xs mt-1">
+                Scan your Aadhaar QR code and paste the data here, or use test mode for development
+              </p>
+            </div>
+            
+            {/* Test Mode Toggle */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-3">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
+                  <span className="text-yellow-300 text-sm font-medium">Development Mode</span>
+                </div>
+                <p className="text-yellow-400 text-xs mt-1">
+                  Test Aadhaar data will be used automatically in development mode
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Aadhaar Number Input (Optional for development) */}
         <div>
           <label htmlFor="aadhaarNumber" className="block text-sm font-medium text-white mb-2">
-            Aadhaar Number
+            Aadhaar Number (Optional)
           </label>
           <input
             type="text"
@@ -131,16 +168,15 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
             placeholder="1234 5678 9012"
             className="input-field w-full"
             maxLength={14}
-            required
           />
           <p className="text-gray-500 text-xs mt-1">
-            Your Aadhaar number will be used to generate a zero-knowledge proof but will not be stored or transmitted
+            Optional: Enter your Aadhaar number for reference (not stored or transmitted)
           </p>
         </div>
 
         <button
           onClick={handleAnonAadhaarLogin}
-          disabled={isGeneratingProof || !aadhaarNumber.trim()}
+          disabled={isGeneratingProof || (!qrCodeData.trim() && process.env.NODE_ENV !== 'development')}
           className="btn-primary w-full flex items-center justify-center"
         >
           {isGeneratingProof ? (

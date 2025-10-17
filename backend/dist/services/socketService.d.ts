@@ -1,11 +1,19 @@
-import { Server } from 'socket.io';
-export declare function setupSocketHandlers(io: Server): void;
-export declare function emitTollPaymentUpdate(io: Server, transaction: any): void;
-export declare function emitVehicleRegistrationUpdate(io: Server, vehicle: any): void;
-export declare function emitVehicleBlacklistUpdate(io: Server, vehicleId: string, isBlacklisted: boolean): void;
-export declare function emitSystemAlert(io: Server, alert: {
-    type: string;
-    message: string;
-    severity: 'info' | 'warning' | 'error';
-}): void;
+import { Server as HTTPServer } from 'http';
+export declare class SocketService {
+    private io;
+    private adminRooms;
+    constructor(server: HTTPServer);
+    private setupSocketHandlers;
+    emitToAdmins(event: string, data: any): void;
+    emitToAdmin(adminId: string, event: string, data: any): void;
+    emitToUser(userId: string, event: string, data: any): void;
+    emitToRole(role: string, event: string, data: any): void;
+    broadcastNewTransaction(transaction: any): Promise<void>;
+    broadcastVehicleRegistration(vehicle: any): Promise<void>;
+    broadcastVehicleBlacklist(vehicle: any, isBlacklisted: boolean): Promise<void>;
+    broadcastSystemAlert(title: string, message: string, priority?: 'low' | 'medium' | 'high' | 'critical'): Promise<void>;
+    getConnectedAdminCount(): number;
+    getConnectedAdmins(): string[];
+}
+export default SocketService;
 //# sourceMappingURL=socketService.d.ts.map

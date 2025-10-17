@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.hardwareRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const Vehicle_1 = require("../models/Vehicle");
-const socketService_1 = require("../services/socketService");
+const socketInstance_1 = require("../services/socketInstance");
 const router = express_1.default.Router();
 exports.hardwareRoutes = router;
 // Handle RFID/QR code scan
@@ -24,11 +24,8 @@ router.post('/scan', async (req, res) => {
         });
         if (!vehicle) {
             // Emit alert for unregistered vehicle
-            (0, socketService_1.emitSystemAlert)(req.app.get('io'), {
-                type: 'unregistered_vehicle',
-                message: `Unregistered vehicle detected: ${vehicleId}`,
-                severity: 'warning'
-            });
+            const socketService = (0, socketInstance_1.getSocketService)();
+            await socketService.broadcastSystemAlert('Unregistered Vehicle Detected', `Unregistered vehicle detected: ${vehicleId}`, 'medium');
             return res.status(404).json({
                 error: 'Vehicle not registered or not eligible',
                 vehicleId,
@@ -90,11 +87,14 @@ router.post('/alert', async (req, res) => {
     try {
         const { type, message, severity, tollBoothId, metadata } = req.body;
         // Emit system alert
-        (0, socketService_1.emitSystemAlert)(req.app.get('io'), {
-            type,
-            message: `${tollBoothId ? `[${tollBoothId}] ` : ''}${message}`,
-            severity: severity || 'info'
-        });
+        const socketService = (0, socketInstance_1.getSocketService)();
+        const priorityMap = {
+            'info': 'low',
+            'warning': 'medium',
+            'error': 'high',
+            'critical': 'critical'
+        };
+        await socketService.broadcastSystemAlert(type, `${tollBoothId ? `[${tollBoothId}] ` : ''}${message}`, priorityMap[severity] || 'medium');
         res.json({
             success: true,
             message: 'Alert processed'

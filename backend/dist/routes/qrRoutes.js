@@ -126,7 +126,7 @@ router.post('/qr/payment', async (req, res) => {
         }
         // Create toll transaction record
         const tollTransaction = new TollTransaction_1.TollTransaction({
-            vehicleId: vehicle.vehicleId,
+            vehicleId: vehicle._id,
             vehicleType: vehicle.vehicleType,
             owner: walletAddress,
             amount: tollRate || 0.001,

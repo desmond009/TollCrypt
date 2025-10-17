@@ -8,10 +8,10 @@ const cors_1 = __importDefault(require("cors"));
 const morgan_1 = __importDefault(require("morgan"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const http_1 = require("http");
-const socket_io_1 = require("socket.io");
 const mongoose_1 = __importDefault(require("mongoose"));
 const blockchainService_1 = require("./services/blockchainService");
-const socketService_1 = require("./services/socketService");
+const socketService_1 = __importDefault(require("./services/socketService"));
+const socketInstance_1 = require("./services/socketInstance");
 const vehicleRoutes_1 = require("./routes/vehicleRoutes");
 const tollRoutes_1 = require("./routes/tollRoutes");
 const adminRoutes_1 = require("./routes/adminRoutes");
@@ -23,26 +23,9 @@ const topUpWalletRoutes_1 = __importDefault(require("./routes/topUpWalletRoutes"
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
-const io = new socket_io_1.Server(server, {
-    cors: {
-        origin: [
-            process.env.FRONTEND_URL || "http://localhost:3000",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:3002",
-            "http://127.0.0.1:3002"
-        ],
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: [
-            "Content-Type",
-            "Authorization",
-            "X-Session-Token",
-            "X-User-Address"
-        ],
-        credentials: true
-    },
-    allowEIO3: true
-});
+// Initialize Socket.IO service
+const socketService = new socketService_1.default(server);
+(0, socketInstance_1.setSocketService)(socketService);
 const PORT = process.env.PORT || 3001 || 3003 || 3004;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tollchain';
 // Middleware - Temporarily disable helmet to test CORS
@@ -144,9 +127,7 @@ async function startServer() {
                 throw error;
             }
         }
-        // Setup Socket.IO handlers
-        (0, socketService_1.setupSocketHandlers)(io);
-        console.log('Socket.IO handlers configured');
+        console.log('Socket.IO service initialized');
         // Start server
         server.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);

@@ -34,6 +34,17 @@ let anonAadhaarVerifierContract;
 let eventFilters = new Map();
 let pollingInterval = null;
 let isPolling = false;
+let lastProcessedBlock = 0;
+const MAX_BLOCK_RANGE = 10; // Alchemy free tier limit
+// Load last processed block from environment or start from recent block
+function loadLastProcessedBlock() {
+    const saved = process.env.LAST_PROCESSED_BLOCK;
+    return saved ? parseInt(saved, 10) : 0;
+}
+// Save last processed block (in production, you'd want to persist this to a database)
+function saveLastProcessedBlock(blockNumber) {
+    process.env.LAST_PROCESSED_BLOCK = blockNumber.toString();
+}
 async function connectToBlockchain() {
     try {
         // Check if running in mock mode first
@@ -115,23 +126,67 @@ async function startEventPolling() {
     }, 5000);
 }
 async function pollForEvents() {
-    for (const [eventName, filter] of eventFilters) {
-        try {
-            const events = await tollCollectionContract.queryFilter(filter);
-            for (const event of events) {
-                await processEvent(eventName, event);
-            }
-        }
-        catch (error) {
-            // Handle filter not found errors gracefully
-            if (error instanceof Error && error.message.includes('filter not found')) {
-                console.log(`Filter for ${eventName} not found, will recreate on next cycle`);
-                eventFilters.delete(eventName);
+    try {
+        // Get current block number
+        const currentBlock = await provider.getBlockNumber();
+        // Load last processed block from saved state
+        if (lastProcessedBlock === 0) {
+            lastProcessedBlock = loadLastProcessedBlock();
+            // If no saved state, start from a recent block (last 100 blocks)
+            if (lastProcessedBlock === 0) {
+                lastProcessedBlock = Math.max(0, currentBlock - 100);
+                console.log(`Starting event polling from block ${lastProcessedBlock}`);
             }
             else {
-                console.error(`Error polling ${eventName} events:`, error);
+                console.log(`Resuming event polling from block ${lastProcessedBlock}`);
             }
         }
+        // Process events in chunks to respect Alchemy's block range limit
+        while (lastProcessedBlock < currentBlock) {
+            const toBlock = Math.min(lastProcessedBlock + MAX_BLOCK_RANGE, currentBlock);
+            console.log(`Polling events from block ${lastProcessedBlock} to ${toBlock}`);
+            for (const [eventName, filter] of eventFilters) {
+                try {
+                    const events = await tollCollectionContract.queryFilter(filter, lastProcessedBlock + 1, toBlock);
+                    for (const event of events) {
+                        await processEvent(eventName, event);
+                    }
+                }
+                catch (error) {
+                    // Handle filter not found errors gracefully
+                    if (error instanceof Error && error.message.includes('filter not found')) {
+                        console.log(`Filter for ${eventName} not found, will recreate on next cycle`);
+                        eventFilters.delete(eventName);
+                    }
+                    else if (error instanceof Error && error.message.includes('Under the Free tier plan')) {
+                        console.log(`Rate limited by Alchemy free tier, reducing block range for ${eventName}`);
+                        // Reduce block range and retry
+                        const reducedToBlock = Math.min(lastProcessedBlock + 5, toBlock);
+                        try {
+                            const events = await tollCollectionContract.queryFilter(filter, lastProcessedBlock + 1, reducedToBlock);
+                            for (const event of events) {
+                                await processEvent(eventName, event);
+                            }
+                        }
+                        catch (retryError) {
+                            console.error(`Error polling ${eventName} events with reduced range:`, retryError);
+                        }
+                    }
+                    else {
+                        console.error(`Error polling ${eventName} events:`, error);
+                    }
+                }
+            }
+            lastProcessedBlock = toBlock;
+            saveLastProcessedBlock(lastProcessedBlock);
+            // Add a small delay to avoid overwhelming the RPC
+            if (lastProcessedBlock < currentBlock) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+    }
+    catch (error) {
+        console.error('Error in pollForEvents:', error);
     }
 }
 async function processEvent(eventName, event) {
@@ -172,9 +227,15 @@ async function handleTollPaid(event) {
     const [payer, vehicleId, amount, tollId, zkProofHash, timestamp] = event.args;
     console.log(`Toll paid: ${amount} by ${payer} for vehicle ${vehicleId}`);
     try {
+        // Find the vehicle to get its ObjectId
+        const vehicle = await Vehicle_1.Vehicle.findOne({ vehicleId });
+        if (!vehicle) {
+            console.error(`Vehicle not found: ${vehicleId}`);
+            return;
+        }
         const transaction = new TollTransaction_1.TollTransaction({
             transactionId: `toll_${tollId}`,
-            vehicleId,
+            vehicleId: vehicle._id,
             payer,
             amount: Number(ethers_1.ethers.formatEther(amount)),
             zkProofHash,

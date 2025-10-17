@@ -43,7 +43,8 @@ const TollTransactionSchema = new mongoose_1.Schema({
         index: true
     },
     vehicleId: {
-        type: String,
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Vehicle',
         required: true,
         index: true
     },

@@ -8,6 +8,8 @@ const express_1 = __importDefault(require("express"));
 const TollTransaction_1 = require("../models/TollTransaction");
 const Vehicle_1 = require("../models/Vehicle");
 const blockchainService_1 = require("../services/blockchainService");
+const anonAadhaarService_1 = require("../services/anonAadhaarService");
+const socketInstance_1 = require("../services/socketInstance");
 const router = express_1.default.Router();
 exports.tollRoutes = router;
 // Anon-Aadhaar authentication endpoint
@@ -20,16 +22,24 @@ router.post('/auth/anon-aadhaar', async (req, res) => {
                 message: 'All fields are required'
             });
         }
-        // Verify the anon-Aadhaar proof
-        const isValidProof = await (0, blockchainService_1.verifyAnonAadhaarProof)(proof, publicInputs, userAddress);
-        if (!isValidProof) {
+        // Verify the anon-Aadhaar proof using the new service
+        const verificationResult = await anonAadhaarService_1.anonAadhaarService.verifyProof(proof, publicInputs, userAddress);
+        if (!verificationResult.isValid) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid anon-Aadhaar proof'
+                message: verificationResult.error || 'Invalid anon-Aadhaar proof'
             });
         }
         // Generate a session token for the authenticated user
         const sessionToken = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // Create or update user record
+        try {
+            await anonAadhaarService_1.anonAadhaarService.createOrUpdateUser(userAddress, verificationResult.aadhaarHash, sessionToken);
+        }
+        catch (userError) {
+            console.error('Error creating/updating user:', userError);
+            // Continue with authentication even if user creation fails
+        }
         res.json({
             success: true,
             message: 'Anonymous Aadhaar authentication successful',
@@ -37,7 +47,7 @@ router.post('/auth/anon-aadhaar', async (req, res) => {
                 sessionToken,
                 userAddress,
                 authenticatedAt: new Date(),
-                proofHash: proof // In production, this would be a hash
+                aadhaarHash: verificationResult.aadhaarHash
             }
         });
     }
@@ -84,8 +94,14 @@ router.post('/vehicle/register', async (req, res) => {
             lastTollTime: null
         });
         await vehicle.save();
-        // Emit real-time update
-        emitVehicleRegistrationUpdate(req.app.get('io'), vehicle);
+        // Broadcast to admin dashboard
+        try {
+            const socketService = (0, socketInstance_1.getSocketService)();
+            await socketService.broadcastVehicleRegistration(vehicle);
+        }
+        catch (socketError) {
+            console.error('Error broadcasting vehicle registration:', socketError);
+        }
         res.status(201).json({
             success: true,
             message: 'Vehicle registered successfully',
@@ -172,7 +188,7 @@ router.post('/pay', async (req, res) => {
         // Create transaction record
         const transaction = new TollTransaction_1.TollTransaction({
             transactionId,
-            vehicleId,
+            vehicleId: vehicle._id,
             payer,
             amount,
             currency: 'USDC',
@@ -187,8 +203,16 @@ router.post('/pay', async (req, res) => {
             }
         });
         await transaction.save();
-        // Emit real-time update
-        emitTollPaymentUpdate(req.app.get('io'), transaction);
+        // Update vehicle's last toll time
+        await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, { lastTollTime: new Date() });
+        // Broadcast to admin dashboard
+        try {
+            const socketService = (0, socketInstance_1.getSocketService)();
+            await socketService.broadcastNewTransaction(transaction);
+        }
+        catch (socketError) {
+            console.error('Error broadcasting new transaction:', socketError);
+        }
         res.status(201).json({
             success: true,
             message: 'Toll payment processed successfully',
