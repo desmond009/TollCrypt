@@ -115,6 +115,14 @@ export class AnonAadhaarService {
   }
 
   /**
+   * Generate a hash of the aadhaar data for privacy
+   */
+  private generateAadhaarHash(publicInputs: number[]): string {
+    const inputString = publicInputs.join(',');
+    return crypto.createHash('sha256').update(inputString).digest('hex');
+  }
+
+  /**
    * Validate proof format and inputs
    */
   private validateProofFormat(proof: string, publicInputs: number[], userAddress: string): boolean {

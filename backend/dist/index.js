@@ -19,6 +19,7 @@ const hardwareRoutes_1 = require("./routes/hardwareRoutes");
 const qrRoutes_1 = __importDefault(require("./routes/qrRoutes"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const topUpWalletRoutes_1 = __importDefault(require("./routes/topUpWalletRoutes"));
+const aadhaarRoutes_1 = __importDefault(require("./routes/aadhaarRoutes"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -88,6 +89,7 @@ app.use('/api/admin', adminRoutes_1.adminRoutes);
 app.use('/api/hardware', hardwareRoutes_1.hardwareRoutes);
 app.use('/api/qr', qrRoutes_1.default);
 app.use('/api/topup-wallet', topUpWalletRoutes_1.default);
+app.use('/api/aadhaar', aadhaarRoutes_1.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({
