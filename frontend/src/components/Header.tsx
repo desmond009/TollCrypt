@@ -75,7 +75,13 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
             </button>
             <button
               onClick={() => onNavigate?.('topup')}
-              className="px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              disabled={!sessionStatus.hasVehicles}
+              className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                sessionStatus.hasVehicles
+                  ? 'text-gray-300 hover:text-white hover:bg-gray-800'
+                  : 'text-gray-500 cursor-not-allowed opacity-50'
+              }`}
+              title={!sessionStatus.hasVehicles ? 'Please register a vehicle first to enable wallet top-up' : ''}
             >
               <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
@@ -208,10 +214,18 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                       </button>
                       <button 
                         onClick={() => {
-                          onNavigate?.('topup');
-                          setShowMenuDropdown(false);
+                          if (sessionStatus.hasVehicles) {
+                            onNavigate?.('topup');
+                            setShowMenuDropdown(false);
+                          }
                         }}
-                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 transition-colors"
+                        disabled={!sessionStatus.hasVehicles}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                          sessionStatus.hasVehicles
+                            ? 'text-white hover:bg-gray-700'
+                            : 'text-gray-500 cursor-not-allowed opacity-50'
+                        }`}
+                        title={!sessionStatus.hasVehicles ? 'Please register a vehicle first to enable wallet top-up' : ''}
                       >
                         <svg className="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>

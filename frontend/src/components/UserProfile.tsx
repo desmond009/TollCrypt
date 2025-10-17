@@ -170,13 +170,24 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
           <div className="border-t border-gray-700 pt-4">
             <button
               onClick={() => onNavigate?.('topup')}
-              className="btn-primary w-full flex items-center justify-center space-x-2"
+              disabled={!sessionStatus.hasVehicles}
+              className={`w-full flex items-center justify-center space-x-2 ${
+                sessionStatus.hasVehicles 
+                  ? 'btn-primary' 
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+              }`}
+              title={!sessionStatus.hasVehicles ? 'Please register a vehicle first to enable wallet top-up' : ''}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
               <span>Top-up Wallet</span>
             </button>
+            {!sessionStatus.hasVehicles && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                Register a vehicle to enable wallet top-up functionality
+              </p>
+            )}
           </div>
         </div>
 

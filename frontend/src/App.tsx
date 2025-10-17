@@ -411,7 +411,13 @@ function AppContent() {
                   
                   <button
                     onClick={() => setCurrentStep('topup')}
-                    className="flex flex-col items-center p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 text-white"
+                    disabled={!sessionStatus.hasVehicles}
+                    className={`flex flex-col items-center p-4 rounded-lg transition-all duration-200 ${
+                      sessionStatus.hasVehicles
+                        ? 'bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                        : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                    }`}
+                    title={!sessionStatus.hasVehicles ? 'Please register a vehicle first to enable wallet top-up' : ''}
                   >
                     <svg className="w-6 h-6 mb-2" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
