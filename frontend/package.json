@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@anon-aadhaar/core": "^2.4.3",
     "@craco/craco": "^7.1.0",
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
@@ -23,6 +24,7 @@
     "ajv": "^8.17.1",
     "ajv-keywords": "^5.1.0",
     "autoprefixer": "^10.4.21",
+    "axios": "^1.12.2",
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",
     "process": "^0.11.10",

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useSession, VehicleInfo } from '../services/sessionManager';
+import { VehicleRegistration } from './VehicleRegistration';
 
 type AppStep = 'wallet' | 'auth' | 'register' | 'topup' | 'payment' | 'dashboard' | 'profile';
 
@@ -16,7 +17,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     removeVehicle, 
     updateVehicle, 
     clearSession,
-    getSessionStatus 
+    getSessionStatus,
+    addVehicle
   } = useSession();
   
   const [session, setSession] = useState(getSession());
@@ -207,6 +209,58 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
             </div>
           </div>
         )}
+
+        {/* Anon-Aadhaar Authentication Section */}
+        {sessionStatus.needsAuth && (
+          <div className="card mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4">🔐 Anon-Aadhaar Authentication</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Complete Aadhaar verification to access vehicle registration and other secure features.
+            </p>
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-xl mx-auto mb-4 flex items-center justify-center">
+                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+                </svg>
+              </div>
+              <h4 className="text-lg font-medium text-white mb-2">Anonymous Aadhaar Authentication</h4>
+              <p className="text-gray-400 text-sm mb-6">
+                Verify your identity using zero-knowledge proofs without revealing personal data
+              </p>
+              <button
+                onClick={() => onNavigate?.('auth')}
+                className="btn-primary px-6 py-3 text-lg"
+              >
+                🔐 Start Aadhaar Authentication
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Vehicle Registration Section - Only show if authenticated but no vehicles */}
+        {sessionStatus.isAuthenticated && !sessionStatus.hasVehicles && (
+          <div className="card mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4">🚗 Register Your Vehicle</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Register your vehicle to start using FASTag services and enable wallet top-up functionality.
+            </p>
+            <VehicleRegistration
+              onRegistrationSuccess={(vehicleData) => {
+                // Update session with new vehicle
+                const vehicleInfo: VehicleInfo = {
+                  vehicleId: vehicleData.vehicleId,
+                  vehicleType: vehicleData.vehicleType,
+                  registrationDate: vehicleData.registrationDate,
+                  documents: vehicleData.documents,
+                  isActive: vehicleData.isActive
+                };
+                addVehicle(vehicleInfo);
+                setSession(getSession());
+                setSessionStatus(getSessionStatus());
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Vehicle Management */}
@@ -224,7 +278,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
               <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
             </svg>
             <p className="text-gray-400 mb-2">No vehicles registered</p>
-            <p className="text-sm text-gray-500">Register a vehicle to start using FASTag services.</p>
+            {sessionStatus.needsAuth ? (
+              <p className="text-sm text-gray-500">Complete Aadhaar authentication above to register your first vehicle.</p>
+            ) : (
+              <p className="text-sm text-gray-500">Register a vehicle to start using FASTag services.</p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">

@@ -17,6 +17,7 @@ import { hardwareRoutes } from './routes/hardwareRoutes';
 import qrRoutes from './routes/qrRoutes';
 import authRoutes from './routes/authRoutes';
 import topUpWalletRoutes from './routes/topUpWalletRoutes';
+import aadhaarRoutes from './routes/aadhaarRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -97,6 +98,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/hardware', hardwareRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/topup-wallet', topUpWalletRoutes);
+app.use('/api/aadhaar', aadhaarRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
