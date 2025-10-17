@@ -110,18 +110,30 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
   // Send OTP to user's mobile
   const sendOTP = async (): Promise<OTPResponse> => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/aadhaar/send-otp`, {
+      const requestData = {
+        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
+        userAddress: address
+      };
+      
+      const url = `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/aadhaar/send-otp`;
+      
+      console.log('📤 Frontend Send OTP Request:', {
+        url,
+        requestData
+      });
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
-          userAddress: address
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('📡 Send OTP Response status:', response.status);
       const data = await response.json();
+      console.log('📋 Send OTP Response data:', data);
+      
       return data;
     } catch (error) {
       console.error('Error sending OTP:', error);
@@ -135,20 +147,35 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
   // Verify OTP
   const verifyOTP = async (): Promise<boolean> => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/aadhaar/verify-otp`, {
+      const requestData = {
+        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
+        otp,
+        txnId: otpTxnId || 'dummy_txn_' + aadhaarNumber.replace(/\s/g, ''), // Fallback for dummy data
+        userAddress: address
+      };
+      
+      const url = `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/aadhaar/verify-otp`;
+      
+      console.log('🔍 Frontend OTP Verification Request:', {
+        url,
+        requestData,
+        currentOtpTxnId: otpTxnId,
+        currentAadhaarNumber: aadhaarNumber,
+        currentOtp: otp
+      });
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
-          otp,
-          txnId: otpTxnId,
-          userAddress: address
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('📡 Response status:', response.status);
       const data = await response.json();
+      console.log('📋 Response data:', data);
+      
       return data.success;
     } catch (error) {
       console.error('Error verifying OTP:', error);
@@ -159,19 +186,45 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
   // Download Aadhaar XML
   const downloadAadhaarXML = async (): Promise<string> => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/aadhaar/download-xml`, {
+      const requestData = {
+        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
+        shareCode: shareCode || 'test123', // Fallback for testing
+        userAddress: address
+      };
+      
+      const url = `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/aadhaar/download-xml`;
+      
+      console.log('📥 Frontend Download XML Request:', {
+        url,
+        requestData,
+        currentShareCode: shareCode,
+        currentAadhaarNumber: aadhaarNumber,
+        currentAddress: address
+      });
+
+      // Validate required fields
+      if (!requestData.aadhaarNumber) {
+        throw new Error('Aadhaar number is required');
+      }
+      if (!requestData.shareCode) {
+        throw new Error('Share code is required');
+      }
+      if (!requestData.userAddress) {
+        throw new Error('User address is required. Please connect your wallet first.');
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
-          shareCode,
-          userAddress: address
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('📡 Download XML Response status:', response.status);
       const data = await response.json();
+      console.log('📋 Download XML Response data:', data);
+      
       if (data.success) {
         return data.xmlData;
       } else {
@@ -252,6 +305,21 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
     setIsLoading(true);
     setError('');
 
+    // Check if wallet is connected
+    if (!address) {
+      setError('Please connect your wallet first');
+      setIsLoading(false);
+      return;
+    }
+
+    console.log('🔄 Step Progression:', {
+      currentStep,
+      aadhaarNumber,
+      shareCode,
+      address,
+      otpTxnId
+    });
+
     try {
       switch (currentStep) {
         case 0: // Aadhaar input
@@ -264,24 +332,34 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
 
         case 1: // OTP verification
           const otpResponse = await sendOTP();
+          console.log('🔄 OTP Response received:', otpResponse);
           if (!otpResponse.success) {
             setError(otpResponse.message);
             return;
           }
+          console.log('✅ Setting txnId:', otpResponse.txnId);
           setOtpTxnId(otpResponse.txnId || '');
           setCurrentStep(2);
           break;
 
         case 2: // Share code
+          console.log('🔍 Share Code Validation:', {
+            shareCode,
+            shareCodeLength: shareCode?.length,
+            isValid: shareCode && shareCode.length >= 6
+          });
           if (!shareCode || shareCode.length < 6) {
             setError('Share code must be at least 6 characters long');
             return;
           }
+          console.log('✅ Share code validated, proceeding to XML download');
           setCurrentStep(3);
           break;
 
         case 3: // XML download
+          console.log('🔄 Starting XML download...');
           const xmlData = await downloadAadhaarXML();
+          console.log('✅ XML downloaded successfully');
           setAadhaarXmlData(xmlData);
           setCurrentStep(4);
           break;
@@ -320,6 +398,26 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
   const handleOTPVerification = async () => {
     setIsLoading(true);
     setError('');
+
+    // Check if txnId is available
+    if (!otpTxnId) {
+      console.log('⚠️ No txnId found, sending OTP first...');
+      try {
+        const otpResponse = await sendOTP();
+        if (!otpResponse.success) {
+          setError(otpResponse.message);
+          setIsLoading(false);
+          return;
+        }
+        setOtpTxnId(otpResponse.txnId || '');
+        console.log('✅ txnId set:', otpResponse.txnId);
+      } catch (error) {
+        console.error('Error sending OTP:', error);
+        setError('Failed to send OTP. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+    }
 
     try {
       const isValid = await verifyOTP();

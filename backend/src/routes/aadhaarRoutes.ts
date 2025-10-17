@@ -8,6 +8,47 @@ const router = express.Router();
 // In production, this would integrate with UIDAI's OTP service
 const otpStorage = new Map<string, { otp: string; expiresAt: number; txnId: string }>();
 
+// Dummy Aadhaar data for testing
+interface DummyAadhaarData {
+  name: string;
+  mobile: string;
+  email: string;
+  address: string;
+  dob: string;
+  gender: string;
+  otp: string;
+}
+
+const DUMMY_AADHAAR_DATA: Record<string, DummyAadhaarData> = {
+  '123456789012': {
+    name: 'John Doe',
+    mobile: '9876543210',
+    email: 'john.doe@example.com',
+    address: '123 Main Street, Bangalore, Karnataka',
+    dob: '1990-01-15',
+    gender: 'Male',
+    otp: '123456' // Fixed OTP for testing
+  },
+  '987654321098': {
+    name: 'Jane Smith',
+    mobile: '8765432109',
+    email: 'jane.smith@example.com',
+    address: '456 Park Avenue, Mumbai, Maharashtra',
+    dob: '1985-05-20',
+    gender: 'Female',
+    otp: '654321' // Fixed OTP for testing
+  },
+  '111111111111': {
+    name: 'Test User',
+    mobile: '9999999999',
+    email: 'test@example.com',
+    address: '789 Test Road, Delhi, Delhi',
+    dob: '1995-12-01',
+    gender: 'Male',
+    otp: '111111' // Fixed OTP for testing
+  }
+};
+
 // Send OTP to user's mobile
 router.post('/send-otp', async (req, res) => {
   try {
@@ -28,9 +69,21 @@ router.post('/send-otp', async (req, res) => {
       });
     }
 
-    // Generate OTP (6 digits)
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Check if this is a dummy Aadhaar number for testing
+    const dummyData = DUMMY_AADHAAR_DATA[aadhaarNumber];
+    let otp: string;
+    let txnId: string;
+
+    if (dummyData) {
+      // Use fixed OTP for dummy data
+      otp = dummyData.otp;
+      txnId = `dummy_txn_${aadhaarNumber}`;
+      console.log(`🧪 DUMMY DATA - Aadhaar: ${aadhaarNumber}, Name: ${dummyData.name}, Mobile: ${dummyData.mobile}`);
+    } else {
+      // Generate random OTP for other numbers
+      otp = Math.floor(100000 + Math.random() * 900000).toString();
+      txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
     
     // Store OTP with expiration (5 minutes)
     otpStorage.set(aadhaarNumber, {
@@ -39,8 +92,11 @@ router.post('/send-otp', async (req, res) => {
       txnId
     });
 
-    // In production, this would send SMS via UIDAI's OTP service
+    // Log OTP for development/testing
     console.log(`📱 OTP for Aadhaar ${aadhaarNumber}: ${otp} (TXN: ${txnId})`);
+    if (dummyData) {
+      console.log(`   👤 User: ${dummyData.name} (${dummyData.mobile})`);
+    }
 
     res.json({
       success: true,
@@ -62,6 +118,13 @@ router.post('/verify-otp', async (req, res) => {
   try {
     const { aadhaarNumber, otp, txnId, userAddress } = req.body;
 
+    console.log(`🔍 OTP Verification Request:`, {
+      aadhaarNumber,
+      otp,
+      txnId,
+      userAddress
+    });
+
     if (!aadhaarNumber || !otp || !txnId || !userAddress) {
       return res.status(400).json({
         success: false,
@@ -71,6 +134,8 @@ router.post('/verify-otp', async (req, res) => {
 
     // Get stored OTP data
     const storedData = otpStorage.get(aadhaarNumber);
+    
+    console.log(`📋 Stored OTP Data:`, storedData);
     
     if (!storedData) {
       return res.status(400).json({
@@ -89,14 +154,38 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     // Verify OTP
-    if (otp !== storedData.otp || txnId !== storedData.txnId) {
+    console.log(`🔐 OTP Comparison:`, {
+      providedOTP: otp,
+      storedOTP: storedData.otp,
+      otpMatch: otp === storedData.otp
+    });
+
+    if (otp !== storedData.otp) {
+      console.log(`❌ OTP mismatch for Aadhaar ${aadhaarNumber}`);
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP'
       });
     }
 
+    // For dummy data, we're more lenient with txnId matching
+    const dummyData = DUMMY_AADHAAR_DATA[aadhaarNumber];
+    console.log(`🎭 Dummy Data Check:`, {
+      isDummyData: !!dummyData,
+      providedTxnId: txnId,
+      storedTxnId: storedData.txnId
+    });
+
+    if (!dummyData && txnId !== storedData.txnId) {
+      console.log(`❌ Transaction ID mismatch for non-dummy data`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid transaction ID'
+      });
+    }
+
     // OTP verified successfully
+    console.log(`✅ OTP verified successfully for Aadhaar ${aadhaarNumber}`);
     otpStorage.delete(aadhaarNumber);
 
     res.json({
@@ -166,8 +255,35 @@ function generateMockAadhaarXML(aadhaarNumber: string, shareCode: string): strin
     .update(aadhaarNumber + shareCode + timestamp)
     .digest('hex');
 
-  // Mock XML structure that would be similar to UIDAI's e-Aadhaar XML
-  const xmlData = `<?xml version="1.0" encoding="UTF-8"?>
+  // Get dummy data if available
+  const dummyData = DUMMY_AADHAAR_DATA[aadhaarNumber];
+  
+  let xmlData: string;
+  
+  if (dummyData) {
+    // Use dummy data for realistic XML
+    xmlData = `<?xml version="1.0" encoding="UTF-8"?>
+<PrintLetterBarcodeData>
+  <uid>${aadhaarNumber}</uid>
+  <name>${dummyData.name}</name>
+  <gender>${dummyData.gender === 'Male' ? 'M' : 'F'}</gender>
+  <yob>${dummyData.dob.split('-')[0]}</yob>
+  <co>S/O Test Father</co>
+  <house>${dummyData.address.split(',')[0]}</house>
+  <street>${dummyData.address.split(',')[1] || 'Test Street'}</street>
+  <lm>Test Locality</lm>
+  <vtc>Test Village</vtc>
+  <po>Test Post Office</po>
+  <dist>${dummyData.address.split(',')[3] || 'Test District'}</dist>
+  <state>${dummyData.address.split(',')[4] || 'Test State'}</state>
+  <pc>123456</pc>
+  <dob>${dummyData.dob.split('-').reverse().join('/')}</dob>
+  <timestamp>${timestamp}</timestamp>
+  <signature>${signature}</signature>
+</PrintLetterBarcodeData>`;
+  } else {
+    // Fallback for non-dummy numbers
+    xmlData = `<?xml version="1.0" encoding="UTF-8"?>
 <PrintLetterBarcodeData>
   <uid>${aadhaarNumber}</uid>
   <name>Test User</name>
@@ -186,6 +302,7 @@ function generateMockAadhaarXML(aadhaarNumber: string, shareCode: string): strin
   <timestamp>${timestamp}</timestamp>
   <signature>${signature}</signature>
 </PrintLetterBarcodeData>`;
+  }
 
   return xmlData;
 }
