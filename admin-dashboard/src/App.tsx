@@ -26,13 +26,24 @@ const queryClient = new QueryClient();
 function AppContent() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const { address } = useAccount();
+  const [loginTrigger, setLoginTrigger] = useState(0);
   
-  console.log('AppContent - isAuthenticated:', isAuthenticated, 'user:', user);
+  console.log('AppContent - isAuthenticated:', isAuthenticated, 'user:', user, 'loginTrigger:', loginTrigger);
   
   // Monitor authentication state changes
   useEffect(() => {
     console.log('Authentication state changed:', { isAuthenticated, user: user?.email });
+    if (isAuthenticated && user) {
+      console.log('User is authenticated, should show dashboard');
+    } else {
+      console.log('User not authenticated, showing login form');
+    }
   }, [isAuthenticated, user]);
+
+  // Force re-render when login trigger changes
+  useEffect(() => {
+    console.log('Login trigger changed:', loginTrigger);
+  }, [loginTrigger]);
   
   const [socket, setSocket] = useState<Socket | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -132,12 +143,15 @@ function AppContent() {
   }
 
   if (!isAuthenticated || !user) {
-    return <Login onLogin={(userData) => {
-      // The useAuth hook should handle this automatically
-      // This callback is mainly for any additional logic if needed
-      console.log('Login successful:', userData);
+    console.log('Rendering Login component - isAuthenticated:', isAuthenticated, 'user:', user);
+    return <Login key={loginTrigger} onLogin={(userData) => {
+      console.log('Login successful - user data received:', userData);
+      // Force a re-render by updating the trigger
+      setLoginTrigger(prev => prev + 1);
     }} />;
   }
+
+  console.log('Rendering Dashboard - isAuthenticated:', isAuthenticated, 'user:', user);
 
   const renderContent = () => {
     if (isScanning) {

@@ -39,7 +39,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         walletAddress: address,
       });
       console.log('Login response:', response);
+      
+      // Call the onLogin callback to notify parent component
       onLogin(response.user);
+      
+      console.log('Login completed, should redirect to dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'Login failed');

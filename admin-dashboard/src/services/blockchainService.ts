@@ -11,11 +11,16 @@ const USDC_CONTRACT = process.env.REACT_APP_USDC_CONTRACT_ADDRESS || '0x1c7D4B19
 
 // ABI for TollCollection contract
 const TOLL_COLLECTION_ABI = [
-  'function processTollPayment(address userWallet, string memory vehicleId, uint256 amount, uint256 timestamp) external returns (bool)',
-  'function getVehicleRegistration(string memory vehicleId) external view returns (bool isRegistered, address owner, string memory vehicleType)',
-  'function getTollRate(string memory vehicleType) external view returns (uint256)',
-  'function isVehicleBlacklisted(string memory vehicleId) external view returns (bool)',
-  'event TollPaymentProcessed(address indexed user, string indexed vehicleId, uint256 amount, uint256 timestamp)',
+  'function processTollPayment(string memory vehicleId, bytes32 zkProofHash, uint256 amount) external returns (bool)',
+  'function processTollPaymentFromTopUpWallet(string memory vehicleId, bytes32 zkProofHash, uint256 amount) external returns (bool)',
+  'function getVehicle(string memory vehicleId) external view returns (address owner, string memory vehicleId, bool isActive, bool isBlacklisted, uint256 registrationTime, uint256 lastTollTime)',
+  'function getTollRate() external view returns (uint256)',
+  'function getUserTopUpWallet(address user) external view returns (address walletAddress)',
+  'function hasUserTopUpWallet(address user) external view returns (bool hasWallet)',
+  'function getUserTopUpWalletBalance(address user) external view returns (uint256 balance)',
+  'function isTopUpWalletAuthorized(address topUpWallet) external view returns (bool isAuthorized)',
+  'event TollPaid(address indexed payer, string indexed vehicleId, uint256 amount, uint256 tollId, bytes32 zkProofHash, uint256 timestamp)',
+  'event TopUpWalletPaymentProcessed(address indexed topUpWallet, string indexed vehicleId, uint256 amount, uint256 tollId, bytes32 zkProofHash, uint256 timestamp)',
 ];
 
 // ABI for USDC contract
@@ -156,11 +161,11 @@ class BlockchainService {
     }
 
     try {
-      const [isRegistered, owner, vehicleType] = await this.tollContract.getVehicleRegistration(vehicleId);
+      const vehicle = await this.tollContract.getVehicle(vehicleId);
       return {
-        isRegistered,
-        owner,
-        vehicleType,
+        isRegistered: vehicle.owner !== '0x0000000000000000000000000000000000000000' && vehicle.isActive,
+        owner: vehicle.owner,
+        vehicleType: vehicle.vehicleId, // Using vehicleId as vehicleType for now
       };
     } catch (error) {
       console.error('Failed to get vehicle registration:', error);
@@ -174,7 +179,8 @@ class BlockchainService {
     }
 
     try {
-      return await this.tollContract.isVehicleBlacklisted(vehicleId);
+      const vehicle = await this.tollContract.getVehicle(vehicleId);
+      return vehicle.isBlacklisted;
     } catch (error) {
       console.error('Failed to check blacklist status:', error);
       return false;
@@ -187,8 +193,10 @@ class BlockchainService {
     }
 
     try {
-      const rate = await this.tollContract.getTollRate(vehicleType);
-      return rate.toString();
+      const rate = await this.tollContract.getTollRate();
+      // Convert from wei to ETH
+      const rateInEth = ethers.formatEther(rate);
+      return rateInEth;
     } catch (error) {
       console.error('Failed to get toll rate:', error);
       // Return default rates based on vehicle type
@@ -226,6 +234,44 @@ class BlockchainService {
     }
   }
 
+  async getWalletBalance(walletAddress: string): Promise<BalanceInfo> {
+    if (!this.tollContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      // First try to get TopUpWallet balance
+      const topUpWalletBalance = await this.tollContract.getUserTopUpWalletBalance(walletAddress);
+      
+      // Convert ETH balance to USDC equivalent (simplified conversion)
+      const ethBalance = await this.provider?.getBalance(walletAddress) || BigInt(0);
+      const ethInUsdc = parseFloat(ethers.formatEther(ethBalance)) * 2000; // Approximate ETH to USDC rate
+      
+      const totalBalance = topUpWalletBalance + ethInUsdc;
+      
+      return {
+        balance: totalBalance.toString(),
+        formattedBalance: totalBalance.toFixed(2),
+        decimals: 6, // USDC decimals
+      };
+    } catch (error) {
+      console.error('Failed to get wallet balance:', error);
+      // Fallback to ETH balance
+      try {
+        const ethBalance = await this.provider?.getBalance(walletAddress) || BigInt(0);
+        const ethInUsdc = parseFloat(ethers.formatEther(ethBalance)) * 2000;
+        
+        return {
+          balance: ethInUsdc.toString(),
+          formattedBalance: ethInUsdc.toFixed(2),
+          decimals: 6,
+        };
+      } catch (fallbackError) {
+        throw new Error('Failed to get wallet balance');
+      }
+    }
+  }
+
   async processTollPayment(
     qrData: QRCodeData,
     tollAmount: string,
@@ -236,20 +282,50 @@ class BlockchainService {
     }
 
     try {
-      // Convert toll amount to wei (USDC has 6 decimals)
-      const amountInWei = ethers.parseUnits(tollAmount, 6);
+      // Convert toll amount to wei (ETH has 18 decimals)
+      const amountInWei = ethers.parseEther(tollAmount);
       
-      // Call the smart contract function
-      const tx = await this.tollContract.processTollPayment(
-        qrData.walletAddress,
-        qrData.vehicleId,
-        amountInWei,
-        qrData.timestamp,
-        {
-          from: adminWallet,
-          gasLimit: 300000, // Adjust gas limit as needed
-        }
+      // Generate ZK proof hash (simplified - in production this would be a real ZK proof)
+      const zkProofHash = ethers.keccak256(
+        ethers.toUtf8Bytes(
+          JSON.stringify({
+            walletAddress: qrData.walletAddress,
+            vehicleId: qrData.vehicleId,
+            timestamp: qrData.timestamp,
+            amount: tollAmount,
+            nonce: qrData.nonce || Date.now().toString(),
+          })
+        )
       );
+
+      // Check if user has a TopUpWallet
+      const hasTopUpWallet = await this.tollContract.hasUserTopUpWallet(qrData.walletAddress);
+      
+      let tx;
+      if (hasTopUpWallet) {
+        // Process payment from TopUpWallet
+        const topUpWalletAddress = await this.tollContract.getUserTopUpWallet(qrData.walletAddress);
+        tx = await this.tollContract.processTollPaymentFromTopUpWallet(
+          qrData.vehicleId,
+          zkProofHash,
+          amountInWei,
+          {
+            from: adminWallet,
+            gasLimit: 300000,
+          }
+        );
+      } else {
+        // Process direct payment (fallback)
+        tx = await this.tollContract.processTollPayment(
+          qrData.vehicleId,
+          zkProofHash,
+          amountInWei,
+          {
+            from: adminWallet,
+            gasLimit: 300000,
+          }
+        );
+      }
 
       // Wait for transaction confirmation
       const receipt = await tx.wait();
@@ -277,7 +353,23 @@ class BlockchainService {
 
   async validateQRCode(qrData: QRCodeData): Promise<{ isValid: boolean; error?: string }> {
     try {
-      // Check if QR code is not too old (5 minutes)
+      // Step 1: Validate required fields
+      if (!qrData.walletAddress || !qrData.vehicleId || !qrData.vehicleType || !qrData.timestamp) {
+        return {
+          isValid: false,
+          error: 'Invalid QR code data structure - missing required fields',
+        };
+      }
+
+      // Step 2: Validate wallet address format
+      if (!ethers.isAddress(qrData.walletAddress)) {
+        return {
+          isValid: false,
+          error: 'Invalid wallet address format',
+        };
+      }
+
+      // Step 3: Check timestamp validity (QR code not expired)
       const now = Date.now();
       const qrAge = now - qrData.timestamp;
       const maxAge = 5 * 60 * 1000; // 5 minutes
@@ -289,45 +381,40 @@ class BlockchainService {
         };
       }
 
-      // Validate required fields
-      if (!qrData.walletAddress || !qrData.vehicleId || !qrData.vehicleType) {
-        return {
-          isValid: false,
-          error: 'Invalid QR code data structure',
-        };
+      // Step 4: Verify signature if present
+      if (qrData.signature) {
+        const isValidSignature = await this.verifyQRSignature(qrData);
+        if (!isValidSignature) {
+          return {
+            isValid: false,
+            error: 'QR code signature verification failed - code may be tampered',
+          };
+        }
       }
 
-      // Validate wallet address format
-      if (!ethers.isAddress(qrData.walletAddress)) {
-        return {
-          isValid: false,
-          error: 'Invalid wallet address format',
-        };
-      }
-
-      // Check vehicle registration
+      // Step 5: Check vehicle registration
       const registration = await this.getVehicleRegistration(qrData.vehicleId);
       if (!registration.isRegistered) {
         return {
           isValid: false,
-          error: 'Vehicle is not registered',
+          error: 'Vehicle is not registered in the system',
         };
       }
 
-      // Check if vehicle is blacklisted
+      // Step 6: Check if vehicle is blacklisted
       const isBlacklisted = await this.isVehicleBlacklisted(qrData.vehicleId);
       if (isBlacklisted) {
         return {
           isValid: false,
-          error: 'Vehicle is blacklisted',
+          error: 'Vehicle is blacklisted and cannot proceed',
         };
       }
 
-      // Verify vehicle owner matches QR code wallet
+      // Step 7: Verify vehicle owner matches QR code wallet
       if (registration.owner.toLowerCase() !== qrData.walletAddress.toLowerCase()) {
         return {
           isValid: false,
-          error: 'Vehicle owner does not match wallet address',
+          error: 'Vehicle owner does not match wallet address in QR code',
         };
       }
 
@@ -336,8 +423,39 @@ class BlockchainService {
       console.error('QR code validation failed:', error);
       return {
         isValid: false,
-        error: 'Failed to validate QR code',
+        error: 'Failed to validate QR code - system error',
       };
+    }
+  }
+
+  async verifyQRSignature(qrData: QRCodeData): Promise<boolean> {
+    try {
+      if (!qrData.signature) {
+        return false;
+      }
+
+      // Create message hash from QR data
+      const messageData = {
+        walletAddress: qrData.walletAddress,
+        vehicleId: qrData.vehicleId,
+        vehicleType: qrData.vehicleType,
+        timestamp: qrData.timestamp,
+        sessionToken: qrData.sessionToken,
+        plazaId: qrData.plazaId,
+        nonce: qrData.nonce,
+      };
+
+      const messageString = JSON.stringify(messageData);
+      const messageHash = ethers.keccak256(ethers.toUtf8Bytes(messageString));
+
+      // Recover the signer address
+      const recoveredAddress = ethers.verifyMessage(ethers.getBytes(messageHash), qrData.signature);
+
+      // Verify the recovered address matches the wallet address
+      return recoveredAddress.toLowerCase() === qrData.walletAddress.toLowerCase();
+    } catch (error) {
+      console.error('Signature verification failed:', error);
+      return false;
     }
   }
 

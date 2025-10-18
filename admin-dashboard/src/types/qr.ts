@@ -5,4 +5,7 @@ export interface QRCodeData {
   timestamp: number;
   sessionToken: string;
   tollRate?: number;
+  signature?: string;
+  plazaId?: string;
+  nonce?: string;
 }
