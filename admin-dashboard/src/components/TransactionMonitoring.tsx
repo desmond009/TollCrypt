@@ -36,10 +36,20 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
         `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/admin/transactions?${params}`
       );
       const data = await response.json();
-      setTransactions(data.transactions);
-      setTotalPages(data.totalPages);
+      
+      // Handle both success and error responses
+      if (data.success !== false) {
+        setTransactions(data.transactions || []);
+        setTotalPages(data.totalPages || 1);
+      } else {
+        console.error('API Error:', data.message);
+        setTransactions([]);
+        setTotalPages(1);
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error);
+      setTransactions([]);
+      setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
@@ -172,7 +182,7 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {transactions.map((transaction) => (
+              {transactions && transactions.length > 0 ? transactions.map((transaction) => (
                 <tr key={transaction._id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                     {transaction.transactionId.slice(0, 8)}...
@@ -219,7 +229,13 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
                     )}
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
+                    No transactions found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

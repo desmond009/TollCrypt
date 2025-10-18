@@ -105,20 +105,20 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
         setStats(statsResponse.data.data);
 
         // Fetch recent transactions
-        const transactionsResponse = await api.get('/api/transactions/recent?limit=10');
-        setRecentTransactions(transactionsResponse.data.data);
+        const transactionsResponse = await api.get('/api/admin/transactions/recent?limit=10');
+        setRecentTransactions(transactionsResponse.data.data || []);
 
         // Fetch plazas
         const plazasResponse = await api.get('/api/admin/plazas');
-        setPlazas(plazasResponse.data.data);
+        setPlazas(plazasResponse.data.data || []);
 
         // Fetch revenue chart data
-        const revenueResponse = await api.get('/api/analytics/revenue?period=7d');
-        setRevenueData(revenueResponse.data.data);
+        const revenueResponse = await api.get('/api/admin/analytics/revenue?period=7d');
+        setRevenueData(revenueResponse.data.data || null);
 
         // Fetch vehicle type distribution
-        const vehicleTypeResponse = await api.get('/api/analytics/vehicle-types');
-        setVehicleTypeData(vehicleTypeResponse.data.data);
+        const vehicleTypeResponse = await api.get('/api/admin/analytics/vehicle-types');
+        setVehicleTypeData(vehicleTypeResponse.data.data || null);
 
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
@@ -353,7 +353,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
             <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
           </div>
           <div className="divide-y divide-gray-200">
-            {recentTransactions.map((transaction) => (
+            {recentTransactions && recentTransactions.length > 0 ? recentTransactions.map((transaction) => (
               <div key={transaction.id} className="px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -379,7 +379,11 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="px-6 py-4 text-center text-sm text-gray-500">
+                No recent transactions
+              </div>
+            )}
           </div>
         </div>
 
@@ -389,7 +393,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
             <h3 className="text-lg font-semibold text-gray-900">Toll Plaza Status</h3>
           </div>
           <div className="divide-y divide-gray-200">
-            {plazas.map((plaza) => (
+            {plazas && plazas.length > 0 ? plazas.map((plaza) => (
               <div key={plaza.id} className="px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -415,7 +419,11 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="px-6 py-4 text-center text-sm text-gray-500">
+                No plazas found
+              </div>
+            )}
           </div>
         </div>
       </div>
