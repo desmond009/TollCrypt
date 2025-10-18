@@ -6,7 +6,7 @@ export interface QRVerificationResponse {
   success: boolean;
   message: string;
   data?: {
-    vehicleId: string;
+    vehicleNumber: string;
     vehicleType: string;
     owner: string;
     tollRate: number;
@@ -19,7 +19,7 @@ export interface QRPaymentResponse {
   message: string;
   data?: {
     transactionId: string;
-    vehicleId: string;
+    vehicleNumber: string;
     amount: number;
     transactionHash: string;
     timestamp: Date;
@@ -166,7 +166,7 @@ class QRAPIService {
     success: boolean;
     data?: Array<{
       _id: string;
-      vehicleId: string;
+      vehicleNumber: string;
       vehicleType: string;
       owner: string;
       amount: number;

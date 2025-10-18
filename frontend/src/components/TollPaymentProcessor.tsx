@@ -191,8 +191,8 @@ export const TollPaymentProcessor: React.FC<TollPaymentProcessorProps> = ({
         <h3 className="font-medium text-gray-800 mb-3">Payment Details</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-600">Vehicle ID:</span>
-            <span className="font-medium">{qrData.vehicleId}</span>
+            <span className="text-gray-600">Vehicle Number:</span>
+            <span className="font-medium">{qrData.vehicleNumber}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Vehicle Type:</span>

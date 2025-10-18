@@ -3,6 +3,7 @@ import { useAccount } from 'wagmi';
 import { useSession, sessionManager } from '../services/sessionManager';
 import { qrService, QRCodeResult } from '../services/qrService';
 import { VehicleInfo } from '../services/sessionManager';
+import { topUpWalletAPI, TopUpWalletInfo } from '../services/topUpWalletService';
 
 interface QRCodeGeneratorProps {
   onQRGenerated?: (qrResult: QRCodeResult) => void;
@@ -20,6 +21,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
   const [qrCodeResult, setQrCodeResult] = useState<QRCodeResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string>('');
+  const [topUpWalletInfo, setTopUpWalletInfo] = useState<TopUpWalletInfo | null>(null);
 
   // Load vehicles on component mount
   useEffect(() => {
@@ -33,6 +35,23 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     }
   }, [selectedVehicleProp]);
 
+  // Load top-up wallet info
+  useEffect(() => {
+    const loadTopUpWalletInfo = async () => {
+      if (!address) return;
+      
+      try {
+        const walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
+        setTopUpWalletInfo(walletInfo);
+      } catch (error) {
+        console.error('Error loading top-up wallet info:', error);
+        // Don't set error state here as user might not have created top-up wallet yet
+      }
+    };
+
+    loadTopUpWalletInfo();
+  }, [address]);
+
   const handleGenerateQR = async () => {
     if (!address) {
       setError('Please connect your wallet first');
@@ -41,6 +60,11 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
 
     if (!selectedVehicleId) {
       setError('Please select a vehicle');
+      return;
+    }
+
+    if (!topUpWalletInfo) {
+      setError('Top-up wallet not found. Please create a top-up wallet first.');
       return;
     }
 
@@ -61,7 +85,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
 
     try {
       const result = await qrService.generateTollQRCodeSimple(
-        address,
+        topUpWalletInfo.walletAddress, // Use top-up wallet address instead of main wallet
         vehicle,
         session.sessionToken,
         0.001 // Default toll rate in ETH
@@ -132,6 +156,30 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Top-up Wallet Info */}
+          {topUpWalletInfo && (
+            <div className="mb-6 p-4 bg-blue-900 rounded-lg border border-blue-700">
+              <h3 className="font-medium text-blue-300 mb-2">Top-up Wallet Details</h3>
+              <div className="text-sm text-blue-400 space-y-1">
+                <p><span className="font-medium">Address:</span> 
+                  <span className="font-mono text-xs ml-1">
+                    {topUpWalletInfo.walletAddress.slice(0, 6)}...{topUpWalletInfo.walletAddress.slice(-4)}
+                  </span>
+                </p>
+                <p><span className="font-medium">Balance:</span> {topUpWalletInfo.balance} ETH</p>
+                <p><span className="font-medium">Status:</span> 
+                  <span className={`ml-1 px-2 py-1 rounded-full text-xs ${
+                    topUpWalletInfo.isInitialized 
+                      ? 'bg-green-900 text-green-300 border border-green-700' 
+                      : 'bg-yellow-900 text-yellow-300 border border-yellow-700'
+                  }`}>
+                    {topUpWalletInfo.isInitialized ? 'Initialized' : 'Pending'}
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Selected Vehicle Info */}
           {selectedVehicle && (

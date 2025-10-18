@@ -84,20 +84,23 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     console.log('Scanning QR code from image data...');
     
     // Simulate QR code detection delay
-    setTimeout(() => {
+    setTimeout(async () => {
       // For demo, we'll use a mock QR code data
       const mockQRData = {
         walletAddress: process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291',
-        vehicleId: 'MH12AB1234',
-        vehicleType: 'car',
-        timestamp: Date.now(),
+        vehicleNumber: 'MH12AB1234',
+        vehicleType: '4W',
+        userId: 'a3f5e8d9c2b1f4a6e7d8c9b0a1f2e3d4c5b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0',
+        timestamp: Math.floor(Date.now() / 1000),
+        signature: '0x' + '0'.repeat(130),
+        version: 'v1',
         sessionToken: 'session_' + Date.now(),
         tollRate: 0.001
       };
 
       try {
         const qrData = qrService.parseQRCodeData(JSON.stringify(mockQRData));
-        const validation = qrService.validateQRCodeData(qrData);
+        const validation = await qrService.validateQRCodeData(qrData);
         
         if (validation.isValid) {
           setLastScannedData(JSON.stringify(qrData));
