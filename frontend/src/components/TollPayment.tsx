@@ -51,21 +51,21 @@ export const TollPayment: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
+    <div className="min-h-screen bg-black py-8">
       <div className="max-w-6xl mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-4">
+          <h1 className="text-4xl font-bold text-white mb-4">
             QR Code-Based Toll Payment
           </h1>
-          <p className="text-lg text-gray-600 mb-6">
+          <p className="text-lg text-gray-400 mb-6">
             Generate QR codes for toll payment or scan QR codes at toll plazas
           </p>
         </div>
 
         {/* Mode Selection */}
         <div className="flex justify-center mb-8">
-          <div className="bg-white rounded-lg shadow-md p-1">
+          <div className="bg-gray-900 rounded-lg shadow-md p-1 border border-gray-800">
             <button
               onClick={() => {
                 setMode('user');
@@ -73,8 +73,8 @@ export const TollPayment: React.FC = () => {
               }}
               className={`px-6 py-2 rounded-md transition-colors ${
                 mode === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-yellow-400 text-black'
+                  : 'text-gray-400 hover:bg-gray-800'
               }`}
             >
               User Mode
@@ -86,8 +86,8 @@ export const TollPayment: React.FC = () => {
               }}
               className={`px-6 py-2 rounded-md transition-colors ${
                 mode === 'admin'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-yellow-400 text-black'
+                  : 'text-gray-400 hover:bg-gray-800'
               }`}
             >
               Admin Mode
@@ -97,7 +97,7 @@ export const TollPayment: React.FC = () => {
 
         {/* Error Display */}
         {error && (
-          <div className="max-w-2xl mx-auto mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          <div className="max-w-2xl mx-auto mb-6 p-4 bg-red-900 border border-red-700 text-red-300 rounded-lg">
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -110,7 +110,7 @@ export const TollPayment: React.FC = () => {
 
         {/* Success Message */}
         {paymentComplete && (
-          <div className="max-w-2xl mx-auto mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+          <div className="max-w-2xl mx-auto mb-6 p-4 bg-green-900 border border-green-700 text-green-300 rounded-lg">
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -126,8 +126,8 @@ export const TollPayment: React.FC = () => {
           {/* User Mode - QR Code Generation */}
           {mode === 'user' && (
             <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
+              <div className="card">
+                <h2 className="text-xl font-bold text-white mb-4">
                   Generate QR Code for Toll Payment
                 </h2>
                 <QRCodeGenerator
@@ -137,17 +137,17 @@ export const TollPayment: React.FC = () => {
 
               {/* Generated QR Code Display */}
               {generatedQRResult && (
-                <div className="bg-white rounded-lg shadow-lg p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">
+                <div className="card">
+                  <h3 className="text-lg font-bold text-white mb-4">
                     Your QR Code
                   </h3>
                   <div className="text-center">
                     <img
                       src={generatedQRResult.dataUrl}
                       alt="Generated QR Code"
-                      className="w-48 h-48 mx-auto mb-4 border-2 border-gray-200 rounded-lg"
+                      className="w-48 h-48 mx-auto mb-4 border-2 border-gray-700 rounded-lg"
                     />
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-400 mb-4">
                       Show this QR code at the toll plaza for payment
                     </p>
                     <div className="space-y-2">
@@ -158,13 +158,13 @@ export const TollPayment: React.FC = () => {
                           link.href = generatedQRResult.dataUrl;
                           link.click();
                         }}
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                        className="btn-primary w-full"
                       >
                         Download QR Code
                       </button>
                       <button
                         onClick={() => navigator.clipboard.writeText(JSON.stringify(generatedQRResult.qrData))}
-                        className="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
+                        className="btn-secondary w-full"
                       >
                         Copy QR Data
                       </button>
@@ -178,8 +178,8 @@ export const TollPayment: React.FC = () => {
           {/* Admin Mode - QR Code Scanning */}
           {mode === 'admin' && (
             <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
+              <div className="card">
+                <h2 className="text-xl font-bold text-white mb-4">
                   Scan QR Code at Toll Plaza
                 </h2>
                 <QRCodeScanner
@@ -204,100 +204,100 @@ export const TollPayment: React.FC = () => {
           )}
 
           {/* Instructions Panel */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
+          <div className="card">
+            <h2 className="text-xl font-bold text-white mb-4">
               How It Works
             </h2>
             
             {mode === 'user' ? (
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
                     1
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Login & Register Vehicle</h3>
-                    <p className="text-sm text-gray-600">Login with Anon-Aadhaar and register your vehicle</p>
+                    <h3 className="font-medium text-white">Login & Register Vehicle</h3>
+                    <p className="text-sm text-gray-400">Login with Anon-Aadhaar and register your vehicle</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
                     2
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Top-up Wallet</h3>
-                    <p className="text-sm text-gray-600">Add funds to your FASTag wallet for toll payments</p>
+                    <h3 className="font-medium text-white">Top-up Wallet</h3>
+                    <p className="text-sm text-gray-400">Add funds to your FASTag wallet for toll payments</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
                     3
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Generate QR Code</h3>
-                    <p className="text-sm text-gray-600">Generate a unique QR code linked to your wallet and vehicle</p>
+                    <h3 className="font-medium text-white">Generate QR Code</h3>
+                    <p className="text-sm text-gray-400">Generate a unique QR code linked to your wallet and vehicle</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
                     4
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Show at Toll Plaza</h3>
-                    <p className="text-sm text-gray-600">Show the QR code to the toll plaza scanner</p>
+                    <h3 className="font-medium text-white">Show at Toll Plaza</h3>
+                    <p className="text-sm text-gray-400">Show the QR code to the toll plaza scanner</p>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
                     1
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Start Camera</h3>
-                    <p className="text-sm text-gray-600">Enable camera to scan QR codes from users</p>
+                    <h3 className="font-medium text-white">Start Camera</h3>
+                    <p className="text-sm text-gray-400">Enable camera to scan QR codes from users</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
                     2
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Scan QR Code</h3>
-                    <p className="text-sm text-gray-600">Scan the QR code shown by the user</p>
+                    <h3 className="font-medium text-white">Scan QR Code</h3>
+                    <p className="text-sm text-gray-400">Scan the QR code shown by the user</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
                     3
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Verify & Process</h3>
-                    <p className="text-sm text-gray-600">Verify vehicle registration and process payment</p>
+                    <h3 className="font-medium text-white">Verify & Process</h3>
+                    <p className="text-sm text-gray-400">Verify vehicle registration and process payment</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
                     4
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-800">Record Transaction</h3>
-                    <p className="text-sm text-gray-600">Transaction is recorded on blockchain</p>
+                    <h3 className="font-medium text-white">Record Transaction</h3>
+                    <p className="text-sm text-gray-400">Transaction is recorded on blockchain</p>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-medium text-blue-800 mb-2">Key Features:</h3>
-              <ul className="text-sm text-blue-700 space-y-1">
+            <div className="mt-6 p-4 bg-blue-900 border border-blue-700 rounded-lg">
+              <h3 className="font-medium text-blue-300 mb-2">Key Features:</h3>
+              <ul className="text-sm text-blue-400 space-y-1">
                 <li>• Privacy-preserving with Anon-Aadhaar</li>
                 <li>• Blockchain-based transaction recording</li>
                 <li>• Real-time payment processing</li>
