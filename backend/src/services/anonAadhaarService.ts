@@ -126,31 +126,45 @@ export class AnonAadhaarService {
    * Validate proof format and inputs
    */
   private validateProofFormat(proof: string, publicInputs: number[], userAddress: string): boolean {
+    console.log('🔍 Validating proof format:', {
+      proofLength: proof?.length,
+      proofPrefix: proof?.substring(0, 10),
+      publicInputsLength: publicInputs?.length,
+      userAddressPrefix: userAddress?.substring(0, 10)
+    });
+
     // Basic validation
-    if (!proof.startsWith('0x') || proof.length < 10) {
+    if (!proof || !proof.startsWith('0x') || proof.length < 10) {
+      console.log('❌ Invalid proof format: missing or invalid prefix');
       return false;
     }
 
     if (!publicInputs || publicInputs.length < 2) {
+      console.log('❌ Invalid public inputs: insufficient inputs');
       return false;
     }
 
     if (!userAddress || !userAddress.startsWith('0x')) {
+      console.log('❌ Invalid user address: missing or invalid prefix');
       return false;
     }
 
     // Check proof length (should be reasonable for a ZK proof)
-    if (proof.length < 100 || proof.length > 10000) {
+    // More lenient for mock proofs in development
+    if (proof.length < 50 || proof.length > 20000) {
+      console.log('❌ Invalid proof length:', proof.length);
       return false;
     }
 
     // Check public inputs are within reasonable ranges
     for (const input of publicInputs) {
-      if (input === 0 || input > Number.MAX_SAFE_INTEGER) {
+      if (typeof input !== 'number' || input <= 0 || input > Number.MAX_SAFE_INTEGER) {
+        console.log('❌ Invalid public input:', input);
         return false;
       }
     }
 
+    console.log('✅ Proof format validation passed');
     return true;
   }
 

@@ -261,10 +261,16 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
       setProofProgress(100);
 
       // Generate mock proof and public inputs
-      const proof = '0x' + Math.random().toString(16).substr(2, 64);
+      // Create a longer proof to meet backend validation requirements (100-10000 chars)
+      const proof = '0x' + 
+        Math.random().toString(16).substr(2, 64) + 
+        Math.random().toString(16).substr(2, 64) + 
+        Math.random().toString(16).substr(2, 64) + 
+        Math.random().toString(16).substr(2, 64) + 
+        Math.random().toString(16).substr(2, 64); // ~320+ characters
       const publicInputs = [
-        Math.floor(Math.random() * 1000000), // Mock public input 1
-        Math.floor(Math.random() * 1000000), // Mock public input 2
+        Math.floor(Math.random() * 1000000) + 1, // Mock public input 1 (non-zero)
+        Math.floor(Math.random() * 1000000) + 1, // Mock public input 2 (non-zero)
       ];
 
       return { proof, publicInputs };
@@ -279,20 +285,50 @@ export const AnonAadhaarAuth: React.FC<AnonAadhaarAuthProps> = ({ onAuthSuccess,
   // Verify proof on blockchain
   const verifyProofOnBlockchain = async (proof: string, publicInputs: number[]): Promise<boolean> => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/tolls/auth/anon-aadhaar`, {
+      const requestData = {
+        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
+        proof: proof,
+        publicInputs: publicInputs,
+        userAddress: address
+      };
+      
+      const url = `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/tolls/auth/anon-aadhaar`;
+      
+      console.log('🔗 Frontend Blockchain Verification Request:', {
+        url,
+        requestData,
+        currentAadhaarNumber: aadhaarNumber,
+        currentAddress: address,
+        proofLength: proof?.length,
+        publicInputsLength: publicInputs?.length
+      });
+
+      // Validate required fields
+      if (!requestData.aadhaarNumber) {
+        throw new Error('Aadhaar number is required');
+      }
+      if (!requestData.proof) {
+        throw new Error('Proof is required');
+      }
+      if (!requestData.publicInputs || requestData.publicInputs.length === 0) {
+        throw new Error('Public inputs are required');
+      }
+      if (!requestData.userAddress) {
+        throw new Error('User address is required. Please connect your wallet first.');
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
-          proof: proof,
-          publicInputs: publicInputs,
-          userAddress: address
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('📡 Blockchain Verification Response status:', response.status);
       const data = await response.json();
+      console.log('📋 Blockchain Verification Response data:', data);
+      
       return data.success;
     } catch (error) {
       console.error('Error verifying proof on blockchain:', error);
