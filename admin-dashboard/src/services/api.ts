@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 export const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -34,7 +34,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       
       try {
-        const refreshResponse = await api.post('/auth/refresh');
+        const refreshResponse = await api.post('/api/auth/refresh');
         const { token } = refreshResponse.data.data;
         
         localStorage.setItem('authToken', token);

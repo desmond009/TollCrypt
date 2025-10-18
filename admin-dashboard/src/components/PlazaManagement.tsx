@@ -107,8 +107,8 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
       try {
         setIsLoading(true);
         const [plazasResponse, operatorsResponse] = await Promise.all([
-          api.get('/plazas'),
-          api.get('/operators')
+          api.get('/api/admin/plazas'),
+          api.get('/api/admin/operators')
         ]);
         setPlazas(plazasResponse.data.data);
         setOperators(operatorsResponse.data.data);
@@ -124,7 +124,7 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
 
   const handleCreatePlaza = async (data: PlazaFormData) => {
     try {
-      const response = await api.post('/plazas', data);
+      const response = await api.post('/api/admin/plazas', data);
       setPlazas(prev => [...prev, response.data.data]);
       setShowModal(false);
       reset();
@@ -137,7 +137,7 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
     if (!selectedPlaza) return;
 
     try {
-      const response = await api.put(`/plazas/${selectedPlaza.id}`, data);
+      const response = await api.put(`/api/admin/plazas/${selectedPlaza.id}`, data);
       setPlazas(prev => prev.map(plaza =>
         plaza.id === selectedPlaza.id ? response.data.data : plaza
       ));
@@ -154,7 +154,7 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
     if (!window.confirm('Are you sure you want to delete this plaza?')) return;
 
     try {
-      await api.delete(`/plazas/${plazaId}`);
+      await api.delete(`/api/admin/plazas/${plazaId}`);
       setPlazas(prev => prev.filter(plaza => plaza.id !== plazaId));
     } catch (error) {
       console.error('Failed to delete plaza:', error);

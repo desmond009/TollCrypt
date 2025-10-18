@@ -16,7 +16,21 @@ exports.tollRoutes = router;
 router.post('/auth/anon-aadhaar', async (req, res) => {
     try {
         const { aadhaarNumber, proof, publicInputs, userAddress } = req.body;
+        console.log('🔗 Backend Blockchain Verification Request:', {
+            aadhaarNumber,
+            proof: proof ? `${proof.substring(0, 20)}...` : 'undefined',
+            publicInputs,
+            userAddress,
+            proofLength: proof?.length,
+            publicInputsLength: publicInputs?.length
+        });
         if (!aadhaarNumber || !proof || !publicInputs || !userAddress) {
+            console.log('❌ Missing required fields:', {
+                hasAadhaarNumber: !!aadhaarNumber,
+                hasProof: !!proof,
+                hasPublicInputs: !!publicInputs,
+                hasUserAddress: !!userAddress
+            });
             return res.status(400).json({
                 success: false,
                 message: 'All fields are required'
@@ -40,6 +54,11 @@ router.post('/auth/anon-aadhaar', async (req, res) => {
             console.error('Error creating/updating user:', userError);
             // Continue with authentication even if user creation fails
         }
+        console.log('✅ Blockchain verification successful:', {
+            userAddress,
+            sessionToken,
+            aadhaarHash: verificationResult.aadhaarHash
+        });
         res.json({
             success: true,
             message: 'Anonymous Aadhaar authentication successful',

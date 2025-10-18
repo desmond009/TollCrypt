@@ -65,7 +65,7 @@ export const VehicleManagement: React.FC<VehicleManagementProps> = ({ socket }) 
     const fetchVehicles = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get('/vehicles');
+        const response = await api.get('/api/admin/vehicles');
         setVehicles(response.data.data);
       } catch (error) {
         console.error('Failed to fetch vehicles:', error);

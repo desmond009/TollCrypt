@@ -127,7 +127,7 @@ export const TransactionProcessor: React.FC<TransactionProcessorProps> = ({
 
       if (result.success) {
         // Log transaction to backend
-        await api.post('/transactions', {
+        await api.post('/api/admin/transactions', {
           qrData,
           tollAmount: data.tollAmount,
           transactionHash: result.transactionHash,

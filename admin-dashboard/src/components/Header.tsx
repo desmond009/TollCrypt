@@ -30,19 +30,19 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications })
   ).length;
 
   return (
-    <header className="bg-white shadow">
+    <header className="admin-header shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-xl lg:text-2xl font-bold text-white">
               TollChain Admin
             </h1>
-            <span className="ml-2 text-sm text-gray-500">
+            <span className="ml-2 text-xs lg:text-sm text-gray-400 hidden sm:block">
               {user.role.replace('_', ' ').toUpperCase()}
             </span>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 lg:space-x-4">
             {/* Wallet Connector */}
             <WalletConnector />
 
@@ -50,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications })
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 text-gray-400 hover:text-gray-500 relative"
+                className="p-2 text-gray-400 hover:text-white relative transition-colors"
               >
                 <BellIcon className="h-6 w-6" />
                 {unreadCount > 0 && (
@@ -61,27 +61,27 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications })
               </button>
               
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-50">
-                  <div className="p-4 border-b">
-                    <h3 className="text-lg font-medium text-gray-900">Notifications</h3>
+                <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-md shadow-lg z-50 border border-gray-800">
+                  <div className="p-4 border-b border-gray-800">
+                    <h3 className="text-lg font-medium text-white">Notifications</h3>
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="p-4 text-gray-500 text-center">
+                      <div className="p-4 text-gray-400 text-center">
                         No notifications
                       </div>
                     ) : (
                       notifications.slice(0, 10).map((notification, index) => (
                         <div
                           key={index}
-                          className={`p-4 border-b last:border-b-0 ${
-                            notification.severity === 'error' ? 'bg-red-50' :
-                            notification.severity === 'warning' ? 'bg-yellow-50' :
-                            'bg-white'
+                          className={`p-4 border-b border-gray-800 last:border-b-0 ${
+                            notification.severity === 'error' ? 'bg-red-900/20' :
+                            notification.severity === 'warning' ? 'bg-yellow-900/20' :
+                            'bg-gray-800/20'
                           }`}
                         >
-                          <p className="text-sm text-gray-900">{notification.message}</p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-sm text-white">{notification.message}</p>
+                          <p className="text-xs text-gray-400 mt-1">
                             {notification.timestamp.toLocaleTimeString()}
                           </p>
                         </div>

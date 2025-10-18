@@ -30,9 +30,11 @@ export interface LoginCredentials {
 
 export interface AuthResponse {
   success: boolean;
-  token: string;
-  user: AdminUser;
-  expiresIn: number;
+  message: string;
+  data: {
+    user: AdminUser;
+    token: string;
+  };
 }
 
 export interface SessionData {

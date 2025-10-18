@@ -152,7 +152,7 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
           reportType: filters.reportType || 'revenue',
         });
 
-        const response = await api.get(`/analytics?${params}`);
+        const response = await api.get(`/api/analytics?${params}`);
         setData(response.data.data);
       } catch (error) {
         console.error('Failed to fetch analytics data:', error);
@@ -168,7 +168,7 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
   useEffect(() => {
     const fetchPlazas = async () => {
       try {
-        const response = await api.get('/plazas');
+        const response = await api.get('/api/admin/plazas');
         setPlazas(response.data.data);
       } catch (error) {
         console.error('Failed to fetch plazas:', error);

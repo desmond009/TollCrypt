@@ -101,23 +101,23 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
         setIsLoading(true);
         
         // Fetch stats
-        const statsResponse = await api.get('/dashboard/stats');
+        const statsResponse = await api.get('/api/dashboard/stats');
         setStats(statsResponse.data.data);
 
         // Fetch recent transactions
-        const transactionsResponse = await api.get('/transactions/recent?limit=10');
+        const transactionsResponse = await api.get('/api/transactions/recent?limit=10');
         setRecentTransactions(transactionsResponse.data.data);
 
         // Fetch plazas
-        const plazasResponse = await api.get('/plazas');
+        const plazasResponse = await api.get('/api/admin/plazas');
         setPlazas(plazasResponse.data.data);
 
         // Fetch revenue chart data
-        const revenueResponse = await api.get('/analytics/revenue?period=7d');
+        const revenueResponse = await api.get('/api/analytics/revenue?period=7d');
         setRevenueData(revenueResponse.data.data);
 
         // Fetch vehicle type distribution
-        const vehicleTypeResponse = await api.get('/analytics/vehicle-types');
+        const vehicleTypeResponse = await api.get('/api/analytics/vehicle-types');
         setVehicleTypeData(vehicleTypeResponse.data.data);
 
       } catch (error) {
@@ -209,78 +209,78 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Live Dashboard</h1>
-          <p className="text-gray-600">Real-time toll collection monitoring</p>
+          <h1 className="text-2xl font-bold text-white">Live Dashboard</h1>
+          <p className="text-gray-400">Real-time toll collection monitoring</p>
         </div>
         <div className="flex items-center space-x-2">
           <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-sm text-gray-600">Live</span>
+          <span className="text-sm text-gray-400">Live</span>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <div className="admin-card">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <TruckIcon className="h-6 w-6 text-blue-600" />
+            <div className="p-2 bg-blue-900/20 rounded-lg">
+              <TruckIcon className="h-6 w-6 text-blue-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Vehicles</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.totalVehicles}</p>
+              <p className="text-sm font-medium text-gray-400">Total Vehicles</p>
+              <p className="text-2xl font-semibold text-white">{stats.totalVehicles}</p>
             </div>
           </div>
           <div className="mt-4 flex items-center">
             <ArrowUpIcon className="h-4 w-4 text-green-500" />
-            <span className="text-sm text-green-600 ml-1">+12% from yesterday</span>
+            <span className="text-sm text-green-400 ml-1">+12% from yesterday</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="admin-card">
           <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CurrencyDollarIcon className="h-6 w-6 text-green-600" />
+            <div className="p-2 bg-green-900/20 rounded-lg">
+              <CurrencyDollarIcon className="h-6 w-6 text-green-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Today's Revenue</p>
-              <p className="text-2xl font-semibold text-gray-900">{formatCurrency(stats.todayRevenue)}</p>
+              <p className="text-sm font-medium text-gray-400">Today's Revenue</p>
+              <p className="text-2xl font-semibold text-white">{formatCurrency(stats.todayRevenue)}</p>
             </div>
           </div>
           <div className="mt-4 flex items-center">
             <ArrowUpIcon className="h-4 w-4 text-green-500" />
-            <span className="text-sm text-green-600 ml-1">+8% from yesterday</span>
+            <span className="text-sm text-green-400 ml-1">+8% from yesterday</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="admin-card">
           <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <ClockIcon className="h-6 w-6 text-yellow-600" />
+            <div className="p-2 bg-yellow-900/20 rounded-lg">
+              <ClockIcon className="h-6 w-6 text-yellow-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Avg Wait Time</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.averageWaitTime}s</p>
+              <p className="text-sm font-medium text-gray-400">Avg Wait Time</p>
+              <p className="text-2xl font-semibold text-white">{stats.averageWaitTime}s</p>
             </div>
           </div>
           <div className="mt-4 flex items-center">
             <ArrowDownIcon className="h-4 w-4 text-green-500" />
-            <span className="text-sm text-green-600 ml-1">-15% from yesterday</span>
+            <span className="text-sm text-green-400 ml-1">-15% from yesterday</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="admin-card">
           <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <CheckCircleIcon className="h-6 w-6 text-purple-600" />
+            <div className="p-2 bg-purple-900/20 rounded-lg">
+              <CheckCircleIcon className="h-6 w-6 text-purple-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Success Rate</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.successRate}%</p>
+              <p className="text-sm font-medium text-gray-400">Success Rate</p>
+              <p className="text-2xl font-semibold text-white">{stats.successRate}%</p>
             </div>
           </div>
           <div className="mt-4 flex items-center">
             <ArrowUpIcon className="h-4 w-4 text-green-500" />
-            <span className="text-sm text-green-600 ml-1">+2% from yesterday</span>
+            <span className="text-sm text-green-400 ml-1">+2% from yesterday</span>
           </div>
         </div>
       </div>
@@ -288,7 +288,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Chart */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="admin-card">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Trend (7 Days)</h3>
           {revenueData ? (
             <Line
@@ -323,7 +323,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
         </div>
 
         {/* Vehicle Type Distribution */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="admin-card">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Vehicle Type Distribution</h3>
           {vehicleTypeData ? (
             <Doughnut

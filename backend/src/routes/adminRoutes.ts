@@ -607,4 +607,372 @@ router.post('/users', async (req, res) => {
   }
 });
 
+// Dashboard stats endpoint
+router.get('/dashboard/stats', async (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // Get transaction statistics
+    const todayTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: today },
+      status: 'confirmed'
+    });
+    
+    const thisMonthTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: thisMonth },
+      status: 'confirmed'
+    });
+    
+    // Get revenue statistics
+    const todayRevenue = await TollTransaction.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: today },
+          status: 'confirmed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+    
+    const thisMonthRevenue = await TollTransaction.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: thisMonth },
+          status: 'confirmed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+    
+    // Get vehicle statistics
+    const totalVehicles = await Vehicle.countDocuments({ isActive: true });
+    const blacklistedVehicles = await Vehicle.countDocuments({ isBlacklisted: true });
+    const newVehiclesToday = await Vehicle.countDocuments({
+      registrationTime: { $gte: today }
+    });
+    
+    // Get active plazas
+    const activePlazas = await TollPlaza.countDocuments({ isActive: true });
+    
+    // Get failed transactions
+    const failedTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: today },
+      status: 'failed'
+    });
+    
+    // Calculate success rate
+    const totalTodayTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: today }
+    });
+    const successRate = totalTodayTransactions > 0 ? 
+      ((todayTransactions / totalTodayTransactions) * 100) : 0;
+    
+    // Calculate average wait time (mock data for now)
+    const averageWaitTime = 2.5; // minutes
+    
+    res.json({
+      success: true,
+      data: {
+        totalVehicles,
+        totalRevenue: thisMonthRevenue[0]?.total || 0,
+        averageWaitTime,
+        successRate: Math.round(successRate * 100) / 100,
+        todayTransactions,
+        todayRevenue: todayRevenue[0]?.total || 0,
+        activePlazas,
+        failedTransactions
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch dashboard stats' 
+    });
+  }
+});
+
+// Recent transactions endpoint
+router.get('/transactions/recent', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    
+    const transactions = await TollTransaction.find({ status: 'confirmed' })
+      .sort({ timestamp: -1 })
+      .limit(Number(limit))
+      .populate('vehicleId', 'vehicleId owner');
+    
+    res.json({
+      success: true,
+      data: transactions.map(tx => ({
+        id: tx._id,
+        vehicleId: (tx.vehicleId as any)?.vehicleId || 'Unknown',
+        amount: tx.amount,
+        timestamp: tx.timestamp,
+        plaza: tx.tollLocation || 'Unknown',
+        status: tx.status
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching recent transactions:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch recent transactions' 
+    });
+  }
+});
+
+// Revenue analytics endpoint
+router.get('/analytics/revenue', async (req, res) => {
+  try {
+    const { period = '7d' } = req.query;
+    
+    let startDate = new Date();
+    switch (period) {
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '90d':
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      case '1y':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+    }
+    
+    // Daily revenue data
+    const dailyRevenue = await TollTransaction.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: startDate },
+          status: 'confirmed'
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$timestamp' },
+            month: { $month: '$timestamp' },
+            day: { $dayOfMonth: '$timestamp' }
+          },
+          revenue: { $sum: '$amount' },
+          transactions: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+      }
+    ]);
+    
+    // Revenue by plaza
+    const revenueByPlaza = await TollTransaction.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: startDate },
+          status: 'confirmed'
+        }
+      },
+      {
+        $group: {
+          _id: '$tollLocation',
+          revenue: { $sum: '$amount' },
+          transactions: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          plaza: '$_id',
+          revenue: 1,
+          transactions: 1
+        }
+      }
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        daily: dailyRevenue.map(item => ({
+          date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
+          revenue: item.revenue,
+          transactions: item.transactions
+        })),
+        byPlaza: revenueByPlaza
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching revenue analytics:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch revenue analytics' 
+    });
+  }
+});
+
+// Vehicle types analytics endpoint
+router.get('/analytics/vehicle-types', async (req, res) => {
+  try {
+    const { period = '30d' } = req.query;
+    
+    let startDate = new Date();
+    switch (period) {
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '90d':
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      case '1y':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+    }
+    
+    // Vehicle type distribution
+    const vehicleTypeDistribution = await Vehicle.aggregate([
+      {
+        $match: {
+          isActive: true,
+          'metadata.vehicleType': { $exists: true },
+          registrationTime: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: '$metadata.vehicleType',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+    
+    // Vehicle type revenue
+    const vehicleTypeRevenue = await TollTransaction.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: startDate },
+          status: 'confirmed'
+        }
+      },
+      {
+        $lookup: {
+          from: 'vehicles',
+          localField: 'vehicleId',
+          foreignField: '_id',
+          as: 'vehicle'
+        }
+      },
+      {
+        $unwind: '$vehicle'
+      },
+      {
+        $group: {
+          _id: '$vehicle.metadata.vehicleType',
+          revenue: { $sum: '$amount' },
+          transactions: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { revenue: -1 }
+      }
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        distribution: vehicleTypeDistribution,
+        revenue: vehicleTypeRevenue
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching vehicle types analytics:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch vehicle types analytics' 
+    });
+  }
+});
+
+// Get all vehicles for admin management
+router.get('/vehicles', async (req, res) => {
+  try {
+    const vehicles = await Vehicle.find({})
+      .sort({ createdAt: -1 })
+      .limit(100); // Limit to prevent large responses
+    
+    res.json({
+      success: true,
+      data: vehicles.map(vehicle => ({
+        id: vehicle._id,
+        vehicleId: vehicle.vehicleId,
+        owner: vehicle.owner,
+        isActive: vehicle.isActive,
+        isBlacklisted: vehicle.isBlacklisted,
+        registrationTime: vehicle.registrationTime,
+        metadata: vehicle.metadata
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching vehicles:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch vehicles' 
+    });
+  }
+});
+
+// Operators endpoint
+router.get('/operators', async (req, res) => {
+  try {
+    // For now, return mock data since we don't have an operators model
+    const operators = [
+      {
+        id: '1',
+        name: 'John Doe',
+        email: 'john@tollchain.com',
+        role: 'operator',
+        plaza: 'Highway Plaza 1',
+        isActive: true
+      },
+      {
+        id: '2',
+        name: 'Jane Smith',
+        email: 'jane@tollchain.com',
+        role: 'operator',
+        plaza: 'Highway Plaza 2',
+        isActive: true
+      }
+    ];
+    
+    res.json({
+      success: true,
+      data: operators
+    });
+  } catch (error) {
+    console.error('Error fetching operators:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch operators' 
+    });
+  }
+});
+
 export { router as adminRoutes };

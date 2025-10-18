@@ -49,35 +49,35 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-black text-white">
       {/* Header with Wallet Connector */}
-      <div className="flex justify-between items-center p-6">
+      <div className="flex justify-between items-center p-4 lg:p-6">
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg mr-3 flex items-center justify-center">
-            <WalletIcon className="h-5 w-5 text-white" />
+          <div className="w-6 h-6 lg:w-8 lg:h-8 bg-yellow-400 rounded-lg mr-2 lg:mr-3 flex items-center justify-center">
+            <WalletIcon className="h-4 w-4 lg:h-5 lg:w-5 text-black" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">TollChain Admin</h1>
+          <h1 className="text-lg lg:text-xl font-bold text-white">TollChain Admin</h1>
         </div>
         <WalletConnector />
       </div>
 
       {/* Login Form */}
-      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
+      <div className="flex items-center justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-6 lg:space-y-8">
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <WalletIcon className="h-8 w-8 text-white" />
+            <div className="mx-auto h-12 w-12 bg-yellow-400 rounded-lg flex items-center justify-center">
+              <WalletIcon className="h-8 w-8 text-black" />
             </div>
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            <h2 className="mt-4 lg:mt-6 text-2xl lg:text-3xl font-extrabold text-white">
               Admin Portal
             </h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-400">
               Toll Collection System Management
             </p>
           </div>
 
           {/* Wallet Connection Status */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="card">
             <div className="flex items-center">
               {isConnected ? (
                 <>
@@ -103,7 +103,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <form className="mt-8 space-y-6" onSubmit={handleSubmit(handleLogin)}>
             <div className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300">
                   Email Address
                 </label>
                 <input
@@ -115,16 +115,16 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     },
                   })}
                   type="email"
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="input-field mt-1"
                   placeholder="admin@tollchain.com"
                 />
                 {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                  <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
                 )}
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-300">
                   Password
                 </label>
                 <div className="mt-1 relative">
@@ -137,7 +137,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                       },
                     })}
                     type={showPassword ? 'text' : 'password'}
-                    className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                    className="input-field"
                     placeholder="Enter your password"
                   />
                   <button
@@ -153,14 +153,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                  <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
                 )}
               </div>
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <div className="text-sm text-red-700">{error}</div>
+              <div className="rounded-md bg-red-900/20 border border-red-800 p-4">
+                <div className="text-sm text-red-400">{error}</div>
               </div>
             )}
 
@@ -168,7 +168,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <button
                 type="submit"
                 disabled={isLoading || !isConnected}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={(e) => {
                   console.log('Login button clicked');
                   console.log('Wallet connected:', isConnected);
@@ -181,7 +181,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </form>
 
           <div className="text-center">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-400">
               Secure access to the blockchain-based toll collection system
             </p>
           </div>

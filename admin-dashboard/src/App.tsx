@@ -24,7 +24,7 @@ import { useRealtime } from './hooks/useRealtime';
 const queryClient = new QueryClient();
 
 function AppContent() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const { address } = useAccount();
   
   console.log('AppContent - isAuthenticated:', isAuthenticated, 'user:', user);
@@ -119,6 +119,18 @@ function AppContent() {
     setScannedQRData(null);
   };
 
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated || !user) {
     return <Login onLogin={(userData) => {
       // The useAuth hook should handle this automatically
@@ -197,11 +209,11 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-black text-white">
       <Header user={user} onLogout={logout} notifications={notifications} />
-      <div className="flex">
+      <div className="flex flex-col lg:flex-row">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 lg:p-6">
           {renderContent()}
         </main>
       </div>

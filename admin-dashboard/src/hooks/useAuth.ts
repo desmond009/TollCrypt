@@ -13,7 +13,7 @@ export const useAuth = () => {
       try {
         const token = localStorage.getItem('authToken');
         if (token) {
-          const response = await api.get('/auth/profile');
+          const response = await api.get('/api/auth/profile');
           if (response.data.success) {
             setUser(response.data.data.user);
             setIsAuthenticated(true);
@@ -32,13 +32,13 @@ export const useAuth = () => {
     checkSession();
   }, []);
 
-  const login = useCallback(async (credentials: LoginCredentials): Promise<AuthResponse> => {
+  const login = useCallback(async (credentials: LoginCredentials): Promise<{ user: AdminUser; token: string }> => {
     try {
       console.log('useAuth login called with:', credentials);
-      const response = await api.post('/auth/login', credentials);
+      const response = await api.post('/api/auth/login', credentials);
       console.log('API response:', response.data);
       
-      const { token, user: userData, expiresIn } = response.data.data;
+      const { token, user: userData } = response.data.data;
       
       localStorage.setItem('authToken', token);
       localStorage.setItem('userData', JSON.stringify(userData));
@@ -59,7 +59,7 @@ export const useAuth = () => {
 
   const logout = useCallback(async () => {
     try {
-      await api.post('/auth/logout');
+      await api.post('/api/auth/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -72,7 +72,7 @@ export const useAuth = () => {
 
   const refreshToken = useCallback(async () => {
     try {
-      const response = await api.post('/auth/refresh');
+      const response = await api.post('/api/auth/refresh');
       const { token, user: userData } = response.data.data;
       
       localStorage.setItem('authToken', token);
