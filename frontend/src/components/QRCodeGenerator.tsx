@@ -60,7 +60,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     setError('');
 
     try {
-      const result = await qrService.generateTollQRCode(
+      const result = await qrService.generateTollQRCodeSimple(
         address,
         vehicle,
         session.sessionToken,

@@ -135,43 +135,6 @@ export const TollPayment: React.FC = () => {
                 />
               </div>
 
-              {/* Generated QR Code Display */}
-              {generatedQRResult && (
-                <div className="card">
-                  <h3 className="text-lg font-bold text-white mb-4">
-                    Your QR Code
-                  </h3>
-                  <div className="text-center">
-                    <img
-                      src={generatedQRResult.dataUrl}
-                      alt="Generated QR Code"
-                      className="w-48 h-48 mx-auto mb-4 border-2 border-gray-700 rounded-lg"
-                    />
-                    <p className="text-sm text-gray-400 mb-4">
-                      Show this QR code at the toll plaza for payment
-                    </p>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.download = 'toll-qr-code.png';
-                          link.href = generatedQRResult.dataUrl;
-                          link.click();
-                        }}
-                        className="btn-primary w-full"
-                      >
-                        Download QR Code
-                      </button>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(JSON.stringify(generatedQRResult.qrData))}
-                        className="btn-secondary w-full"
-                      >
-                        Copy QR Data
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
