@@ -3,6 +3,7 @@ import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wa
 import { QRCodeData } from '../services/qrService';
 import { qrAPIService } from '../services/qrAPIService';
 import { useSession } from '../services/sessionManager';
+import { formatETHDisplay } from '../utils/currency';
 
 interface TollPaymentProcessorProps {
   qrData: QRCodeData;
@@ -130,9 +131,7 @@ export const TollPaymentProcessor: React.FC<TollPaymentProcessorProps> = ({
     }
   };
 
-  const formatAmount = (amount: number) => {
-    return `${amount.toFixed(6)} ETH`;
-  };
+  // Using formatETHDisplay from utils instead of local formatAmount
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -204,11 +203,11 @@ export const TollPaymentProcessor: React.FC<TollPaymentProcessorProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Toll Amount:</span>
-            <span className="font-medium text-green-600">{formatAmount(qrData.tollRate || 0)}</span>
+            <span className="font-medium text-green-600">{formatETHDisplay(qrData.tollRate || 0)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Current Balance:</span>
-            <span className="font-medium">{formatAmount(parseFloat(walletBalance))}</span>
+            <span className="font-medium">{formatETHDisplay(parseFloat(walletBalance))}</span>
           </div>
         </div>
       </div>
@@ -247,7 +246,7 @@ export const TollPaymentProcessor: React.FC<TollPaymentProcessorProps> = ({
             disabled={isProcessing || parseFloat(walletBalance) < (qrData.tollRate || 0)}
             className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
           >
-            Process Payment ({formatAmount(qrData.tollRate || 0)})
+            Process Payment ({formatETHDisplay(qrData.tollRate || 0)})
           </button>
         )}
 

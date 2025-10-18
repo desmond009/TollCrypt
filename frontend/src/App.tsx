@@ -16,6 +16,7 @@ import { useAccount } from 'wagmi';
 import { useSession } from './services/sessionManager';
 import { vehicleAPIService } from './services/vehicleAPIService';
 import { useRealtime } from './hooks/useRealtime';
+import { formatETHDisplay } from './utils/currency';
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,10 @@ function AppContent() {
   
   const [currentStep, setCurrentStep] = useState<AppStep>('wallet');
   const [sessionStatus, setSessionStatus] = useState(getSessionStatus());
+  const [dashboardStats, setDashboardStats] = useState({
+    totalTransactions: 0,
+    totalSpent: 0
+  });
   
   // Initialize real-time functionality
   const { data: realtimeData, isConnected: isRealtimeConnected } = useRealtime(address, false, undefined, undefined);
@@ -70,6 +75,23 @@ function AppContent() {
 
     return () => clearInterval(interval);
   }, [getSessionStatus]);
+
+  // Calculate dashboard stats from session data
+  useEffect(() => {
+    const session = getSession();
+    if (session) {
+      // Calculate total transactions (mock data for now - in real app this would come from backend)
+      const totalTransactions = session.vehicles.length * 3; // Mock: 3 transactions per vehicle
+      
+      // Calculate total spent (mock data - in real app this would come from transaction history)
+      const totalSpent = session.vehicles.length * 0.5; // Mock: 0.5 ETH per vehicle
+      
+      setDashboardStats({
+        totalTransactions,
+        totalSpent
+      });
+    }
+  }, [sessionStatus, getSession]);
 
   const handleAuthSuccess = (proof: string, publicInputs: number[]) => {
     updateAuth(proof);
@@ -385,11 +407,11 @@ function AppContent() {
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
                     <p className="text-sm opacity-80">Total Transactions</p>
-                    <p className="text-2xl font-bold">12</p>
+                    <p className="text-2xl font-bold">{dashboardStats.totalTransactions}</p>
                   </div>
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
                     <p className="text-sm opacity-80">Total Spent</p>
-                    <p className="text-2xl font-bold">₹1,250</p>
+                    <p className="text-2xl font-bold">{formatETHDisplay(dashboardStats.totalSpent)}</p>
                   </div>
                 </div>
                 <VehicleList />

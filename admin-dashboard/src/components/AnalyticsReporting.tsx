@@ -259,10 +259,7 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+    return `${amount.toFixed(4)} ETH`;
   };
 
   const getChartData = () => {

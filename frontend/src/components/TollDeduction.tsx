@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useSession } from '../services/sessionManager';
+import { formatETHDisplay } from '../utils/currency';
 
 // Contract addresses from deployment
 const TOLL_COLLECTION_ADDRESS = (process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291') as `0x${string}`;
@@ -263,7 +264,7 @@ export const TollDeduction: React.FC = () => {
                     <p className="text-sm opacity-80">{plaza.location}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold">₹{plaza.baseRate}</p>
+                    <p className="font-semibold">{formatETHDisplay(plaza.baseRate / 1000)}</p>
                     <p className="text-xs opacity-80">base rate</p>
                   </div>
                 </div>
@@ -296,7 +297,7 @@ export const TollDeduction: React.FC = () => {
               </div>
               <div className="flex justify-between text-lg font-semibold">
                 <span className="text-white">Total Amount:</span>
-                <span className="text-yellow-400">₹{tollAmount}</span>
+                <span className="text-yellow-400">{formatETHDisplay(tollAmount / 1000)}</span>
               </div>
             </div>
           </div>
@@ -345,7 +346,7 @@ export const TollDeduction: React.FC = () => {
               disabled={isPending || isConfirming}
               className="btn-primary w-full"
             >
-              {isPending || isConfirming ? 'Processing...' : `Pay ₹${tollAmount}`}
+              {isPending || isConfirming ? 'Processing...' : `Pay ${formatETHDisplay(tollAmount / 1000)}`}
             </button>
           )}
 

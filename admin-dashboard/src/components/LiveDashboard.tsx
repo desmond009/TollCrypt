@@ -163,10 +163,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
   }, [socket]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+    return `${amount.toFixed(4)} ETH`;
   };
 
   const formatTime = (timestamp: string) => {
