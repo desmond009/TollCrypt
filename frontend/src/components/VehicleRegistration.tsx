@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { vehicleAPIService, VehicleRegistrationData } from '../services/vehicleAPIService';
 import { topUpWalletAPI, TopUpWalletInfo } from '../services/topUpWalletService';
+import { useSession } from '../services/sessionManager';
 
 // Contract addresses from deployment
 const TOLL_COLLECTION_ADDRESS = (process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291') as `0x${string}`;
@@ -31,6 +32,7 @@ interface VehicleRegistrationProps {
 
 export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegistrationSuccess }) => {
   const { address } = useAccount();
+  const { getSessionStatus, isAuthValid } = useSession();
   const [vehicleId, setVehicleId] = useState('');
   const [vehicleType, setVehicleType] = useState('');
   const [documents, setDocuments] = useState<VehicleDocument[]>([]);
@@ -48,41 +50,27 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
     hash,
   });
 
-  // Check Aadhaar verification status on component mount
+  // Check Aadhaar verification status using session manager
   useEffect(() => {
-    const checkAadhaarVerification = async () => {
+    const checkAadhaarVerification = () => {
       try {
-        const sessionToken = localStorage.getItem('sessionToken');
-        const userAddress = localStorage.getItem('userAddress') || address;
+        const sessionStatus = getSessionStatus();
+        const authValid = isAuthValid();
         
-        if (!sessionToken || !userAddress) {
-          setVerificationStatus('not-verified');
-          setIsAadhaarVerified(false);
-          return;
-        }
-
-        // Check verification status with backend
-        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/aadhaar/verification-status/${userAddress}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Session-Token': sessionToken,
-            'X-User-Address': userAddress
-          }
+        console.log('🔍 Checking Aadhaar verification status:', {
+          sessionStatus,
+          authValid,
+          isAuthenticated: sessionStatus.isAuthenticated
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data.isVerified) {
-            setIsAadhaarVerified(true);
-            setVerificationStatus('verified');
-          } else {
-            setIsAadhaarVerified(false);
-            setVerificationStatus('not-verified');
-          }
+        
+        if (sessionStatus.isAuthenticated && authValid) {
+          setIsAadhaarVerified(true);
+          setVerificationStatus('verified');
+          console.log('✅ Aadhaar verification confirmed');
         } else {
           setIsAadhaarVerified(false);
           setVerificationStatus('not-verified');
+          console.log('❌ Aadhaar verification not found or expired');
         }
       } catch (error) {
         console.error('Error checking Aadhaar verification:', error);
@@ -92,7 +80,7 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
     };
 
     checkAadhaarVerification();
-  }, [address]);
+  }, [address, getSessionStatus, isAuthValid]);
 
   // Reset form after successful registration and create top-up wallet
   useEffect(() => {

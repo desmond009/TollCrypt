@@ -26,7 +26,6 @@ export const WalletTopUp: React.FC = () => {
   const [selectedAmount, setSelectedAmount] = useState('');
   const [customAmount, setCustomAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'fiat' | 'crypto'>('crypto');
   const [fastagBalance, setFastagBalance] = useState<string>('0');
   const [topUpWalletInfo, setTopUpWalletInfo] = useState<TopUpWalletInfo | null>(null);
   const [hasTopUpWallet, setHasTopUpWallet] = useState<boolean>(false);
@@ -181,13 +180,13 @@ export const WalletTopUp: React.FC = () => {
 
   // Handle successful crypto transaction
   useEffect(() => {
-    if (isSuccess && paymentMethod === 'crypto' && selectedAmount) {
+    if (isSuccess && selectedAmount) {
       // Refresh balance from blockchain after successful transaction
       refreshBalance();
       setSelectedAmount(''); // Reset selected amount
       setIsProcessing(false);
     }
-  }, [isSuccess, paymentMethod, selectedAmount, refreshBalance]);
+  }, [isSuccess, selectedAmount, refreshBalance]);
 
   const formatBalance = (balance: string) => {
     return parseFloat(balance).toFixed(6);
@@ -242,57 +241,46 @@ export const WalletTopUp: React.FC = () => {
     setErrorMessage('');
     
     try {
-      if (paymentMethod === 'crypto') {
-        // Check if user has a top-up wallet
-        if (!hasTopUpWallet) {
-          setErrorMessage('Please create a top-up wallet first');
-          setIsProcessing(false);
-          setSelectedAmount('');
-          return;
-        }
+      // Check if user has a top-up wallet
+      if (!hasTopUpWallet) {
+        setErrorMessage('Please create a top-up wallet first');
+        setIsProcessing(false);
+        setSelectedAmount('');
+        return;
+      }
 
-        // Get private key from localStorage
-        const privateKey = localStorage.getItem(`topup-private-key-${address}`);
-        if (!privateKey) {
-          setErrorMessage('Top-up wallet private key not found');
-          setIsProcessing(false);
-          setSelectedAmount('');
-          return;
-        }
+      // Get private key from localStorage
+      const privateKey = localStorage.getItem(`topup-private-key-${address}`);
+      if (!privateKey) {
+        setErrorMessage('Top-up wallet private key not found');
+        setIsProcessing(false);
+        setSelectedAmount('');
+        return;
+      }
 
-        // Check if user has enough ETH balance in their main wallet
-        if (ethBalance && ethBalance.value < parseEther(amount)) {
-          alert(`Insufficient ETH balance. You have ${formatEther(ethBalance.value)} ETH in your main wallet but need ${amount} ETH.`);
-          setIsProcessing(false);
-          setSelectedAmount('');
-          return;
-        }
+      // Check if user has enough ETH balance in their main wallet
+      if (ethBalance && ethBalance.value < parseEther(amount)) {
+        alert(`Insufficient ETH balance. You have ${formatEther(ethBalance.value)} ETH in your main wallet but need ${amount} ETH.`);
+        setIsProcessing(false);
+        setSelectedAmount('');
+        return;
+      }
 
-        // Real blockchain transaction - send ETH from user's wallet to top-up wallet
-        try {
-          // Send transaction from user's wallet to top-up wallet
-          await sendTransaction({
-            to: topUpWalletInfo!.walletAddress as `0x${string}`,
-            value: parseEther(amount),
-          });
-          
-          // Transaction will be handled by the useEffect that watches for isSuccess
-          // No need to manually update balance here as it will be refreshed from blockchain
-          
-        } catch (error) {
-          console.error('Transaction failed:', error);
-          setErrorMessage(error instanceof Error ? error.message : 'Transaction failed');
-          setIsProcessing(false);
-          setSelectedAmount('');
-        }
+      // Real blockchain transaction - send ETH from user's wallet to top-up wallet
+      try {
+        // Send transaction from user's wallet to top-up wallet
+        await sendTransaction({
+          to: topUpWalletInfo!.walletAddress as `0x${string}`,
+          value: parseEther(amount),
+        });
         
-      } else {
-        // Fiat payment simulation
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        // Add amount to FASTag wallet balance
-        const newBalance = (parseFloat(fastagBalance) + parseFloat(amount)).toString();
-        setFastagBalance(newBalance);
-        alert(`Successfully topped up ${amount} ETH equivalent to your FASTag wallet!`);
+        // Transaction will be handled by the useEffect that watches for isSuccess
+        // No need to manually update balance here as it will be refreshed from blockchain
+        
+      } catch (error) {
+        console.error('Transaction failed:', error);
+        setErrorMessage(error instanceof Error ? error.message : 'Transaction failed');
+        setIsProcessing(false);
         setSelectedAmount('');
       }
       
@@ -488,51 +476,21 @@ export const WalletTopUp: React.FC = () => {
         </div>
       </div>
 
-      {/* Payment Method Selector */}
+      {/* Blockchain Payment Method */}
       <div>
-        <h3 className="text-lg font-semibold text-white mb-4">Choose Payment Method</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setPaymentMethod('crypto')}
-            className={`p-4 rounded-lg border transition-colors ${
-              paymentMethod === 'crypto'
-                ? 'bg-blue-600 border-blue-500 text-white'
-                : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
-                </svg>
-              </div>
-              <div className="text-left">
-                <p className="font-medium">Crypto Wallet</p>
-                <p className="text-sm opacity-80">ETH</p>
-              </div>
+        <h3 className="text-lg font-semibold text-white mb-4">Payment Method</h3>
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg p-4 text-white">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
+              </svg>
             </div>
-          </button>
-          
-          <button
-            onClick={() => setPaymentMethod('fiat')}
-            className={`p-4 rounded-lg border transition-colors ${
-              paymentMethod === 'fiat'
-                ? 'bg-blue-600 border-blue-500 text-white'
-                : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"/>
-                </svg>
-              </div>
-              <div className="text-left">
-                <p className="font-medium">Fiat Payment</p>
-                <p className="text-sm opacity-80">Card, UPI, Net Banking</p>
-              </div>
+            <div>
+              <p className="font-medium">Blockchain Wallet</p>
+              <p className="text-sm opacity-80">ETH - Direct Transfer</p>
             </div>
-          </button>
+          </div>
         </div>
       </div>
 
@@ -550,7 +508,7 @@ export const WalletTopUp: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-white font-semibold">
-                    {paymentMethod === 'crypto' ? formatCryptoAmount(option.amount) : option.label}
+                    {formatCryptoAmount(option.amount)}
                   </p>
                   <p className="text-gray-400 text-sm">{option.description}</p>
                 </div>
@@ -570,7 +528,7 @@ export const WalletTopUp: React.FC = () => {
           <div className="flex">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                {paymentMethod === 'crypto' ? 'ETH' : '₹'}
+                ETH
               </span>
               <input
                 type="number"
@@ -591,88 +549,11 @@ export const WalletTopUp: React.FC = () => {
             </button>
           </div>
           <p className="text-gray-500 text-sm">
-            Minimum top-up amount: {paymentMethod === 'crypto' ? '0.001 ETH' : '₹1.00'}
+            Minimum top-up amount: 0.001 ETH
           </p>
         </div>
       </div>
 
-      {/* Payment Methods */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">Payment Methods</h3>
-        <div className="space-y-3">
-          {/* Crypto Payment Method */}
-          <div className="flex items-center justify-between bg-gray-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-medium">Crypto Wallet</p>
-                <p className="text-gray-400 text-sm">ETH, Direct Transfer</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <span className="text-green-400 text-sm mr-2">Available</span>
-              <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd"/>
-              </svg>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between bg-gray-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-medium">Credit/Debit Card</p>
-                <p className="text-gray-400 text-sm">Visa, Mastercard, RuPay</p>
-              </div>
-            </div>
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd"/>
-            </svg>
-          </div>
-
-          <div className="flex items-center justify-between bg-gray-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-medium">UPI</p>
-                <p className="text-gray-400 text-sm">PhonePe, Google Pay, Paytm</p>
-              </div>
-            </div>
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd"/>
-            </svg>
-          </div>
-
-          <div className="flex items-center justify-between bg-gray-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-medium">Net Banking</p>
-                <p className="text-gray-400 text-sm">All major banks</p>
-              </div>
-            </div>
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd"/>
-            </svg>
-          </div>
-        </div>
-      </div>
 
       {/* Processing State */}
       {isProcessing && (
@@ -683,13 +564,10 @@ export const WalletTopUp: React.FC = () => {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
             <p className="text-blue-300">
-              {paymentMethod === 'crypto' 
-                ? 'Signing transaction with MetaMask...'
-                : 'Processing payment...'
-              }
+              Signing transaction with MetaMask...
             </p>
           </div>
-          {paymentMethod === 'crypto' && hash && (
+          {hash && (
             <div className="mt-3 text-sm text-blue-200">
               <p>Transaction Hash: {hash.slice(0, 10)}...{hash.slice(-8)}</p>
               <p>Status: {isConfirming ? 'Confirming...' : isSuccess ? 'Confirmed!' : 'Pending'}</p>
@@ -699,7 +577,7 @@ export const WalletTopUp: React.FC = () => {
       )}
 
       {/* Success State */}
-      {isSuccess && paymentMethod === 'crypto' && (
+      {isSuccess && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-4">
           <div className="flex items-center">
             <svg className="h-5 w-5 text-green-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
