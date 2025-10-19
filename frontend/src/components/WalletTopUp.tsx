@@ -80,6 +80,38 @@ export const WalletTopUp: React.FC = () => {
     loadWallet();
   }, [address]);
 
+  // Refresh wallet from blockchain/database (bypassing localStorage)
+  const refreshWalletFromBlockchain = async () => {
+    if (!address) return;
+
+    try {
+      console.log('🔄 Refreshing wallet from blockchain/database...');
+      const result = await walletPersistenceService.getWalletInfoFresh(address, false);
+      
+      if (result.walletInfo) {
+        console.log(`✅ Wallet refreshed from ${result.source}:`, result.walletInfo.walletAddress);
+        setTopUpWalletInfo({
+          walletAddress: result.walletInfo.walletAddress,
+          privateKey: result.walletInfo.privateKey,
+          publicKey: result.walletInfo.publicKey,
+          balance: result.walletInfo.balance,
+          isInitialized: true
+        });
+        setHasTopUpWallet(true);
+        setFastagBalance(result.walletInfo.balance);
+        setWalletCreatedMessage(`Wallet refreshed from ${result.source}`);
+        setTimeout(() => setWalletCreatedMessage(''), 3000);
+      } else {
+        console.log('ℹ️ No wallet found on blockchain/database');
+        setHasTopUpWallet(false);
+        setFastagBalance('0');
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing wallet:', error);
+      setErrorMessage('Failed to refresh wallet. Please try again.');
+    }
+  };
+
   // Function to refresh balance from blockchain
   const refreshBalance = useCallback(async () => {
     if (!address || !hasTopUpWallet || !topUpWalletInfo) return;
@@ -167,16 +199,25 @@ export const WalletTopUp: React.FC = () => {
       }
 
       try {
-        const existsResponse = await topUpWalletAPI.hasTopUpWallet();
+        // Use persistence service to check for existing wallet without creating new one
+        console.log('🔄 Checking for existing wallet using persistence service...');
+        const walletInfo = await walletPersistenceService.getWalletWithFallback(address, false);
         
-        if (existsResponse.exists) {
+        if (walletInfo) {
           // User has existing wallet - load wallet info and balance
+          console.log('✅ Existing wallet found:', walletInfo.walletAddress);
           setHasTopUpWallet(true);
-          const walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
-          setTopUpWalletInfo(walletInfo);
+          setTopUpWalletInfo({
+            walletAddress: walletInfo.walletAddress,
+            privateKey: walletInfo.privateKey,
+            publicKey: walletInfo.publicKey,
+            balance: walletInfo.balance,
+            isInitialized: true
+          });
           setFastagBalance(walletInfo.balance);
         } else {
           // First-time user - show create wallet option but don't auto-create
+          console.log('ℹ️ No existing wallet found, user can create one');
           setHasTopUpWallet(false);
           setTopUpWalletInfo(null);
           setFastagBalance('0');
@@ -417,6 +458,13 @@ export const WalletTopUp: React.FC = () => {
                       title="Copy full address"
                     >
                       📋
+                    </button>
+                    <button
+                      onClick={refreshWalletFromBlockchain}
+                      className="text-green-400 hover:text-green-300 text-xs flex-shrink-0"
+                      title="Refresh from blockchain/database"
+                    >
+                      🔄
                     </button>
                   </div>
                 </div>

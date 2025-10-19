@@ -1,9 +1,9 @@
 /**
  * Wallet Persistence Service - Three-Tier Storage Strategy
  * 
- * Tier 1: Blockchain (Smart Contract) - Single source of truth
+ * Tier 1: Blockchain (Smart Contract) - Single source of truth, checked first
  * Tier 2: Database (MongoDB) - Fast retrieval, backup
- * Tier 3: Browser (localStorage) - Instant access, UX optimization
+ * Tier 3: Browser (localStorage) - Instant access, UX optimization, checked last
  */
 
 import { topUpWalletAPI } from './topUpWalletService';
@@ -19,7 +19,7 @@ export interface WalletInfo {
 
 export interface WalletLookupResult {
   walletInfo: WalletInfo | null;
-  source: 'localStorage' | 'database' | 'blockchain' | 'created';
+  source: 'localStorage' | 'database' | 'blockchain' | 'created' | 'not_found';
   fromCache: boolean;
 }
 
@@ -37,45 +37,15 @@ class WalletPersistenceService {
 
   /**
    * Get wallet info using three-tier fallback strategy
-   * 1. Check localStorage first (instant)
-   * 2. Check database (fast)
-   * 3. Check blockchain (slow but authoritative)
-   * 4. Create new wallet if none exists
+   * 1. Check blockchain first (authoritative source)
+   * 2. Check database (fast retrieval, backup)
+   * 3. Check localStorage last (instant access, UX optimization)
+   * 4. Create new wallet if none exists (optional)
    */
-  public async getWalletInfo(userAddress: string): Promise<WalletLookupResult> {
+  public async getWalletInfo(userAddress: string, createIfNotFound: boolean = true): Promise<WalletLookupResult> {
     console.log('🔍 Starting wallet lookup for user:', userAddress);
 
-    // Tier 3: Check localStorage first (instant access)
-    const cachedWallet = this.getFromLocalStorage(userAddress);
-    if (cachedWallet && this.isCacheValid(cachedWallet)) {
-      console.log('✅ Wallet found in localStorage (instant)');
-      this.updateLastAccessed(cachedWallet);
-      return {
-        walletInfo: cachedWallet,
-        source: 'localStorage',
-        fromCache: true
-      };
-    }
-
-    // Tier 2: Check database (fast retrieval)
-    try {
-      console.log('🔍 Checking database for wallet...');
-      const dbWallet = await this.getFromDatabase(userAddress);
-      if (dbWallet) {
-        console.log('✅ Wallet found in database (fast)');
-        // Cache in localStorage for future instant access
-        this.saveToLocalStorage(userAddress, dbWallet);
-        return {
-          walletInfo: dbWallet,
-          source: 'database',
-          fromCache: false
-        };
-      }
-    } catch (error) {
-      console.warn('⚠️ Database lookup failed:', error);
-    }
-
-    // Tier 1: Check blockchain (authoritative but slow)
+    // Tier 1: Check blockchain first (authoritative source)
     try {
       console.log('🔍 Checking blockchain for wallet...');
       const blockchainWallet = await this.getFromBlockchain(userAddress);
@@ -94,19 +64,58 @@ class WalletPersistenceService {
       console.warn('⚠️ Blockchain lookup failed:', error);
     }
 
-    // No wallet found - create new one
-    console.log('🔧 No wallet found, creating new one...');
+    // Tier 2: Check database (fast retrieval, backup)
     try {
-      const newWallet = await this.createNewWallet(userAddress);
-      console.log('✅ New wallet created successfully');
+      console.log('🔍 Checking database for wallet...');
+      const dbWallet = await this.getFromDatabase(userAddress);
+      if (dbWallet) {
+        console.log('✅ Wallet found in database (fast)');
+        // Cache in localStorage for future instant access
+        this.saveToLocalStorage(userAddress, dbWallet);
+        return {
+          walletInfo: dbWallet,
+          source: 'database',
+          fromCache: false
+        };
+      }
+    } catch (error) {
+      console.warn('⚠️ Database lookup failed:', error);
+    }
+
+    // Tier 3: Check localStorage last (instant access, UX optimization)
+    const cachedWallet = this.getFromLocalStorage(userAddress);
+    if (cachedWallet && this.isCacheValid(cachedWallet)) {
+      console.log('✅ Wallet found in localStorage (cached)');
+      this.updateLastAccessed(cachedWallet);
       return {
-        walletInfo: newWallet,
-        source: 'created',
+        walletInfo: cachedWallet,
+        source: 'localStorage',
+        fromCache: true
+      };
+    }
+
+    // No wallet found - create new one if requested
+    if (createIfNotFound) {
+      console.log('🔧 No wallet found, creating new one...');
+      try {
+        const newWallet = await this.createNewWallet(userAddress);
+        console.log('✅ New wallet created successfully');
+        return {
+          walletInfo: newWallet,
+          source: 'created',
+          fromCache: false
+        };
+      } catch (error) {
+        console.error('❌ Failed to create new wallet:', error);
+        throw new Error('Failed to create or retrieve wallet');
+      }
+    } else {
+      console.log('ℹ️ No wallet found and createIfNotFound is false');
+      return {
+        walletInfo: null,
+        source: 'not_found',
         fromCache: false
       };
-    } catch (error) {
-      console.error('❌ Failed to create new wallet:', error);
-      throw new Error('Failed to create or retrieve wallet');
     }
   }
 
@@ -286,9 +295,9 @@ class WalletPersistenceService {
   /**
    * Get wallet info with fallback strategy (main public method)
    */
-  public async getWalletWithFallback(userAddress: string): Promise<WalletInfo | null> {
+  public async getWalletWithFallback(userAddress: string, createIfNotFound: boolean = true): Promise<WalletInfo | null> {
     try {
-      const result = await this.getWalletInfo(userAddress);
+      const result = await this.getWalletInfo(userAddress, createIfNotFound);
       return result.walletInfo;
     } catch (error) {
       console.error('❌ Failed to get wallet with fallback:', error);
@@ -320,6 +329,19 @@ class WalletPersistenceService {
     }
     
     return null;
+  }
+
+  /**
+   * Get wallet info bypassing localStorage cache (always check blockchain/database first)
+   */
+  public async getWalletInfoFresh(userAddress: string, createIfNotFound: boolean = true): Promise<WalletLookupResult> {
+    console.log('🔄 Getting fresh wallet info (bypassing localStorage cache)...');
+    
+    // Clear cache first
+    this.clearWalletCache(userAddress);
+    
+    // Use the normal flow which now checks blockchain first
+    return this.getWalletInfo(userAddress, createIfNotFound);
   }
 }
 

@@ -3,6 +3,7 @@ import { useAccount, useDisconnect } from 'wagmi';
 import { useSession, VehicleInfo } from '../services/sessionManager';
 import { VehicleRegistration } from './VehicleRegistration';
 import { topUpWalletAPI, TopUpWalletInfo } from '../services/topUpWalletService';
+import { walletPersistenceService } from '../services/walletPersistenceService';
 
 type AppStep = 'wallet' | 'auth' | 'register' | 'topup' | 'payment' | 'dashboard' | 'profile';
 
@@ -46,12 +47,25 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
       try {
         setIsLoadingWallet(true);
         
-        // Try to get wallet info - this will work for both existing and new wallets
+        // Try to get wallet info using persistence service
         try {
-          const walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
-          setTopUpWalletInfo(walletInfo);
-          setHasTopUpWallet(true);
-          console.log('Top-up wallet loaded successfully:', walletInfo.walletAddress);
+          const walletInfo = await walletPersistenceService.getWalletWithFallback(address, false);
+          if (walletInfo) {
+            setTopUpWalletInfo({
+              walletAddress: walletInfo.walletAddress,
+              privateKey: walletInfo.privateKey,
+              publicKey: walletInfo.publicKey,
+              balance: walletInfo.balance,
+              isInitialized: true
+            });
+            setHasTopUpWallet(true);
+            console.log('Top-up wallet loaded successfully:', walletInfo.walletAddress);
+          } else {
+            // If wallet doesn't exist, that's okay - user can create one later
+            console.log('No top-up wallet found for user');
+            setTopUpWalletInfo(null);
+            setHasTopUpWallet(false);
+          }
         } catch (error) {
           // If wallet doesn't exist, that's okay - user can create one later
           console.log('No top-up wallet found for user');

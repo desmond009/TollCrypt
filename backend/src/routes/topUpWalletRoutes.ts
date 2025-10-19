@@ -465,6 +465,29 @@ router.post('/signature/withdraw', authenticateSession, async (req: Request, res
 });
 
 /**
+ * @route GET /api/topup-wallet/debug-request
+ * @desc Debug endpoint to see what requests are coming in
+ * @access Public
+ */
+router.get('/debug-request', (req: Request, res: Response) => {
+  console.log('🔍 Debug request received:', {
+    url: req.url,
+    method: req.method,
+    headers: req.headers,
+    query: req.query,
+    body: req.body
+  });
+  
+  res.json({
+    message: 'Debug request received',
+    url: req.url,
+    method: req.method,
+    headers: req.headers,
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
  * @route GET /api/topup-wallet/debug
  * @desc Debug endpoint to check user and wallet status
  * @access Private

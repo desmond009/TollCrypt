@@ -44,7 +44,12 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
         const walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
         setTopUpWalletInfo(walletInfo);
       } catch (error) {
-        console.error('Error loading top-up wallet info:', error);
+        // Only log non-404 errors as errors, 404 or "not found" means wallet doesn't exist yet
+        if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+          console.log('Top-up wallet not found - user needs to create one first');
+        } else {
+          console.error('Error loading top-up wallet info:', error);
+        }
         // Don't set error state here as user might not have created top-up wallet yet
       }
     };
@@ -158,7 +163,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
           </div>
 
           {/* Top-up Wallet Info */}
-          {topUpWalletInfo && (
+          {topUpWalletInfo ? (
             <div className="mb-6 p-4 bg-blue-900 rounded-lg border border-blue-700">
               <h3 className="font-medium text-blue-300 mb-2">Top-up Wallet Details</h3>
               <div className="text-sm text-blue-400 space-y-1">
@@ -177,6 +182,14 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
                     {topUpWalletInfo.isInitialized ? 'Initialized' : 'Pending'}
                   </span>
                 </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6 p-4 bg-yellow-900 rounded-lg border border-yellow-700">
+              <h3 className="font-medium text-yellow-300 mb-2">Top-up Wallet Required</h3>
+              <div className="text-sm text-yellow-400 space-y-2">
+                <p>You need to create a top-up wallet before generating QR codes for toll payments.</p>
+                <p>Please go to the "Wallet Top-Up" section to create your top-up wallet first.</p>
               </div>
             </div>
           )}

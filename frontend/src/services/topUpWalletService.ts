@@ -26,7 +26,7 @@ export interface TopUpResult {
 export class TopUpWalletAPIService {
   private baseURL: string;
 
-  constructor(baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:3001') {
+  constructor(baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:3001/api') {
     this.baseURL = baseURL;
   }
 
@@ -35,6 +35,13 @@ export class TopUpWalletAPIService {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}/topup-wallet${endpoint}`;
+    
+    // Debug logging
+    console.log('🔍 TopUpWalletAPIService.makeRequest:', {
+      baseURL: this.baseURL,
+      endpoint,
+      fullURL: url
+    });
     
     // Get session token and user address from localStorage
     let sessionToken = localStorage.getItem('sessionToken');
@@ -68,14 +75,22 @@ export class TopUpWalletAPIService {
       throw new Error('Wallet not connected or session not initialized. Please connect your wallet and try again.');
     }
     
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      'X-Session-Token': sessionToken,
+      'X-User-Address': userAddress,
+      ...options.headers,
+    };
+    
+    console.log('🔍 Request details:', {
+      url,
+      method: options.method || 'GET',
+      headers: requestHeaders
+    });
+    
     const response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-Token': sessionToken,
-        'X-User-Address': userAddress,
-        ...options.headers,
-      },
+      headers: requestHeaders,
       credentials: 'include',
     });
 
