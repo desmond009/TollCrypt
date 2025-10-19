@@ -12,7 +12,6 @@ import { PlazaManagement } from './components/PlazaManagement';
 import { QRScanner } from './components/QRScanner';
 import { TransactionProcessor } from './components/TransactionProcessor';
 import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { useAuth } from './hooks/useAuth';
@@ -223,14 +222,19 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <Header user={user} onLogout={logout} notifications={notifications} />
-      <div className="flex flex-col lg:flex-row">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 p-4 lg:p-6">
+    <div className="min-h-screen bg-gray-900 text-white">
+      <Header 
+        user={user} 
+        onLogout={logout} 
+        notifications={notifications}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
           {renderContent()}
-        </main>
-      </div>
+        </div>
+      </main>
       
       {/* Real-time Notifications */}
       {isAuthenticated && user && (
