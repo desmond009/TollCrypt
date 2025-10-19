@@ -49,6 +49,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ socket }) => {
 
   const fetchAnalytics = useCallback(async () => {
     try {
+      setIsLoading(true);
       const response = await fetch(
         `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/admin/analytics?period=${period}`
       );
@@ -63,9 +64,12 @@ export const Analytics: React.FC<AnalyticsProps> = ({ socket }) => {
 
   useEffect(() => {
     fetchAnalytics();
-  }, [fetchAnalytics]);
+  }, [period]); // Only depend on period, not fetchAnalytics
 
   const formatDailyData = (dailyTransactions: any[]) => {
+    if (!dailyTransactions || !Array.isArray(dailyTransactions)) {
+      return [];
+    }
     return dailyTransactions.map(item => ({
       date: `${item._id.month}/${item._id.day}`,
       transactions: item.count,
@@ -74,6 +78,9 @@ export const Analytics: React.FC<AnalyticsProps> = ({ socket }) => {
   };
 
   const formatVehicleTypeData = (vehicleTypes: any[]) => {
+    if (!vehicleTypes || !Array.isArray(vehicleTypes)) {
+      return [];
+    }
     return vehicleTypes.map((item, index) => ({
       name: item._id,
       value: item.count,
@@ -82,6 +89,9 @@ export const Analytics: React.FC<AnalyticsProps> = ({ socket }) => {
   };
 
   const formatStatusData = (statuses: any[]) => {
+    if (!statuses || !Array.isArray(statuses)) {
+      return [];
+    }
     return statuses.map((item, index) => ({
       name: item._id,
       value: item.count,
@@ -105,9 +115,9 @@ export const Analytics: React.FC<AnalyticsProps> = ({ socket }) => {
     );
   }
 
-  const dailyData = formatDailyData(data.dailyTransactions);
-  const vehicleTypeData = formatVehicleTypeData(data.vehicleTypeDistribution);
-  const statusData = formatStatusData(data.statusDistribution);
+  const dailyData = formatDailyData(data?.dailyTransactions);
+  const vehicleTypeData = formatVehicleTypeData(data?.vehicleTypeDistribution);
+  const statusData = formatStatusData(data?.statusDistribution);
 
   return (
     <div className="space-y-6">

@@ -28,6 +28,14 @@ import { api } from '../services/api';
 import { format, subDays, subMonths, subYears } from 'date-fns';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { 
+  processRevenueData, 
+  processVehicleTypeData, 
+  processTransactionData, 
+  processVehicleRegistrationData, 
+  processRevenueByPlazaData, 
+  isValidChartData 
+} from '../utils/chartUtils';
 
 // Register Chart.js components
 ChartJS.register(
@@ -267,84 +275,24 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
 
     switch (filters.reportType) {
       case 'revenue':
-        return {
-          labels: data.revenue.daily.map(item => format(new Date(item.date), 'MMM dd')),
-          datasets: [
-            {
-              label: 'Revenue',
-              data: data.revenue.daily.map(item => item.amount),
-              borderColor: 'rgb(59, 130, 246)',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              tension: 0.1,
-            },
-          ],
-        };
+        return processRevenueData(data.revenue);
       case 'transactions':
-        return {
-          labels: data.transactions.daily.map(item => format(new Date(item.date), 'MMM dd')),
-          datasets: [
-            {
-              label: 'Transactions',
-              data: data.transactions.daily.map(item => item.count),
-              borderColor: 'rgb(16, 185, 129)',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              tension: 0.1,
-            },
-          ],
-        };
+        return processTransactionData(data.transactions);
       case 'vehicles':
-        return {
-          labels: data.vehicles.newRegistrations.map(item => format(new Date(item.date), 'MMM dd')),
-          datasets: [
-            {
-              label: 'New Registrations',
-              data: data.vehicles.newRegistrations.map(item => item.count),
-              borderColor: 'rgb(245, 158, 11)',
-              backgroundColor: 'rgba(245, 158, 11, 0.1)',
-              tension: 0.1,
-            },
-          ],
-        };
+        return processVehicleRegistrationData(data.vehicles);
       default:
         return null;
     }
   };
 
   const getVehicleTypeData = () => {
-    if (!data) return null;
-
-    return {
-      labels: data.vehicles.byType.map(item => item.type),
-      datasets: [
-        {
-          data: data.vehicles.byType.map(item => item.count),
-          backgroundColor: [
-            '#3B82F6',
-            '#10B981',
-            '#F59E0B',
-            '#EF4444',
-            '#8B5CF6',
-            '#06B6D4',
-            '#84CC16',
-          ],
-        },
-      ],
-    };
+    if (!data || !data.vehicles) return null;
+    return processVehicleTypeData(data.vehicles);
   };
 
   const getRevenueByPlazaData = () => {
-    if (!data) return null;
-
-    return {
-      labels: data.revenue.byPlaza.map(item => item.plaza),
-      datasets: [
-        {
-          label: 'Revenue',
-          data: data.revenue.byPlaza.map(item => item.amount),
-          backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        },
-      ],
-    };
+    if (!data || !data.revenue) return null;
+    return processRevenueByPlazaData(data.revenue);
   };
 
   if (isLoading) {
@@ -542,7 +490,7 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                   {filters.reportType === 'vehicles' && 'Vehicle Registrations'}
                   {filters.reportType === 'performance' && 'Performance Metrics'}
                 </h3>
-                {getChartData() && (
+                {isValidChartData(getChartData()) ? (
                   <Line
                     data={getChartData()!}
                     options={{
@@ -559,13 +507,17 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                       },
                     }}
                   />
+                ) : (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-gray-500">No chart data available</div>
+                  </div>
                 )}
               </div>
 
               {/* Vehicle Type Distribution */}
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Vehicle Type Distribution</h3>
-                {getVehicleTypeData() && (
+                {isValidChartData(getVehicleTypeData()) ? (
                   <Doughnut
                     data={getVehicleTypeData()!}
                     options={{
@@ -577,6 +529,10 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                       },
                     }}
                   />
+                ) : (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-gray-500">No vehicle type data available</div>
+                  </div>
                 )}
               </div>
             </div>
@@ -584,7 +540,7 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
             {/* Revenue by Plaza */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue by Plaza</h3>
-              {getRevenueByPlazaData() && (
+              {isValidChartData(getRevenueByPlazaData()) ? (
                 <Bar
                   data={getRevenueByPlazaData()!}
                   options={{
@@ -606,6 +562,10 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                     }
                   }}
                 />
+              ) : (
+                <div className="h-64 flex items-center justify-center">
+                  <div className="text-gray-500">No revenue by plaza data available</div>
+                </div>
               )}
             </div>
 

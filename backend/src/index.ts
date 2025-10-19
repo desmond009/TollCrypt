@@ -18,6 +18,10 @@ import qrRoutes from './routes/qrRoutes';
 import authRoutes from './routes/authRoutes';
 import topUpWalletRoutes from './routes/topUpWalletRoutes';
 import aadhaarRoutes from './routes/aadhaarRoutes';
+// Import models for dashboard stats
+const { TollTransaction } = require('./models/TollTransaction');
+const { Vehicle } = require('./models/Vehicle');
+const { TollPlaza } = require('./models/TollPlaza');
 
 // Load environment variables
 dotenv.config();
@@ -106,6 +110,103 @@ app.use('/api/hardware', hardwareRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/topup-wallet', topUpWalletRoutes);
 app.use('/api/aadhaar', aadhaarRoutes);
+
+// Dashboard routes - specific endpoints for frontend compatibility
+app.get('/api/dashboard/stats', async (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // Get transaction statistics
+    const todayTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: today },
+      status: 'confirmed'
+    });
+    
+    const thisMonthTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: thisMonth },
+      status: 'confirmed'
+    });
+    
+    // Get revenue statistics
+    const todayRevenue = await TollTransaction.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: today },
+          status: 'confirmed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+    
+    const thisMonthRevenue = await TollTransaction.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: thisMonth },
+          status: 'confirmed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+    
+    // Get vehicle statistics
+    const totalVehicles = await Vehicle.countDocuments({ isActive: true });
+    const blacklistedVehicles = await Vehicle.countDocuments({ isBlacklisted: true });
+    const newVehiclesToday = await Vehicle.countDocuments({
+      registrationTime: { $gte: today }
+    });
+    
+    // Get active plazas
+    const activePlazas = await TollPlaza.countDocuments({ isActive: true });
+    
+    // Get failed transactions
+    const failedTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: today },
+      status: 'failed'
+    });
+    
+    // Calculate success rate
+    const totalTodayTransactions = await TollTransaction.countDocuments({
+      timestamp: { $gte: today }
+    });
+    const successRate = totalTodayTransactions > 0 ? 
+      ((todayTransactions / totalTodayTransactions) * 100) : 0;
+    
+    // Calculate average wait time (mock data for now)
+    const averageWaitTime = 2.5; // minutes
+    
+    res.json({
+      success: true,
+      data: {
+        totalVehicles,
+        totalRevenue: thisMonthRevenue[0]?.total || 0,
+        averageWaitTime,
+        successRate: Math.round(successRate * 100) / 100,
+        todayTransactions,
+        todayRevenue: todayRevenue[0]?.total || 0,
+        activePlazas,
+        failedTransactions
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch dashboard stats' 
+    });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {

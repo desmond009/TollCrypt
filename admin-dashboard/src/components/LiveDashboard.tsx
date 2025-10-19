@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Chart as ChartJS,
   CategoryScale,
@@ -23,6 +23,7 @@ import {
   ArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { api } from '../services/api';
+import { processRevenueData, processVehicleTypeData, isValidChartData } from '../utils/chartUtils';
 
 // Register Chart.js components
 ChartJS.register(
@@ -95,45 +96,47 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch dashboard data
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch stats
+      const statsResponse = await api.get('/api/dashboard/stats');
+      setStats(statsResponse.data.data);
+
+      // Fetch recent transactions
+      const transactionsResponse = await api.get('/api/admin/transactions/recent?limit=10');
+      setRecentTransactions(transactionsResponse.data.data || []);
+
+      // Fetch plazas
+      const plazasResponse = await api.get('/api/admin/plazas');
+      setPlazas(plazasResponse.data.data || []);
+
+      // Fetch revenue chart data
+      const revenueResponse = await api.get('/api/admin/analytics/revenue?period=7d');
+      const revenueData = processRevenueData(revenueResponse.data.data);
+      setRevenueData(revenueData);
+
+      // Fetch vehicle type distribution
+      const vehicleTypeResponse = await api.get('/api/admin/analytics/vehicle-types');
+      const vehicleData = processVehicleTypeData(vehicleTypeResponse.data.data);
+      setVehicleTypeData(vehicleData);
+
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch stats
-        const statsResponse = await api.get('/api/dashboard/stats');
-        setStats(statsResponse.data.data);
-
-        // Fetch recent transactions
-        const transactionsResponse = await api.get('/api/admin/transactions/recent?limit=10');
-        setRecentTransactions(transactionsResponse.data.data || []);
-
-        // Fetch plazas
-        const plazasResponse = await api.get('/api/admin/plazas');
-        setPlazas(plazasResponse.data.data || []);
-
-        // Fetch revenue chart data
-        const revenueResponse = await api.get('/api/admin/analytics/revenue?period=7d');
-        setRevenueData(revenueResponse.data.data || null);
-
-        // Fetch vehicle type distribution
-        const vehicleTypeResponse = await api.get('/api/admin/analytics/vehicle-types');
-        setVehicleTypeData(vehicleTypeResponse.data.data || null);
-
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchDashboardData();
 
-    // Set up real-time updates
-    const interval = setInterval(fetchDashboardData, 5000); // Update every 5 seconds
+    // Set up real-time updates - reduced frequency to 30 seconds
+    const interval = setInterval(fetchDashboardData, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchDashboardData]);
 
   // Listen for real-time updates via socket
   useEffect(() => {
@@ -290,7 +293,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
         {/* Revenue Chart */}
         <div className="admin-card">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Trend (7 Days)</h3>
-          {revenueData ? (
+          {isValidChartData(revenueData) ? (
             <Line
               data={revenueData}
               options={{
@@ -317,7 +320,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
             />
           ) : (
             <div className="h-64 flex items-center justify-center">
-              <div className="text-gray-500">Loading chart data...</div>
+              <div className="text-gray-500">No revenue data available</div>
             </div>
           )}
         </div>
@@ -325,7 +328,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
         {/* Vehicle Type Distribution */}
         <div className="admin-card">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Vehicle Type Distribution</h3>
-          {vehicleTypeData ? (
+          {isValidChartData(vehicleTypeData) ? (
             <Doughnut
               data={vehicleTypeData}
               options={{
@@ -339,7 +342,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
             />
           ) : (
             <div className="h-64 flex items-center justify-center">
-              <div className="text-gray-500">Loading chart data...</div>
+              <div className="text-gray-500">No vehicle type data available</div>
             </div>
           )}
         </div>
