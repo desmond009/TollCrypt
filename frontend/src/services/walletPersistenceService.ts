@@ -61,7 +61,10 @@ class WalletPersistenceService {
         };
       }
     } catch (error) {
-      console.warn('⚠️ Blockchain lookup failed:', error);
+      // Only log if it's not a "wallet not found" error (which is expected)
+      if (!(error instanceof Error && error.message?.includes('Top-up wallet not found'))) {
+        console.warn('⚠️ Blockchain lookup failed:', error);
+      }
     }
 
     // Tier 2: Check database (fast retrieval, backup)
@@ -79,7 +82,10 @@ class WalletPersistenceService {
         };
       }
     } catch (error) {
-      console.warn('⚠️ Database lookup failed:', error);
+      // Only log if it's not a "wallet not found" error (which is expected)
+      if (!(error instanceof Error && error.message?.includes('Top-up wallet not found'))) {
+        console.warn('⚠️ Database lookup failed:', error);
+      }
     }
 
     // Tier 3: Check localStorage last (instant access, UX optimization)
@@ -153,7 +159,10 @@ class WalletPersistenceService {
         };
       }
     } catch (error) {
-      console.warn('⚠️ Database lookup failed:', error);
+      // Only log if it's not a "wallet not found" error (which is expected)
+      if (!(error instanceof Error && error.message?.includes('Top-up wallet not found'))) {
+        console.warn('⚠️ Database lookup failed:', error);
+      }
     }
     return null;
   }
@@ -180,7 +189,10 @@ class WalletPersistenceService {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Blockchain lookup failed:', error);
+      // Only log if it's not a "wallet not found" error (which is expected)
+      if (!(error instanceof Error && error.message?.includes('Top-up wallet not found'))) {
+        console.warn('⚠️ Blockchain lookup failed:', error);
+      }
     }
     return null;
   }

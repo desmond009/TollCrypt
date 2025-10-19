@@ -667,8 +667,28 @@ export class TopUpWalletService {
         return null;
       }
 
-      // Get wallet info from blockchain
-      return await this.getTopUpWalletInfo(userAddress);
+      console.log(`Found existing top-up wallet in database: ${user.topUpWalletAddress}`);
+
+      // Return wallet info from database first
+      const walletInfo: TopUpWalletInfo = {
+        walletAddress: user.topUpWalletAddress,
+        privateKey: '', // Don't store private keys in database for security
+        publicKey: '', // Don't store public keys in database for security
+        balance: '0', // Will be fetched from blockchain if needed
+        isInitialized: true
+      };
+
+      // Try to get balance from blockchain if possible
+      try {
+        if (process.env.NODE_ENV !== 'development' || process.env.MOCK_BLOCKCHAIN !== 'true') {
+          const balance = await this.getTopUpWalletBalance(userAddress);
+          walletInfo.balance = balance;
+        }
+      } catch (blockchainError) {
+        console.warn('Could not fetch balance from blockchain, using default:', blockchainError);
+      }
+
+      return walletInfo;
     } catch (error) {
       console.error('Error getting existing top-up wallet:', error);
       return null;
