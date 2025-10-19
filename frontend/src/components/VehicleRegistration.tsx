@@ -285,39 +285,41 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
       </div>
 
       <form onSubmit={handleRegisterVehicle} className="space-y-4">
-        <div>
-          <label htmlFor="vehicleId" className="block text-sm font-medium text-white mb-2">
-            Vehicle Number
-          </label>
-          <input
-            type="text"
-            id="vehicleId"
-            value={vehicleId}
-            onChange={(e) => setVehicleId(e.target.value)}
-            placeholder="MJ20CA1343"
-            className="input-field w-full"
-            required
-          />
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="vehicleId" className="block text-sm font-medium text-white mb-2">
+              Vehicle Number
+            </label>
+            <input
+              type="text"
+              id="vehicleId"
+              value={vehicleId}
+              onChange={(e) => setVehicleId(e.target.value)}
+              placeholder="MJ20CA1343"
+              className="input-field w-full text-base"
+              required
+            />
+          </div>
 
-        <div>
-          <label htmlFor="vehicleType" className="block text-sm font-medium text-white mb-2">
-            Vehicle Type
-          </label>
-          <select
-            id="vehicleType"
-            value={vehicleType}
-            onChange={(e) => setVehicleType(e.target.value)}
-            className="input-field w-full"
-            required
-          >
-            <option value="">Select Vehicle Type</option>
-            <option value="car">Car</option>
-            <option value="truck">Truck</option>
-            <option value="bus">Bus</option>
-            <option value="motorcycle">Motorcycle</option>
-            <option value="commercial">Commercial Vehicle</option>
-          </select>
+          <div>
+            <label htmlFor="vehicleType" className="block text-sm font-medium text-white mb-2">
+              Vehicle Type
+            </label>
+            <select
+              id="vehicleType"
+              value={vehicleType}
+              onChange={(e) => setVehicleType(e.target.value)}
+              className="input-field w-full text-base"
+              required
+            >
+              <option value="">Select Vehicle Type</option>
+              <option value="car">Car</option>
+              <option value="truck">Truck</option>
+              <option value="bus">Bus</option>
+              <option value="motorcycle">Motorcycle</option>
+              <option value="commercial">Commercial Vehicle</option>
+            </select>
+          </div>
         </div>
         
         <div>
@@ -327,7 +329,7 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
           
           {/* Document Upload Area */}
           <div 
-            className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-gray-500 transition-colors cursor-pointer"
+            className="border-2 border-dashed border-gray-600 rounded-lg p-4 sm:p-6 text-center hover:border-gray-500 transition-colors cursor-pointer"
             onClick={() => fileInputRef.current?.click()}
           >
             <input
@@ -341,7 +343,7 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
             
             {isUploadingDocs ? (
               <div className="flex flex-col items-center">
-                <svg className="animate-spin h-8 w-8 text-gray-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin h-6 w-6 sm:h-8 sm:w-8 text-gray-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -349,7 +351,7 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
               </div>
             ) : (
               <div>
-                <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
                 </svg>
                 <p className="text-gray-400 text-sm">Click to upload vehicle documents</p>

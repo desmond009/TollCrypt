@@ -40,15 +40,16 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
   }, []);
 
   return (
-    <header className="bg-black border-b border-gray-800 px-4 py-4">
+    <header className="bg-black border-b border-gray-800 px-3 sm:px-4 py-3 sm:py-4">
       <div className="flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-yellow-400 rounded-lg mr-3 flex items-center justify-center">
-            <span className="text-black font-bold text-sm">TC</span>
+          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-yellow-400 rounded-lg mr-2 sm:mr-3 flex items-center justify-center">
+            <span className="text-black font-bold text-xs sm:text-sm">TC</span>
           </div>
-          <h1 className="text-xl font-bold text-white">
-            Toll Chain
+          <h1 className="text-lg sm:text-xl font-bold text-white">
+            <span className="hidden sm:inline">Toll Chain</span>
+            <span className="sm:hidden">TC</span>
           </h1>
         </div>
         
@@ -102,10 +103,10 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
         )}
 
         {/* Wallet Info */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           {isConnected ? (
             <>
-              <div className="text-right">
+              <div className="text-right hidden sm:block">
                 <div className="text-sm text-white">
                   {balance ? `${parseFloat(balance.formatted).toFixed(4)} ${balance.symbol}` : '0 ETH'}
                 </div>
@@ -132,16 +133,31 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                 </div>
               </div>
               
+              {/* Mobile Status Indicators */}
+              <div className="flex items-center space-x-1 sm:hidden">
+                {sessionStatus.isAuthenticated ? (
+                  <div className="w-2 h-2 bg-blue-400 rounded-full" title="Authenticated"></div>
+                ) : (
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Need Authentication"></div>
+                )}
+                {sessionStatus.hasVehicles && (
+                  <div className="w-2 h-2 bg-green-400 rounded-full" title="Has Vehicles"></div>
+                )}
+              </div>
+              
               <div className="relative" ref={walletDropdownRef}>
                 <button 
                   onClick={() => setShowWalletDropdown(!showWalletDropdown)}
-                  className="flex items-center bg-gray-800 rounded-full px-3 py-2 hover:bg-gray-700 transition-colors"
+                  className="flex items-center bg-gray-800 rounded-full px-2 sm:px-3 py-2 hover:bg-gray-700 transition-colors"
                 >
-                  <div className="w-6 h-6 bg-gradient-to-r from-green-400 to-orange-400 rounded-full mr-2"></div>
-                  <span className="text-white text-sm font-mono">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-r from-green-400 to-orange-400 rounded-full mr-1 sm:mr-2"></div>
+                  <span className="text-white text-xs sm:text-sm font-mono hidden sm:block">
                     {address?.slice(0, 6)}...{address?.slice(-4)}
                   </span>
-                  <svg className="w-4 h-4 text-gray-400 ml-2" fill="currentColor" viewBox="0 0 20 20">
+                  <span className="text-white text-xs font-mono sm:hidden">
+                    {address?.slice(0, 4)}...{address?.slice(-2)}
+                  </span>
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 ml-1 sm:ml-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
                   </svg>
                 </button>
@@ -173,12 +189,12 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
               <div className="relative" ref={menuDropdownRef}>
                 <button 
                   onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                  className="bg-gray-800 rounded-lg px-3 py-2 flex items-center hover:bg-gray-700 transition-colors"
+                  className="bg-gray-800 rounded-lg px-2 sm:px-3 py-2 flex items-center hover:bg-gray-700 transition-colors"
                 >
-                  <svg className="w-5 h-5 text-white mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white mr-1 sm:mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
                   </svg>
-                  <span className="text-white text-sm">Menu</span>
+                  <span className="text-white text-xs sm:text-sm hidden sm:block">Menu</span>
                 </button>
                 
                 {showMenuDropdown && (

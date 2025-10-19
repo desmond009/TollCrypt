@@ -134,7 +134,7 @@ function AppContent() {
       <div className="min-h-screen bg-black text-white">
         <Header />
         
-        <main className="px-4 pb-20">
+        <main className="px-3 sm:px-4 pb-20">
           <div className="pt-8">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-yellow-400 rounded-xl mx-auto mb-4 flex items-center justify-center">
@@ -158,17 +158,17 @@ function AppContent() {
     <div className="min-h-screen bg-black text-white">
       <Header onNavigate={setCurrentStep} />
       
-      <main className="px-4 pb-20">
+      <main className="px-3 sm:px-4 pb-20">
         {/* Progress Indicator */}
         <div className="pt-4 mb-6">
-          <div className="flex items-center justify-center space-x-4">
+          <div className="flex items-center justify-center space-x-2 sm:space-x-4 overflow-x-auto pb-2">
             {[
-              { step: 'wallet', label: 'Wallet', icon: '🔗' },
-              { step: 'auth', label: 'Auth', icon: '🔐' },
-              { step: 'register', label: 'Register', icon: '🚗' },
-              { step: 'topup', label: 'Top-up', icon: '💰' },
-              { step: 'payment', label: 'Payment', icon: '💳' },
-              { step: 'dashboard', label: 'Dashboard', icon: '📊' }
+              { step: 'wallet', label: 'Wallet', icon: '🔗', shortLabel: 'W' },
+              { step: 'auth', label: 'Auth', icon: '🔐', shortLabel: 'A' },
+              { step: 'register', label: 'Register', icon: '🚗', shortLabel: 'R' },
+              { step: 'topup', label: 'Top-up', icon: '💰', shortLabel: 'T' },
+              { step: 'payment', label: 'Payment', icon: '💳', shortLabel: 'P' },
+              { step: 'dashboard', label: 'Dashboard', icon: '📊', shortLabel: 'D' }
             ].map((item, index) => {
               const isActive = currentStep === item.step;
               const isCompleted = [
@@ -182,23 +182,30 @@ function AppContent() {
               if (item.step === 'register') stepCompleted = sessionStatus.hasVehicles;
               
               return (
-                <div key={item.step} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${
+                <div key={item.step} className="flex items-center flex-shrink-0">
+                  <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs ${
                     isActive ? 'bg-yellow-400 text-black' : 
                     stepCompleted ? 'bg-green-500 text-white' : 
                     'bg-gray-700 text-gray-400'
                   }`}>
                     {stepCompleted ? '✓' : item.icon}
                   </div>
-                  <span className={`ml-2 text-xs ${
+                  <span className={`ml-1 sm:ml-2 text-xs hidden sm:block ${
                     isActive ? 'text-yellow-400' : 
                     stepCompleted ? 'text-green-400' : 
                     'text-gray-500'
                   }`}>
                     {item.label}
                   </span>
+                  <span className={`ml-1 sm:hidden text-xs font-bold ${
+                    isActive ? 'text-yellow-400' : 
+                    stepCompleted ? 'text-green-400' : 
+                    'text-gray-500'
+                  }`}>
+                    {item.shortLabel}
+                  </span>
                   {index < 5 && (
-                    <div className={`w-8 h-0.5 ml-2 ${
+                    <div className={`w-4 sm:w-8 h-0.5 ml-1 sm:ml-2 ${
                       stepCompleted ? 'bg-green-500' : 'bg-gray-700'
                     }`} />
                   )}
@@ -403,15 +410,15 @@ function AppContent() {
           {currentStep === 'dashboard' && (
             <div className="space-y-6">
               <div className="card">
-                <h2 className="text-xl font-bold text-white mb-4">FASTag Dashboard</h2>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
-                    <p className="text-sm opacity-80">Total Transactions</p>
-                    <p className="text-2xl font-bold">{dashboardStats.totalTransactions}</p>
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-4">FASTag Dashboard</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
+                  <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-3 sm:p-4 text-white">
+                    <p className="text-xs sm:text-sm opacity-80">Total Transactions</p>
+                    <p className="text-xl sm:text-2xl font-bold">{dashboardStats.totalTransactions}</p>
                   </div>
-                  <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
-                    <p className="text-sm opacity-80">Total Spent</p>
-                    <p className="text-2xl font-bold">{formatETHDisplay(dashboardStats.totalSpent)}</p>
+                  <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-3 sm:p-4 text-white">
+                    <p className="text-xs sm:text-sm opacity-80">Total Spent</p>
+                    <p className="text-xl sm:text-2xl font-bold">{formatETHDisplay(dashboardStats.totalSpent)}</p>
                   </div>
                 </div>
                 <VehicleList />
@@ -419,53 +426,53 @@ function AppContent() {
               
               {/* Quick Actions */}
               <div className="card">
-                <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Quick Actions</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   <button
                     onClick={() => setCurrentStep('payment')}
-                    className="flex flex-col items-center p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-white"
+                    className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-white"
                   >
-                    <svg className="w-6 h-6 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-sm font-medium">Toll Payment</span>
+                    <span className="text-xs sm:text-sm font-medium text-center">Toll Payment</span>
                   </button>
                   
                   <button
                     onClick={() => setCurrentStep('topup')}
                     disabled={!sessionStatus.hasVehicles}
-                    className={`flex flex-col items-center p-4 rounded-lg transition-all duration-200 ${
+                    className={`flex flex-col items-center p-3 sm:p-4 rounded-lg transition-all duration-200 ${
                       sessionStatus.hasVehicles
                         ? 'bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
                         : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
                     }`}
                     title={!sessionStatus.hasVehicles ? 'Please register a vehicle first to enable wallet top-up' : ''}
                   >
-                    <svg className="w-6 h-6 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-sm font-medium">Top-up Wallet</span>
+                    <span className="text-xs sm:text-sm font-medium text-center">Top-up Wallet</span>
                   </button>
                   
                   <button
                     onClick={() => setCurrentStep('register')}
-                    className="flex flex-col items-center p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 text-white"
+                    className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 text-white"
                   >
-                    <svg className="w-6 h-6 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-sm font-medium">Add Vehicle</span>
+                    <span className="text-xs sm:text-sm font-medium text-center">Add Vehicle</span>
                   </button>
                   
                   <button
                     onClick={() => setCurrentStep('profile')}
-                    className="flex flex-col items-center p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all duration-200 text-white"
+                    className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all duration-200 text-white"
                   >
-                    <svg className="w-6 h-6 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-sm font-medium">My Profile</span>
+                    <span className="text-xs sm:text-sm font-medium text-center">My Profile</span>
                   </button>
                 </div>
               </div>

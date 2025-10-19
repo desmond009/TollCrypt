@@ -339,10 +339,10 @@ export const WalletTopUp: React.FC = () => {
     <div className="space-y-6">
       {/* Top-up Wallet Creation Status */}
       {!hasTopUpWallet && (
-        <div className="bg-blue-900 border border-blue-700 rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-2">
+        <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div className="flex-1">
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-2">
                 {isCreatingWallet ? 'Creating Smart Contract Wallet' : 'Smart Contract Wallet'}
               </h3>
               <p className="text-blue-200 text-sm">
@@ -352,24 +352,26 @@ export const WalletTopUp: React.FC = () => {
                 }
               </p>
             </div>
-            {!isCreatingWallet && (
-              <button
-                onClick={createTopUpWallet}
-                disabled={isCreatingWallet}
-                className="btn-primary px-6 py-2 disabled:opacity-50"
-              >
-                Create Wallet
-              </button>
-            )}
-            {isCreatingWallet && (
-              <div className="flex items-center">
-                <svg className="animate-spin h-5 w-5 text-blue-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span className="text-blue-300">Creating...</span>
-              </div>
-            )}
+            <div className="flex-shrink-0">
+              {!isCreatingWallet && (
+                <button
+                  onClick={createTopUpWallet}
+                  disabled={isCreatingWallet}
+                  className="btn-primary px-4 sm:px-6 py-2 disabled:opacity-50 w-full sm:w-auto"
+                >
+                  Create Wallet
+                </button>
+              )}
+              {isCreatingWallet && (
+                <div className="flex items-center justify-center sm:justify-start">
+                  <svg className="animate-spin h-5 w-5 text-blue-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-blue-300">Creating...</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -377,22 +379,24 @@ export const WalletTopUp: React.FC = () => {
       {/* Top-up Wallet Info */}
       {hasTopUpWallet && topUpWalletInfo && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-white mb-2">Smart Contract Wallet</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-2">Smart Contract Wallet</h3>
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <p className="text-green-200 text-sm">Address:</p>
-                  <code className="text-green-300 text-xs bg-green-800 px-2 py-1 rounded">
-                    {topUpWalletInfo.walletAddress.slice(0, 10)}...{topUpWalletInfo.walletAddress.slice(-8)}
-                  </code>
-                  <button
-                    onClick={() => copyToClipboard(topUpWalletInfo.walletAddress, 'Wallet address')}
-                    className="text-green-400 hover:text-green-300 text-xs"
-                    title="Copy full address"
-                  >
-                    📋
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <code className="text-green-300 text-xs bg-green-800 px-2 py-1 rounded break-all">
+                      {topUpWalletInfo.walletAddress.slice(0, 10)}...{topUpWalletInfo.walletAddress.slice(-8)}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(topUpWalletInfo.walletAddress, 'Wallet address')}
+                      className="text-green-400 hover:text-green-300 text-xs flex-shrink-0"
+                      title="Copy full address"
+                    >
+                      📋
+                    </button>
+                  </div>
                 </div>
                 {topUpWalletInfo.publicKey && (
                   <div className="flex items-center gap-2">

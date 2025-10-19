@@ -19,19 +19,19 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-yellow-400 text-black font-semibold px-6 py-3 rounded-lg hover:bg-yellow-500 transition-colors;
+    @apply bg-yellow-400 text-black font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-yellow-500 transition-colors text-sm sm:text-base;
   }
   
   .btn-secondary {
-    @apply bg-gray-800 text-white font-semibold px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors;
+    @apply bg-gray-800 text-white font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-base;
   }
   
   .card {
-    @apply bg-gray-900 rounded-xl p-6 border border-gray-800;
+    @apply bg-gray-900 rounded-xl p-4 sm:p-6 border border-gray-800;
   }
   
   .input-field {
-    @apply bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-yellow-400 focus:outline-none;
+    @apply bg-gray-800 border border-gray-700 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-white placeholder-gray-400 focus:border-yellow-400 focus:outline-none text-base;
   }
 }
 
