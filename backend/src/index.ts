@@ -46,7 +46,8 @@ const corsOptions = {
     "http://127.0.0.1:3002",
     "http://localhost:3003",
     "http://127.0.0.1:3003",
-    process.env.FRONTEND_URL || "http://localhost:3000"
+    process.env.FRONTEND_URL || "http://localhost:3000",
+    process.env.ADMIN_DASHBOARD_URL || "http://localhost:3003"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -71,7 +72,9 @@ app.use((req, res, next) => {
     "http://localhost:3002",
     "http://127.0.0.1:3002",
     "http://localhost:3003",
-    "http://127.0.0.1:3003"
+    "http://127.0.0.1:3003",
+    process.env.FRONTEND_URL || "http://localhost:3000",
+    process.env.ADMIN_DASHBOARD_URL || "http://localhost:3003"
   ];
   
   if (origin && allowedOrigins.includes(origin)) {
