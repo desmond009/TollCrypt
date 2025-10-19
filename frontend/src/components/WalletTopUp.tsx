@@ -216,15 +216,32 @@ export const WalletTopUp: React.FC = () => {
         }
       }
 
-      const walletInfo = await topUpWalletAPI.createTopUpWallet();
+      // Check if user already has a top-up wallet, if not create one
+      let walletInfo;
+      try {
+        const existsResponse = await topUpWalletAPI.hasTopUpWallet();
+        if (existsResponse.exists) {
+          // User already has a wallet, get the info
+          walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
+          setWalletCreatedMessage('Your existing smart contract wallet has been loaded.');
+        } else {
+          // Create new top-up wallet
+          walletInfo = await topUpWalletAPI.createTopUpWallet();
+          setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
+        }
+      } catch (error) {
+        console.error('Error handling top-up wallet:', error);
+        // Fallback: try to create wallet
+        walletInfo = await topUpWalletAPI.createTopUpWallet();
+        setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
+      }
+      
       setTopUpWalletInfo(walletInfo);
       setHasTopUpWallet(true);
       setFastagBalance(walletInfo.balance);
       
       // Store private key securely (in a real app, you'd use a secure key management system)
       localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
-      
-      setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
     } catch (error) {
       console.error('Error creating top-up wallet:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Failed to create top-up wallet');

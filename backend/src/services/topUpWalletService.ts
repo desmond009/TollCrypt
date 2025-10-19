@@ -212,8 +212,10 @@ export class TopUpWalletService {
       const existingWallet = await this.factoryContract.getUserTopUpWallet(userAddress);
       if (existingWallet !== ethers.ZeroAddress) {
         return {
-          success: false,
-          error: 'User already has a top-up wallet'
+          success: true,
+          walletAddress: existingWallet,
+          privateKey: '', // Private key is not stored on-chain
+          publicKey: '' // Public key is not stored on-chain
         };
       }
 
@@ -331,7 +333,7 @@ export class TopUpWalletService {
         // Mock implementation for development
         return globalMockWallets.has(userAddress);
       }
-      return await this.factoryContract.hasUserTopUpWallet(userAddress);
+      return await this.factoryContract.hasTopUpWallet(userAddress);
     } catch (error) {
       console.error('Error checking top-up wallet:', error);
       return false;
