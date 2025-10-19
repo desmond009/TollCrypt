@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useSession, VehicleInfo } from '../services/sessionManager';
 import { VehicleRegistration } from './VehicleRegistration';
+import { topUpWalletAPI, TopUpWalletInfo } from '../services/topUpWalletService';
 
 type AppStep = 'wallet' | 'auth' | 'register' | 'topup' | 'payment' | 'dashboard' | 'profile';
 
@@ -25,11 +26,50 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   const [sessionStatus, setSessionStatus] = useState(getSessionStatus());
   const [editingVehicle, setEditingVehicle] = useState<string | null>(null);
   const [newVehicleType, setNewVehicleType] = useState('');
+  const [topUpWalletInfo, setTopUpWalletInfo] = useState<TopUpWalletInfo | null>(null);
+  const [hasTopUpWallet, setHasTopUpWallet] = useState<boolean>(false);
+  const [isLoadingWallet, setIsLoadingWallet] = useState<boolean>(true);
 
   useEffect(() => {
     setSession(getSession());
     setSessionStatus(getSessionStatus());
   }, []);
+
+  // Load top-up wallet information
+  useEffect(() => {
+    const loadTopUpWallet = async () => {
+      if (!address || !sessionStatus.isAuthenticated) {
+        setIsLoadingWallet(false);
+        return;
+      }
+
+      try {
+        setIsLoadingWallet(true);
+        
+        // Check if user has a top-up wallet
+        const existsResponse = await topUpWalletAPI.hasTopUpWallet();
+        
+        if (existsResponse.exists) {
+          // Load existing wallet info
+          const walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
+          setTopUpWalletInfo(walletInfo);
+          setHasTopUpWallet(true);
+        } else {
+          // User doesn't have a wallet yet
+          setTopUpWalletInfo(null);
+          setHasTopUpWallet(false);
+        }
+      } catch (error) {
+        console.error('Error loading top-up wallet:', error);
+        setTopUpWalletInfo(null);
+        setHasTopUpWallet(false);
+      } finally {
+        setIsLoadingWallet(false);
+      }
+    };
+
+    loadTopUpWallet();
+  }, [address, sessionStatus.isAuthenticated]);
 
   const handleRemoveVehicle = async (vehicleId: string) => {
     if (window.confirm(`Are you sure you want to remove vehicle ${vehicleId}?`)) {
@@ -166,28 +206,75 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                 </span>
               </div>
             )}
+            
+            {/* Top-up Wallet Information */}
+            {isLoadingWallet ? (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Top-up Wallet:</span>
+                <span className="text-gray-500 text-sm">Loading...</span>
+              </div>
+            ) : hasTopUpWallet && topUpWalletInfo ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Top-up Wallet:</span>
+                  <span className="text-white font-mono text-sm">
+                    {topUpWalletInfo.walletAddress.slice(0, 6)}...{topUpWalletInfo.walletAddress.slice(-4)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Balance:</span>
+                  <span className="text-green-400 text-sm font-semibold">
+                    {parseFloat(topUpWalletInfo.balance).toFixed(4)} ETH
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Status:</span>
+                  <span className="text-green-400 text-sm">
+                    {topUpWalletInfo.isInitialized ? 'Active' : 'Initializing'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Top-up Wallet:</span>
+                <span className="text-yellow-400 text-sm">Not Created</span>
+              </div>
+            )}
           </div>
           
           {/* Top-up Button */}
           <div className="border-t border-gray-700 pt-4">
             <button
               onClick={() => onNavigate?.('topup')}
-              disabled={!sessionStatus.hasVehicles}
+              disabled={!sessionStatus.hasVehicles || isLoadingWallet}
               className={`w-full flex items-center justify-center space-x-2 ${
-                sessionStatus.hasVehicles 
+                sessionStatus.hasVehicles && !isLoadingWallet
                   ? 'btn-primary' 
                   : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
               }`}
-              title={!sessionStatus.hasVehicles ? 'Please register a vehicle first to enable wallet top-up' : ''}
+              title={
+                !sessionStatus.hasVehicles 
+                  ? 'Please register a vehicle first to enable wallet top-up' 
+                  : isLoadingWallet 
+                    ? 'Loading wallet information...' 
+                    : ''
+              }
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              <span>Top-up Wallet</span>
+              <span>
+                {isLoadingWallet ? 'Loading...' : hasTopUpWallet ? 'Top-up Wallet' : 'Create & Top-up Wallet'}
+              </span>
             </button>
             {!sessionStatus.hasVehicles && (
               <p className="text-xs text-gray-500 mt-2 text-center">
                 Register a vehicle to enable wallet top-up functionality
+              </p>
+            )}
+            {isLoadingWallet && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                Loading wallet information...
               </p>
             )}
           </div>

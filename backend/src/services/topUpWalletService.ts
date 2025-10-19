@@ -195,10 +195,24 @@ export class TopUpWalletService {
   async createTopUpWallet(userAddress: string): Promise<WalletCreationResult> {
     try {
       if (this.isMockMode) {
+        // Check if user already has a mock wallet
+        if (globalMockWallets.has(userAddress)) {
+          const existingWalletAddress = globalMockWallets.get(userAddress)!;
+          return {
+            success: true,
+            walletAddress: existingWalletAddress,
+            privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
+            publicKey: '0x' + 'mock_public_key_' + userAddress.slice(2, 10)
+          };
+        }
+
         // Mock implementation - create a fake wallet
         console.log(`⚠️  Mock createTopUpWallet for ${userAddress}`);
         const mockWallet = ethers.Wallet.createRandom();
         const mockWalletAddress = mockWallet.address;
+        
+        // Store in global mock wallets
+        globalMockWallets.set(userAddress, mockWalletAddress);
         
         return {
           success: true,
@@ -208,9 +222,10 @@ export class TopUpWalletService {
         };
       }
 
-      // Check if user already has a wallet
+      // Check if user already has a wallet on blockchain
       const existingWallet = await this.factoryContract.getUserTopUpWallet(userAddress);
       if (existingWallet !== ethers.ZeroAddress) {
+        console.log(`User ${userAddress} already has a top-up wallet: ${existingWallet}`);
         return {
           success: true,
           walletAddress: existingWallet,
@@ -587,5 +602,46 @@ export class TopUpWalletService {
     
     const wallet = new ethers.Wallet(privateKey);
     return await wallet.signMessage(ethers.getBytes(message));
+  }
+
+  /**
+   * Get user's existing top-up wallet from database
+   * @param userAddress User's wallet address
+   * @returns Top-up wallet information or null if not found
+   */
+  async getExistingTopUpWallet(userAddress: string): Promise<TopUpWalletInfo | null> {
+    try {
+      // Import User model here to avoid circular dependency
+      const { User } = await import('../models/User');
+      
+      const user = await User.findOne({ walletAddress: userAddress.toLowerCase() });
+      if (!user || !user.topUpWalletAddress) {
+        return null;
+      }
+
+      // Get wallet info from blockchain
+      return await this.getTopUpWalletInfo(userAddress);
+    } catch (error) {
+      console.error('Error getting existing top-up wallet:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if user has an existing top-up wallet
+   * @param userAddress User's wallet address
+   * @returns True if user has a wallet
+   */
+  async hasExistingTopUpWallet(userAddress: string): Promise<boolean> {
+    try {
+      // Import User model here to avoid circular dependency
+      const { User } = await import('../models/User');
+      
+      const user = await User.findOne({ walletAddress: userAddress.toLowerCase() });
+      return !!(user && user.topUpWalletAddress);
+    } catch (error) {
+      console.error('Error checking existing top-up wallet:', error);
+      return false;
+    }
   }
 }

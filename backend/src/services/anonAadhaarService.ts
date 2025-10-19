@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { User, IUser } from '../models/User';
+import { TopUpWalletService } from './topUpWalletService';
 
 export interface AnonAadhaarProof {
   proof: string;
@@ -215,9 +216,40 @@ export class AnonAadhaarService {
         }
         await user.save();
       } else {
-        // Create new user
+        // Create new user and top-up wallet
+        console.log('Creating new user and top-up wallet for:', userAddress);
+        
+        // Check if user already has a top-up wallet, if not create one
+        let topUpWalletAddress: string | undefined;
+        try {
+          const topUpWalletService = TopUpWalletService.getInstance();
+          
+          // First check if user already has a wallet
+          const existingWallet = await topUpWalletService.getExistingTopUpWallet(userAddress);
+          if (existingWallet) {
+            topUpWalletAddress = existingWallet.walletAddress;
+            console.log('User already has a top-up wallet:', topUpWalletAddress);
+          } else {
+            // Create new top-up wallet
+            const walletResult = await topUpWalletService.createTopUpWallet(userAddress);
+            
+            if (walletResult.success && walletResult.walletAddress) {
+              topUpWalletAddress = walletResult.walletAddress;
+              console.log('Top-up wallet created successfully:', topUpWalletAddress);
+            } else {
+              console.error('Failed to create top-up wallet:', walletResult.error);
+              throw new Error(walletResult.error || 'Failed to create top-up wallet');
+            }
+          }
+        } catch (walletError) {
+          console.error('Error handling top-up wallet:', walletError);
+          throw new Error('Failed to handle top-up wallet during user registration');
+        }
+
+        // Create new user with top-up wallet address
         user = new User({
           walletAddress: userAddress.toLowerCase(),
+          topUpWalletAddress: topUpWalletAddress.toLowerCase(),
           aadhaarHash,
           isVerified: true,
           verificationDate: new Date(),
@@ -226,6 +258,11 @@ export class AnonAadhaarService {
           isActive: true
         });
         await user.save();
+        
+        console.log('User created successfully with top-up wallet:', {
+          userAddress: user.walletAddress,
+          topUpWalletAddress: user.topUpWalletAddress
+        });
       }
 
       return user;
@@ -264,6 +301,19 @@ export class AnonAadhaarService {
       });
     } catch (error) {
       console.error('Error getting user by address:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get user's top-up wallet address
+   */
+  public async getTopUpWalletAddress(userAddress: string): Promise<string | null> {
+    try {
+      const user = await User.findOne({ walletAddress: userAddress.toLowerCase() });
+      return user?.topUpWalletAddress || null;
+    } catch (error) {
+      console.error('Error getting top-up wallet address:', error);
       return null;
     }
   }

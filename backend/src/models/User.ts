@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IUser extends Document {
   walletAddress: string;
+  topUpWalletAddress?: string; // Address of the persistent top-up wallet
   aadhaarHash: string; // Hash of the Aadhaar number for verification
   isVerified: boolean;
   verificationDate: Date;
@@ -17,6 +18,13 @@ const UserSchema = new Schema<IUser>({
     type: String,
     required: true,
     unique: true,
+    lowercase: true
+  },
+  topUpWalletAddress: {
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true, // Allows multiple null values but enforces uniqueness for non-null values
     lowercase: true
   },
   aadhaarHash: {
@@ -49,6 +57,7 @@ const UserSchema = new Schema<IUser>({
 
 // Index for faster lookups
 UserSchema.index({ walletAddress: 1 });
+UserSchema.index({ topUpWalletAddress: 1 });
 UserSchema.index({ aadhaarHash: 1 });
 UserSchema.index({ isVerified: 1 });
 
