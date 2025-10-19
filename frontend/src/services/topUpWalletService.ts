@@ -36,12 +36,12 @@ export class TopUpWalletAPIService {
   ): Promise<T> {
     const url = `${this.baseURL}/topup-wallet${endpoint}`;
     
-    // Debug logging
-    console.log('🔍 TopUpWalletAPIService.makeRequest:', {
-      baseURL: this.baseURL,
-      endpoint,
-      fullURL: url
-    });
+    // Debug logging (can be removed in production)
+    // console.log('🔍 TopUpWalletAPIService.makeRequest:', {
+    //   baseURL: this.baseURL,
+    //   endpoint,
+    //   fullURL: url
+    // });
     
     // Get session token and user address from localStorage
     let sessionToken = localStorage.getItem('sessionToken');
@@ -82,11 +82,11 @@ export class TopUpWalletAPIService {
       ...options.headers,
     };
     
-    console.log('🔍 Request details:', {
-      url,
-      method: options.method || 'GET',
-      headers: requestHeaders
-    });
+    // console.log('🔍 Request details:', {
+    //   url,
+    //   method: options.method || 'GET',
+    //   headers: requestHeaders
+    // });
     
     const response = await fetch(url, {
       ...options,
@@ -96,6 +96,12 @@ export class TopUpWalletAPIService {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      
+      // Handle 404 as a special case - wallet not found is expected
+      if (response.status === 404) {
+        throw new Error('Top-up wallet not found');
+      }
+      
       throw new Error(errorData.error || `HTTP ${response.status}`);
     }
 

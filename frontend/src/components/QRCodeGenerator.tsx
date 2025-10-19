@@ -45,7 +45,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
         setTopUpWalletInfo(walletInfo);
       } catch (error) {
         // Only log non-404 errors as errors, 404 or "not found" means wallet doesn't exist yet
-        if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+        if (error instanceof Error && (error.message.includes('404') || error.message.toLowerCase().includes('not found'))) {
           console.log('Top-up wallet not found - user needs to create one first');
         } else {
           console.error('Error loading top-up wallet info:', error);
