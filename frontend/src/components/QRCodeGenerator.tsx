@@ -116,6 +116,27 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     }
   };
 
+  const downloadQRCode = () => {
+    if (qrCodeResult) {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = qrCodeResult.dataUrl;
+      
+      // Generate filename with timestamp and vehicle info
+      const selectedVehicle = vehicles.find(v => v.vehicleId === selectedVehicleId);
+      const vehicleIdentifier = selectedVehicle?.vehicleId || 'unknown';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      link.download = `toll-payment-qr-${vehicleIdentifier}-${timestamp}.png`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert('QR code downloaded successfully!');
+    }
+  };
+
   const selectedVehicle = vehicles.find(v => v.vehicleId === selectedVehicleId);
 
   return (
@@ -268,6 +289,13 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
                   className="w-full btn-primary"
                 >
                   Generate New QR Code
+                </button>
+                
+                <button
+                  onClick={downloadQRCode}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                >
+                  📥 Download QR Code
                 </button>
                 
                 <button

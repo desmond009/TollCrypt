@@ -70,7 +70,10 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [tollRate, setTollRate] = useState<string>('0');
   const [isProcessing, setIsProcessing] = useState(false);
   const [qrData, setQrData] = useState<QRCodeData | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const scannerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize the 10-step validation process
   const initializeValidationSteps = (): ValidationStep[] => [
@@ -407,6 +410,56 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadedFile(file);
+
+    try {
+      // Create a canvas to decode the QR code from the uploaded image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      img.onload = async () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+
+        // Convert canvas to data URL
+        const imageDataUrl = canvas.toDataURL('image/png');
+
+        // Use html5-qrcode to decode the QR code from the image
+        const { Html5Qrcode } = await import('html5-qrcode');
+        const html5Qrcode = new Html5Qrcode('qr-reader');
+        
+        try {
+          const decodedText = await html5Qrcode.scanFile(imageDataUrl, true);
+          await handleQRCodeSuccess(decodedText);
+        } catch (decodeError) {
+          console.error('QR code decode error:', decodeError);
+          onError?.('Could not decode QR code from uploaded image. Please ensure the image contains a valid QR code.');
+        } finally {
+          html5Qrcode.clear();
+          setIsUploading(false);
+        }
+      };
+
+      img.onerror = () => {
+        onError?.('Could not load the uploaded image. Please try a different file.');
+        setIsUploading(false);
+      };
+
+      img.src = URL.createObjectURL(file);
+    } catch (error: any) {
+      console.error('File upload error:', error);
+      onError?.(error.message || 'Failed to process uploaded QR code');
+      setIsUploading(false);
+    }
+  };
+
   const playSuccessSound = () => {
     try {
       const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjiE0fPTgjMGHm7A7+OZURE=');
@@ -739,6 +792,42 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         )}
       </div>
 
+      {/* QR Code Upload */}
+      <div className="mt-4">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+        >
+          {isUploading ? (
+            <>
+              <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+              Processing QR Code...
+            </>
+          ) : (
+            <>
+              📁 Upload QR Code Image
+            </>
+          )}
+        </button>
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        
+        {uploadedFile && (
+          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-700">
+              <strong>Uploaded:</strong> {uploadedFile.name}
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Instructions */}
       <div className="mt-4 p-4 bg-blue-50 rounded-lg">
         <h4 className="text-sm font-medium text-blue-900 mb-2">Scanning Instructions:</h4>
@@ -746,6 +835,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           <li>• Position the QR code within the scanning area</li>
           <li>• Ensure good lighting and steady hands</li>
           <li>• The scanner will automatically detect and process valid QR codes</li>
+          <li>• Upload a QR code image file for offline processing</li>
           <li>• Use manual entry if scanning fails</li>
         </ul>
       </div>
