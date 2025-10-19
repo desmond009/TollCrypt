@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useBalance, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { topUpWalletAPI, SignatureUtils, TopUpWalletInfo } from '../services/topUpWalletService';
+import { walletPersistenceService, WalletInfo } from '../services/walletPersistenceService';
 
 interface TopUpOption {
   amount: string;
@@ -45,16 +46,38 @@ export const WalletTopUp: React.FC = () => {
     hash,
   });
 
-  // Load FASTag wallet balance from localStorage on component mount
+  // Load wallet using three-tier persistence strategy
   useEffect(() => {
-    if (address) {
-      const savedBalance = localStorage.getItem(`fastag-balance-${address}`);
-      if (savedBalance) {
-        setFastagBalance(savedBalance);
-      } else {
-        setFastagBalance('0');
+    const loadWallet = async () => {
+      if (!address) return;
+
+      try {
+        console.log('🔄 Loading wallet with persistence strategy...');
+        const walletInfo = await walletPersistenceService.getWalletWithFallback(address);
+        
+        if (walletInfo) {
+          console.log('✅ Wallet loaded successfully:', walletInfo.walletAddress);
+          setTopUpWalletInfo({
+            walletAddress: walletInfo.walletAddress,
+            privateKey: walletInfo.privateKey,
+            publicKey: walletInfo.publicKey,
+            balance: walletInfo.balance,
+            isInitialized: true
+          });
+          setHasTopUpWallet(true);
+          setFastagBalance(walletInfo.balance);
+        } else {
+          console.log('ℹ️ No wallet found, will create when needed');
+          setHasTopUpWallet(false);
+          setFastagBalance('0');
+        }
+      } catch (error) {
+        console.error('❌ Error loading wallet:', error);
+        setErrorMessage('Failed to load wallet. Please try again.');
       }
-    }
+    };
+
+    loadWallet();
   }, [address]);
 
   // Function to refresh balance from blockchain
@@ -217,32 +240,29 @@ export const WalletTopUp: React.FC = () => {
         }
       }
 
-      // Always try to create/get wallet - the backend will handle existing wallet retrieval
-      console.log('Creating or retrieving top-up wallet...');
-      const walletInfo = await topUpWalletAPI.createTopUpWallet();
+      // Use persistence service to get or create wallet
+      console.log('🔄 Getting or creating wallet with persistence service...');
+      const walletInfo = await walletPersistenceService.getWalletWithFallback(address);
       
-      // Check if this was an existing wallet or a new one based on the response
-      const isExistingWallet = walletInfo.message?.includes('existing') || walletInfo.message?.includes('retrieved');
-      
-      setTopUpWalletInfo(walletInfo);
-      setHasTopUpWallet(true);
-      setFastagBalance(walletInfo.balance);
-      
-      // Store private key securely (in a real app, you'd use a secure key management system)
-      localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
-      
-      // Set appropriate message
-      if (isExistingWallet) {
-        setWalletCreatedMessage('Your existing smart contract wallet has been loaded successfully.');
+      if (walletInfo) {
+        setTopUpWalletInfo({
+          walletAddress: walletInfo.walletAddress,
+          privateKey: walletInfo.privateKey,
+          publicKey: walletInfo.publicKey,
+          balance: walletInfo.balance,
+          isInitialized: true
+        });
+        setHasTopUpWallet(true);
+        setFastagBalance(walletInfo.balance);
+        
+        // Store private key securely (in a real app, you'd use a secure key management system)
+        localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
+        
+        setWalletCreatedMessage('Wallet loaded successfully!');
+        console.log('✅ Wallet loaded via persistence service:', walletInfo.walletAddress);
       } else {
-        setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
+        throw new Error('Failed to create or retrieve wallet');
       }
-      
-      console.log('Wallet operation completed:', {
-        address: walletInfo.walletAddress,
-        isExisting: isExistingWallet,
-        message: walletInfo.message
-      });
       
     } catch (error) {
       console.error('Error creating/retrieving top-up wallet:', error);

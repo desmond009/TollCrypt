@@ -5,6 +5,7 @@ const TOPUP_WALLET_FACTORY_ABI = [
   "function deployTopUpWallet(address user) external returns (address)",
   "function getUserTopUpWallet(address user) external view returns (address)",
   "function hasUserTopUpWallet(address user) external view returns (bool)",
+  "function getUserWalletInfo(address user) external view returns (address walletAddress, bool exists, uint256 balance)",
   "event TopUpWalletCreated(address indexed user, address indexed walletAddress)"
 ];
 
@@ -352,6 +353,53 @@ export class TopUpWalletService {
     } catch (error) {
       console.error('Error checking top-up wallet:', error);
       return false;
+    }
+  }
+
+  /**
+   * Get wallet info from blockchain (Tier 1 - Authoritative source)
+   * @param userAddress User's wallet address
+   * @returns Wallet info from blockchain or null if not found
+   */
+  async getWalletInfoFromBlockchain(userAddress: string): Promise<TopUpWalletInfo | null> {
+    try {
+      if (this.isMockMode) {
+        // Mock implementation for development
+        const mockWalletAddress = globalMockWallets.get(userAddress);
+        if (!mockWalletAddress) {
+          return null;
+        }
+        return {
+          walletAddress: mockWalletAddress,
+          privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
+          publicKey: '0x' + 'mock_public_key_' + userAddress.slice(2, 10),
+          balance: '0.0',
+          isInitialized: true
+        };
+      }
+
+      // Use the new getUserWalletInfo function from the contract
+      const [walletAddress, exists, balance] = await this.factoryContract.getUserWalletInfo(userAddress);
+      
+      if (!exists || walletAddress === ethers.ZeroAddress) {
+        return null;
+      }
+
+      // Get additional info from the wallet contract
+      const walletContract = new ethers.Contract(walletAddress, TOPUP_WALLET_ABI, this.provider);
+      const isInitialized = await walletContract.isInitialized();
+
+      return {
+        walletAddress,
+        privateKey: '', // Private key is not stored on-chain
+        publicKey: '', // Public key is not stored on-chain
+        balance: ethers.formatEther(balance),
+        isInitialized
+      };
+
+    } catch (error) {
+      console.error('Error getting wallet info from blockchain:', error);
+      return null;
     }
   }
 

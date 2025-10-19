@@ -15,6 +15,7 @@ import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { useAccount } from 'wagmi';
 import { useSession } from './services/sessionManager';
 import { vehicleAPIService } from './services/vehicleAPIService';
+import { walletPersistenceService } from './services/walletPersistenceService';
 import { useRealtime } from './hooks/useRealtime';
 import { formatETHDisplay } from './utils/currency';
 
@@ -66,6 +67,30 @@ function AppContent() {
       setSessionStatus(getSessionStatus());
     }
   }, [isConnected, address, getSession, createSession, getSessionStatus]);
+
+  // Load wallet using persistence strategy when wallet connects
+  useEffect(() => {
+    const loadWallet = async () => {
+      if (!isConnected || !address) return;
+
+      try {
+        console.log('🔄 Loading wallet with persistence strategy on app startup...');
+        const walletInfo = await walletPersistenceService.getWalletWithFallback(address);
+        
+        if (walletInfo) {
+          console.log('✅ Wallet loaded successfully on startup:', walletInfo.walletAddress);
+          // Store private key for immediate access
+          localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
+        } else {
+          console.log('ℹ️ No wallet found on startup, will create when needed');
+        }
+      } catch (error) {
+        console.error('❌ Error loading wallet on startup:', error);
+      }
+    };
+
+    loadWallet();
+  }, [isConnected, address]);
 
   // Update session status periodically
   useEffect(() => {

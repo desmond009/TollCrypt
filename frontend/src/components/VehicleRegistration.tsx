@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { vehicleAPIService, VehicleRegistrationData } from '../services/vehicleAPIService';
 import { topUpWalletAPI, TopUpWalletInfo } from '../services/topUpWalletService';
+import { walletPersistenceService, WalletInfo } from '../services/walletPersistenceService';
 import { useSession } from '../services/sessionManager';
 
 // Contract addresses from deployment
@@ -107,24 +108,29 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
             }
           }
 
-          // Create or retrieve top-up wallet - the backend will handle existing wallet retrieval
-          let walletInfo;
+          // Use persistence service to get or create wallet
+          let walletInfo: WalletInfo | null;
           try {
-            console.log('Creating or retrieving top-up wallet for vehicle registration...');
-            walletInfo = await topUpWalletAPI.createTopUpWallet();
+            console.log('🔄 Getting or creating wallet with persistence service for vehicle registration...');
+            walletInfo = await walletPersistenceService.getWalletWithFallback(address!);
             
-            // Check if this was an existing wallet or a new one
-            const isExistingWallet = walletInfo.message?.includes('existing') || walletInfo.message?.includes('retrieved');
-            console.log('Wallet operation completed:', {
-              address: walletInfo.walletAddress,
-              isExisting: isExistingWallet,
-              message: walletInfo.message
-            });
+            if (!walletInfo) {
+              throw new Error('Failed to create or retrieve wallet');
+            }
+            
+            console.log('✅ Wallet loaded via persistence service:', walletInfo.walletAddress);
           } catch (error) {
-            console.error('Error handling top-up wallet:', error);
+            console.error('❌ Error handling top-up wallet:', error);
             throw new Error('Failed to create or retrieve top-up wallet');
           }
-          setTopUpWalletInfo(walletInfo);
+          
+          setTopUpWalletInfo({
+            walletAddress: walletInfo.walletAddress,
+            privateKey: walletInfo.privateKey,
+            publicKey: walletInfo.publicKey,
+            balance: walletInfo.balance,
+            isInitialized: true
+          });
           
           // Store private key securely
           localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
