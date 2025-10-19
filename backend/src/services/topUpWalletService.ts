@@ -637,7 +637,16 @@ export class TopUpWalletService {
       // Import User model here to avoid circular dependency
       const { User } = await import('../models/User');
       
-      const user = await User.findOne({ walletAddress: userAddress.toLowerCase() });
+      const normalizedAddress = userAddress.toLowerCase();
+      console.log(`Looking for user with address: ${normalizedAddress}`);
+      
+      const user = await User.findOne({ walletAddress: normalizedAddress });
+      console.log(`User found: ${!!user}`);
+      if (user) {
+        console.log(`User topUpWalletAddress: ${user.topUpWalletAddress}`);
+        console.log(`Has topUpWalletAddress: ${!!user.topUpWalletAddress}`);
+      }
+      
       return !!(user && user.topUpWalletAddress);
     } catch (error) {
       console.error('Error checking existing top-up wallet:', error);

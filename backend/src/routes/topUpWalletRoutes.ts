@@ -348,8 +348,12 @@ router.get('/exists', authenticateSession, async (req: Request, res: Response) =
       return res.status(400).json({ error: 'User address not found' });
     }
 
+    console.log(`Checking wallet existence for user: ${userAddress}`);
+
     // First check if user has a wallet in the database
     const hasExistingWallet = await service.hasExistingTopUpWallet(userAddress);
+    console.log(`Database check result: ${hasExistingWallet}`);
+    
     if (hasExistingWallet) {
       console.log(`User ${userAddress} has existing wallet in database`);
       res.json({ exists: true });
@@ -359,14 +363,36 @@ router.get('/exists', authenticateSession, async (req: Request, res: Response) =
     // Use global mock wallet storage for mock mode
     if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
       const exists = hasGlobalMockWallet(userAddress);
-      console.log(`Checking wallet existence for ${userAddress}: ${exists}`);
+      console.log(`Mock mode check result: ${exists}`);
       console.log('Global mock wallets:', Array.from(getGlobalMockWallets().entries()));
       res.json({ exists });
       return;
     }
 
     // Check blockchain as fallback
+    console.log('Checking blockchain for wallet existence...');
     const exists = await service.hasTopUpWallet(userAddress);
+    console.log(`Blockchain check result: ${exists}`);
+    
+    // If wallet exists on blockchain but not in database, update database
+    if (exists) {
+      console.log('Wallet exists on blockchain but not in database. Updating database...');
+      try {
+        const walletInfo = await service.getTopUpWalletInfo(userAddress);
+        if (walletInfo && walletInfo.walletAddress) {
+          const { User } = await import('../models/User');
+          await User.findOneAndUpdate(
+            { walletAddress: userAddress.toLowerCase() },
+            { topUpWalletAddress: walletInfo.walletAddress.toLowerCase() },
+            { new: true, upsert: false }
+          );
+          console.log(`Updated database with wallet address: ${walletInfo.walletAddress}`);
+        }
+      } catch (dbError) {
+        console.error('Error updating database with wallet address:', dbError);
+        // Don't fail the request, just log the error
+      }
+    }
     
     res.json({ exists });
 
@@ -434,6 +460,76 @@ router.post('/signature/withdraw', authenticateSession, async (req: Request, res
 
   } catch (error) {
     console.error('Error creating withdrawal signature:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @route GET /api/topup-wallet/debug
+ * @desc Debug endpoint to check user and wallet status
+ * @access Private
+ */
+router.get('/debug', authenticateSession, async (req: Request, res: Response) => {
+  try {
+    const service = checkServiceAvailable(res);
+    if (!service) return;
+    
+    const userAddress = req.user?.address;
+    
+    if (!userAddress) {
+      return res.status(400).json({ error: 'User address not found' });
+    }
+
+    console.log(`Debug request for user: ${userAddress}`);
+
+    // Check database
+    const { User } = await import('../models/User');
+    const user = await User.findOne({ walletAddress: userAddress.toLowerCase() });
+    
+    // Check blockchain
+    let blockchainWallet = null;
+    let blockchainExists = false;
+    try {
+      blockchainExists = await service.hasTopUpWallet(userAddress);
+      if (blockchainExists) {
+        blockchainWallet = await service.getTopUpWalletInfo(userAddress);
+      }
+    } catch (error) {
+      console.error('Error checking blockchain:', error);
+    }
+
+    // Check mock wallets
+    const mockExists = hasGlobalMockWallet(userAddress);
+    const mockWalletAddress = getGlobalMockWallets().get(userAddress);
+
+    res.json({
+      userAddress,
+      database: {
+        userFound: !!user,
+        topUpWalletAddress: user?.topUpWalletAddress || null,
+        userData: user ? {
+          walletAddress: user.walletAddress,
+          topUpWalletAddress: user.topUpWalletAddress,
+          isVerified: user.isVerified,
+          createdAt: user.createdAt
+        } : null
+      },
+      blockchain: {
+        exists: blockchainExists,
+        walletInfo: blockchainWallet
+      },
+      mock: {
+        exists: mockExists,
+        walletAddress: mockWalletAddress
+      },
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        mockBlockchain: process.env.MOCK_BLOCKCHAIN
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
