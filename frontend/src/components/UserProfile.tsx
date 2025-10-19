@@ -46,16 +46,15 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
       try {
         setIsLoadingWallet(true);
         
-        // Check if user has a top-up wallet
-        const existsResponse = await topUpWalletAPI.hasTopUpWallet();
-        
-        if (existsResponse.exists) {
-          // Load existing wallet info
+        // Try to get wallet info - this will work for both existing and new wallets
+        try {
           const walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
           setTopUpWalletInfo(walletInfo);
           setHasTopUpWallet(true);
-        } else {
-          // User doesn't have a wallet yet
+          console.log('Top-up wallet loaded successfully:', walletInfo.walletAddress);
+        } catch (error) {
+          // If wallet doesn't exist, that's okay - user can create one later
+          console.log('No top-up wallet found for user');
           setTopUpWalletInfo(null);
           setHasTopUpWallet(false);
         }

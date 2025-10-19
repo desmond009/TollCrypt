@@ -197,6 +197,7 @@ export const WalletTopUp: React.FC = () => {
 
     setIsCreatingWallet(true);
     setErrorMessage('');
+    setWalletCreatedMessage('');
 
     try {
       // Ensure session token and user address are set
@@ -216,25 +217,12 @@ export const WalletTopUp: React.FC = () => {
         }
       }
 
-      // Check if user already has a top-up wallet, if not create one
-      let walletInfo;
-      try {
-        const existsResponse = await topUpWalletAPI.hasTopUpWallet();
-        if (existsResponse.exists) {
-          // User already has a wallet, get the info
-          walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
-          setWalletCreatedMessage('Your existing smart contract wallet has been loaded.');
-        } else {
-          // Create new top-up wallet
-          walletInfo = await topUpWalletAPI.createTopUpWallet();
-          setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
-        }
-      } catch (error) {
-        console.error('Error handling top-up wallet:', error);
-        // Fallback: try to create wallet
-        walletInfo = await topUpWalletAPI.createTopUpWallet();
-        setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
-      }
+      // Always try to create/get wallet - the backend will handle existing wallet retrieval
+      console.log('Creating or retrieving top-up wallet...');
+      const walletInfo = await topUpWalletAPI.createTopUpWallet();
+      
+      // Check if this was an existing wallet or a new one based on the response
+      const isExistingWallet = walletInfo.message?.includes('existing') || walletInfo.message?.includes('retrieved');
       
       setTopUpWalletInfo(walletInfo);
       setHasTopUpWallet(true);
@@ -242,9 +230,23 @@ export const WalletTopUp: React.FC = () => {
       
       // Store private key securely (in a real app, you'd use a secure key management system)
       localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
+      
+      // Set appropriate message
+      if (isExistingWallet) {
+        setWalletCreatedMessage('Your existing smart contract wallet has been loaded successfully.');
+      } else {
+        setWalletCreatedMessage('Smart contract wallet created successfully! You can now top up your wallet.');
+      }
+      
+      console.log('Wallet operation completed:', {
+        address: walletInfo.walletAddress,
+        isExisting: isExistingWallet,
+        message: walletInfo.message
+      });
+      
     } catch (error) {
-      console.error('Error creating top-up wallet:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to create top-up wallet');
+      console.error('Error creating/retrieving top-up wallet:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to create or retrieve top-up wallet');
     } finally {
       setIsCreatingWallet(false);
     }

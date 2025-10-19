@@ -76,10 +76,30 @@ router.post('/create', authenticateSession, async (req: Request, res: Response) 
       return res.status(400).json({ error: 'User address not found' });
     }
 
+    // First check if user already has a wallet in the database
+    const existingWallet = await service.getExistingTopUpWallet(userAddress);
+    if (existingWallet) {
+      console.log(`User ${userAddress} already has a top-up wallet: ${existingWallet.walletAddress}`);
+      return res.json({
+        success: true,
+        walletAddress: existingWallet.walletAddress,
+        privateKey: existingWallet.privateKey,
+        publicKey: existingWallet.publicKey,
+        message: 'Existing wallet retrieved'
+      });
+    }
+
     // Check if user already has a wallet in mock mode
     if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
       if (hasGlobalMockWallet(userAddress)) {
-        return res.status(400).json({ error: 'User already has a top-up wallet' });
+        const mockWalletAddress = getGlobalMockWallets().get(userAddress);
+        return res.json({
+          success: true,
+          walletAddress: mockWalletAddress,
+          privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
+          publicKey: '0x' + 'mock_public_key_' + userAddress.slice(2, 10),
+          message: 'Existing mock wallet retrieved'
+        });
       }
     }
 
@@ -94,11 +114,26 @@ router.post('/create', authenticateSession, async (req: Request, res: Response) 
       setGlobalMockWallet(userAddress, result.walletAddress);
     }
 
+    // Update the user record in database with the new wallet address
+    try {
+      const { User } = await import('../models/User');
+      await User.findOneAndUpdate(
+        { walletAddress: userAddress.toLowerCase() },
+        { topUpWalletAddress: result.walletAddress?.toLowerCase() },
+        { new: true }
+      );
+      console.log(`Updated user ${userAddress} with top-up wallet address: ${result.walletAddress}`);
+    } catch (dbError) {
+      console.error('Error updating user with top-up wallet address:', dbError);
+      // Don't fail the request, just log the error
+    }
+
     res.json({
       success: true,
       walletAddress: result.walletAddress,
       privateKey: result.privateKey,
-      publicKey: result.publicKey
+      publicKey: result.publicKey,
+      message: 'New wallet created'
     });
 
   } catch (error) {
@@ -123,7 +158,13 @@ router.get('/info', authenticateSession, async (req: Request, res: Response) => 
       return res.status(400).json({ error: 'User address not found' });
     }
 
-    const walletInfo = await service.getTopUpWalletInfo(userAddress);
+    // First try to get existing wallet from database
+    let walletInfo = await service.getExistingTopUpWallet(userAddress);
+    
+    // If not found in database, try blockchain
+    if (!walletInfo) {
+      walletInfo = await service.getTopUpWalletInfo(userAddress);
+    }
     
     if (!walletInfo) {
       return res.status(404).json({ error: 'Top-up wallet not found' });
@@ -307,6 +348,14 @@ router.get('/exists', authenticateSession, async (req: Request, res: Response) =
       return res.status(400).json({ error: 'User address not found' });
     }
 
+    // First check if user has a wallet in the database
+    const hasExistingWallet = await service.hasExistingTopUpWallet(userAddress);
+    if (hasExistingWallet) {
+      console.log(`User ${userAddress} has existing wallet in database`);
+      res.json({ exists: true });
+      return;
+    }
+
     // Use global mock wallet storage for mock mode
     if (process.env.NODE_ENV === 'development' && process.env.MOCK_BLOCKCHAIN === 'true') {
       const exists = hasGlobalMockWallet(userAddress);
@@ -316,6 +365,7 @@ router.get('/exists', authenticateSession, async (req: Request, res: Response) =
       return;
     }
 
+    // Check blockchain as fallback
     const exists = await service.hasTopUpWallet(userAddress);
     
     res.json({ exists });

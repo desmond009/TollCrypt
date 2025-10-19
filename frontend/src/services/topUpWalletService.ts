@@ -7,6 +7,7 @@ export interface TopUpWalletInfo {
   publicKey: string;
   balance: string;
   isInitialized: boolean;
+  message?: string; // Optional message from backend about wallet creation/retrieval
 }
 
 export interface WalletStats {

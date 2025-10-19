@@ -107,21 +107,22 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
             }
           }
 
-          // Check if user already has a top-up wallet, if not create one
+          // Create or retrieve top-up wallet - the backend will handle existing wallet retrieval
           let walletInfo;
           try {
-            const existsResponse = await topUpWalletAPI.hasTopUpWallet();
-            if (existsResponse.exists) {
-              // User already has a wallet, get the info
-              walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
-            } else {
-              // Create new top-up wallet
-              walletInfo = await topUpWalletAPI.createTopUpWallet();
-            }
+            console.log('Creating or retrieving top-up wallet for vehicle registration...');
+            walletInfo = await topUpWalletAPI.createTopUpWallet();
+            
+            // Check if this was an existing wallet or a new one
+            const isExistingWallet = walletInfo.message?.includes('existing') || walletInfo.message?.includes('retrieved');
+            console.log('Wallet operation completed:', {
+              address: walletInfo.walletAddress,
+              isExisting: isExistingWallet,
+              message: walletInfo.message
+            });
           } catch (error) {
             console.error('Error handling top-up wallet:', error);
-            // Fallback: try to create wallet
-            walletInfo = await topUpWalletAPI.createTopUpWallet();
+            throw new Error('Failed to create or retrieve top-up wallet');
           }
           setTopUpWalletInfo(walletInfo);
           
