@@ -1,14 +1,55 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { QrCodeIcon, CameraIcon, XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { 
+  QrCodeIcon, 
+  CameraIcon, 
+  XMarkIcon, 
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ClockIcon,
+  ShieldCheckIcon,
+  CurrencyDollarIcon,
+  TruckIcon,
+  UserIcon,
+  WalletIcon,
+  ArrowPathIcon
+} from '@heroicons/react/24/outline';
 import { QRCodeData } from '../types/qr';
 import { ethers } from 'ethers';
+import { blockchainService } from '../services/blockchainService';
+import { api } from '../services/api';
 
 interface QRScannerProps {
   onQRScanned: (data: QRCodeData) => void;
   onError?: (error: string) => void;
   isScanning: boolean;
   onClose?: () => void;
+}
+
+interface ValidationStep {
+  step: number;
+  title: string;
+  description: string;
+  status: 'pending' | 'processing' | 'success' | 'error';
+  error?: string;
+  icon: React.ComponentType<any>;
+}
+
+interface VehicleDetails {
+  vehicleId: string;
+  vehicleType: string;
+  owner: string;
+  isRegistered: boolean;
+  isBlacklisted: boolean;
+  registrationTime: number;
+  lastTollTime: number;
+}
+
+interface WalletInfo {
+  balance: string;
+  formattedBalance: string;
+  hasTopUpWallet: boolean;
+  topUpWalletAddress: string;
 }
 
 export const QRScanner: React.FC<QRScannerProps> = ({
@@ -22,7 +63,88 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [manualEntry, setManualEntry] = useState('');
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [currentStep, setCurrentStep] = useState<'scanning' | 'validating' | 'displaying' | 'processing'>('scanning');
+  const [validationSteps, setValidationSteps] = useState<ValidationStep[]>([]);
+  const [vehicleDetails, setVehicleDetails] = useState<VehicleDetails | null>(null);
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+  const [tollRate, setTollRate] = useState<string>('0');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [qrData, setQrData] = useState<QRCodeData | null>(null);
   const scannerRef = useRef<HTMLDivElement>(null);
+
+  // Initialize the 10-step validation process
+  const initializeValidationSteps = (): ValidationStep[] => [
+    {
+      step: 1,
+      title: 'Decode QR Code',
+      description: 'Extract all fields from QR code',
+      status: 'pending',
+      icon: QrCodeIcon
+    },
+    {
+      step: 2,
+      title: 'Verify Signature',
+      description: 'Confirm QR authenticity',
+      status: 'pending',
+      icon: ShieldCheckIcon
+    },
+    {
+      step: 3,
+      title: 'Check Timestamp',
+      description: 'Ensure QR not expired',
+      status: 'pending',
+      icon: ClockIcon
+    },
+    {
+      step: 4,
+      title: 'Fetch Vehicle Details',
+      description: 'Query blockchain for vehicle info',
+      status: 'pending',
+      icon: TruckIcon
+    },
+    {
+      step: 5,
+      title: 'Check Wallet Balance',
+      description: 'Verify sufficient funds',
+      status: 'pending',
+      icon: WalletIcon
+    },
+    {
+      step: 6,
+      title: 'Display to Admin',
+      description: 'Show vehicle & payment info',
+      status: 'pending',
+      icon: UserIcon
+    },
+    {
+      step: 7,
+      title: 'Admin Confirms',
+      description: 'Admin clicks "Collect Toll"',
+      status: 'pending',
+      icon: CheckCircleIcon
+    },
+    {
+      step: 8,
+      title: 'Trigger Payment',
+      description: 'Call smart contract',
+      status: 'pending',
+      icon: CurrencyDollarIcon
+    },
+    {
+      step: 9,
+      title: 'Smart Contract Processing',
+      description: 'Verify & deduct payment',
+      status: 'pending',
+      icon: ArrowPathIcon
+    },
+    {
+      step: 10,
+      title: 'Success',
+      description: 'Show confirmation & generate receipt',
+      status: 'pending',
+      icon: CheckCircleIcon
+    }
+  ];
 
   const initializeScanner = () => {
     if (scannerRef.current && !isInitialized) {
@@ -50,35 +172,238 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   };
 
-  const handleQRCodeSuccess = (decodedText: string) => {
+  const handleQRCodeSuccess = async (decodedText: string) => {
     try {
+      setCurrentStep('validating');
+      const steps = initializeValidationSteps();
+      setValidationSteps(steps);
+      
+      // Step 1: Decode QR Code
       const qrData = JSON.parse(decodedText);
+      updateStepStatus(1, 'success');
       
       // Validate QR code structure
-      if (qrData.walletAddress && qrData.vehicleId && qrData.vehicleType) {
-        // Validate wallet address format
-        if (!ethers.isAddress(qrData.walletAddress)) {
-          throw new Error('Invalid wallet address in QR code');
-        }
-        
-        setScanResult(decodedText);
-        
-        // Play success sound
-        playSuccessSound();
-        
-        // Vibrate if supported
-        if (navigator.vibrate) {
-          navigator.vibrate([200, 100, 200]);
-        }
-        
-        // Stop scanning and process the QR code
-        stopScanner();
-        onQRScanned(qrData);
-      } else {
-        throw new Error('Invalid QR code format');
+      if (!qrData.walletAddress || !qrData.vehicleId || !qrData.vehicleType) {
+        throw new Error('Invalid QR code format - missing required fields');
       }
+      
+      // Validate wallet address format
+      if (!ethers.isAddress(qrData.walletAddress)) {
+        throw new Error('Invalid wallet address in QR code');
+      }
+      
+      setQrData(qrData);
+      setScanResult(decodedText);
+      
+      // Step 2: Verify Signature
+      updateStepStatus(2, 'processing');
+      try {
+        if (qrData.signature) {
+          const isValidSignature = await verifyQRSignature(qrData);
+          if (!isValidSignature) {
+            throw new Error('QR code signature verification failed');
+          }
+        }
+        updateStepStatus(2, 'success');
+      } catch (error) {
+        updateStepStatus(2, 'error', 'Signature verification failed');
+        throw error;
+      }
+      
+      // Step 3: Check Timestamp
+      updateStepStatus(3, 'processing');
+      try {
+        const now = Date.now();
+        const qrAge = now - qrData.timestamp;
+        const maxAge = 5 * 60 * 1000; // 5 minutes
+        
+        if (qrAge > maxAge) {
+          throw new Error('QR code has expired');
+        }
+        updateStepStatus(3, 'success');
+      } catch (error) {
+        updateStepStatus(3, 'error', 'QR code expired');
+        throw error;
+      }
+      
+      // Step 4: Fetch Vehicle Details
+      updateStepStatus(4, 'processing');
+      try {
+        const vehicleDetails = await fetchVehicleDetails(qrData.vehicleId);
+        setVehicleDetails(vehicleDetails);
+        updateStepStatus(4, 'success');
+      } catch (error) {
+        updateStepStatus(4, 'error', 'Failed to fetch vehicle details');
+        throw error;
+      }
+      
+      // Step 5: Check Wallet Balance
+      updateStepStatus(5, 'processing');
+      try {
+        const walletInfo = await fetchWalletInfo(qrData.walletAddress);
+        setWalletInfo(walletInfo);
+        updateStepStatus(5, 'success');
+      } catch (error) {
+        updateStepStatus(5, 'error', 'Failed to fetch wallet balance');
+        throw error;
+      }
+      
+      // Step 6: Display to Admin
+      updateStepStatus(6, 'success');
+      setCurrentStep('displaying');
+      
+      // Play success sound
+      playSuccessSound();
+      
+      // Vibrate if supported
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+      }
+      
+      // Stop scanning
+      stopScanner();
+      
+    } catch (error: any) {
+      onError?.(error.message || 'QR code validation failed');
+      setCurrentStep('scanning');
+    }
+  };
+
+  // Helper functions for validation process
+  const updateStepStatus = (stepNumber: number, status: 'processing' | 'success' | 'error', error?: string) => {
+    setValidationSteps(prev => prev.map(step => 
+      step.step === stepNumber 
+        ? { ...step, status, error }
+        : step
+    ));
+  };
+
+  const verifyQRSignature = async (qrData: QRCodeData): Promise<boolean> => {
+    try {
+      if (!qrData.signature) return true; // No signature to verify
+      
+      const baseData = {
+        walletAddress: qrData.walletAddress,
+        vehicleId: qrData.vehicleId,
+        vehicleType: qrData.vehicleType,
+        timestamp: qrData.timestamp,
+        sessionToken: qrData.sessionToken
+      };
+      
+      const message = JSON.stringify(baseData);
+      const messageHash = ethers.keccak256(ethers.toUtf8Bytes(message));
+      
+      const recoveredAddress = ethers.verifyMessage(
+        ethers.getBytes(messageHash),
+        qrData.signature
+      );
+      
+      return recoveredAddress.toLowerCase() === qrData.walletAddress.toLowerCase();
     } catch (error) {
-      onError?.('Invalid QR code format. Please try again.');
+      console.error('Signature verification error:', error);
+      return false;
+    }
+  };
+
+  const fetchVehicleDetails = async (vehicleId: string): Promise<VehicleDetails> => {
+    try {
+      const response = await api.post('/api/qr/validate', { qrData: { vehicleId } });
+      if (response.data.success) {
+        return {
+          vehicleId: response.data.data.vehicleId,
+          vehicleType: response.data.data.vehicleType,
+          owner: response.data.data.owner,
+          isRegistered: true,
+          isBlacklisted: false,
+          registrationTime: Date.now(),
+          lastTollTime: Date.now()
+        };
+      }
+      throw new Error('Vehicle not found');
+    } catch (error) {
+      console.error('Error fetching vehicle details:', error);
+      throw new Error('Failed to fetch vehicle details');
+    }
+  };
+
+  const fetchWalletInfo = async (walletAddress: string): Promise<WalletInfo> => {
+    try {
+      const balance = await blockchainService.getWalletBalance(walletAddress);
+      const hasTopUpWallet = await blockchainService.hasUserTopUpWallet(walletAddress);
+      const topUpWalletAddress = hasTopUpWallet ? await blockchainService.getUserTopUpWallet(walletAddress) : '';
+      
+      return {
+        balance: balance.balance,
+        formattedBalance: balance.formattedBalance,
+        hasTopUpWallet,
+        topUpWalletAddress
+      };
+    } catch (error) {
+      console.error('Error fetching wallet info:', error);
+      throw new Error('Failed to fetch wallet information');
+    }
+  };
+
+  const handleCollectToll = async () => {
+    if (!qrData || !vehicleDetails || !walletInfo) return;
+    
+    setIsProcessing(true);
+    setCurrentStep('processing');
+    
+    try {
+      // Step 7: Admin Confirms
+      updateStepStatus(7, 'success');
+      
+      // Step 8: Trigger Payment
+      updateStepStatus(8, 'processing');
+      const tollRate = await blockchainService.getTollRate(qrData.vehicleType);
+      setTollRate(tollRate);
+      
+      // Step 9: Smart Contract Processing
+      updateStepStatus(9, 'processing');
+      const result = await blockchainService.processTollPayment(
+        qrData,
+        tollRate,
+        '0x0000000000000000000000000000000000000000' // Admin wallet placeholder
+      );
+      
+      if (result.success) {
+        updateStepStatus(9, 'success');
+        
+        // Step 10: Success
+        updateStepStatus(10, 'success');
+        
+        // Log transaction to backend
+        await api.post('/api/admin/transactions', {
+          qrData,
+          tollAmount: tollRate,
+          transactionHash: result.transactionHash,
+          adminWallet: '0x0000000000000000000000000000000000000000',
+          gasUsed: result.gasUsed,
+        });
+        
+        // Notify parent component
+        onQRScanned(qrData);
+        
+        // Reset for next scan
+        setTimeout(() => {
+          setCurrentStep('scanning');
+          setValidationSteps([]);
+          setVehicleDetails(null);
+          setWalletInfo(null);
+          setQrData(null);
+          setIsProcessing(false);
+        }, 3000);
+      } else {
+        throw new Error(result.error || 'Transaction failed');
+      }
+    } catch (error: any) {
+      updateStepStatus(8, 'error', error.message);
+      updateStepStatus(9, 'error', error.message);
+      onError?.(error.message || 'Transaction failed');
+      setCurrentStep('displaying');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -150,7 +475,138 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     };
   }, []);
 
-  if (!isScanning) {
+  // Render validation steps
+  const renderValidationSteps = () => (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Code Validation Process</h3>
+      <div className="space-y-3">
+        {validationSteps.map((step) => {
+          const Icon = step.icon;
+          return (
+            <div key={step.step} className="flex items-center p-3 bg-white rounded-lg border">
+              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                step.status === 'success' ? 'bg-green-100 text-green-600' :
+                step.status === 'error' ? 'bg-red-100 text-red-600' :
+                step.status === 'processing' ? 'bg-blue-100 text-blue-600' :
+                'bg-gray-100 text-gray-400'
+              }`}>
+                {step.status === 'success' ? (
+                  <CheckCircleIcon className="h-5 w-5" />
+                ) : step.status === 'error' ? (
+                  <XMarkIcon className="h-5 w-5" />
+                ) : step.status === 'processing' ? (
+                  <ArrowPathIcon className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Icon className="h-5 w-5" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-gray-900">{step.title}</h4>
+                  <span className="text-xs text-gray-500">Step {step.step}</span>
+                </div>
+                <p className="text-xs text-gray-600">{step.description}</p>
+                {step.error && (
+                  <p className="text-xs text-red-600 mt-1">{step.error}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // Render vehicle and payment information
+  const renderVehicleInfo = () => (
+    <div className="space-y-6">
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Vehicle Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center">
+            <TruckIcon className="h-5 w-5 text-gray-400 mr-2" />
+            <div>
+              <p className="text-sm text-gray-500">Vehicle Number</p>
+              <p className="font-medium">{vehicleDetails?.vehicleId}</p>
+            </div>
+          </div>
+          <div className="flex items-center">
+            <TruckIcon className="h-5 w-5 text-gray-400 mr-2" />
+            <div>
+              <p className="text-sm text-gray-500">Vehicle Type</p>
+              <p className="font-medium capitalize">{vehicleDetails?.vehicleType}</p>
+            </div>
+          </div>
+          <div className="flex items-center">
+            <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
+            <div>
+              <p className="text-sm text-gray-500">Owner Wallet</p>
+              <p className="font-medium text-xs">{vehicleDetails?.owner}</p>
+            </div>
+          </div>
+          <div className="flex items-center">
+            <WalletIcon className="h-5 w-5 text-gray-400 mr-2" />
+            <div>
+              <p className="text-sm text-gray-500">Current Balance</p>
+              <p className="font-medium">
+                {walletInfo ? `₹${parseFloat(walletInfo.formattedBalance).toFixed(2)}` : 'Loading...'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Toll Payment Summary</h3>
+        <div className="space-y-3">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Vehicle Type:</span>
+            <span className="font-medium capitalize">{vehicleDetails?.vehicleType}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Toll Rate:</span>
+            <span className="font-medium">₹{tollRate}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Available Balance:</span>
+            <span className="font-medium">
+              {walletInfo ? `₹${parseFloat(walletInfo.formattedBalance).toFixed(2)}` : 'Loading...'}
+            </span>
+          </div>
+          <div className="border-t pt-3">
+            <div className="flex justify-between text-lg font-semibold">
+              <span>Total Amount:</span>
+              <span className="text-blue-600">₹{tollRate}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex space-x-3">
+          <button
+            onClick={() => {
+              setCurrentStep('scanning');
+              setValidationSteps([]);
+              setVehicleDetails(null);
+              setWalletInfo(null);
+              setQrData(null);
+            }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCollectToll}
+            disabled={isProcessing || !walletInfo || parseFloat(walletInfo.formattedBalance) < parseFloat(tollRate)}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? 'Processing...' : 'Collect Toll'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!isScanning && currentStep === 'scanning') {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-lg">
         <QrCodeIcon className="h-16 w-16 text-gray-400 mb-4" />
@@ -164,6 +620,56 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         >
           Start Scanning
         </button>
+      </div>
+    );
+  }
+
+  // Render different states based on current step
+  if (currentStep === 'validating') {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">Validating QR Code</h1>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+        {renderValidationSteps()}
+      </div>
+    );
+  }
+
+  if (currentStep === 'displaying') {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">Vehicle Information</h1>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Close
+            </button>
+          )}
+        </div>
+        {renderVehicleInfo()}
+      </div>
+    );
+  }
+
+  if (currentStep === 'processing') {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">Processing Payment</h1>
+        </div>
+        {renderValidationSteps()}
       </div>
     );
   }

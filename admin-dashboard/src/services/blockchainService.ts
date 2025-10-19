@@ -470,6 +470,34 @@ class BlockchainService {
   parseUSDCAmount(amount: string, decimals: number = 6): string {
     return ethers.parseUnits(amount, decimals).toString();
   }
+
+  async hasUserTopUpWallet(walletAddress: string): Promise<boolean> {
+    if (!this.tollContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      const hasWallet = await this.tollContract.hasUserTopUpWallet(walletAddress);
+      return hasWallet;
+    } catch (error) {
+      console.error('Failed to check if user has top-up wallet:', error);
+      return false;
+    }
+  }
+
+  async getUserTopUpWallet(walletAddress: string): Promise<string> {
+    if (!this.tollContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      const topUpWalletAddress = await this.tollContract.getUserTopUpWallet(walletAddress);
+      return topUpWalletAddress;
+    } catch (error) {
+      console.error('Failed to get user top-up wallet:', error);
+      throw new Error('Failed to get user top-up wallet');
+    }
+  }
 }
 
 export const blockchainService = new BlockchainService();

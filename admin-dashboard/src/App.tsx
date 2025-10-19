@@ -11,6 +11,7 @@ import { AnalyticsReporting } from './components/AnalyticsReporting';
 import { PlazaManagement } from './components/PlazaManagement';
 import { QRScanner } from './components/QRScanner';
 import { TransactionProcessor } from './components/TransactionProcessor';
+import { QRCodeTollCollection } from './components/QRCodeTollCollection';
 import { Header } from './components/Header';
 import { Login } from './components/Login';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
@@ -198,24 +199,10 @@ function AppContent() {
       case 'plazas':
         return <PlazaManagement socket={socket} />;
       case 'scanner':
-        return (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-gray-900">QR Code Scanner</h1>
-              <button
-                onClick={() => setIsScanning(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
-              >
-                Start Scanning
-              </button>
-            </div>
-            <QRScanner
-              onQRScanned={handleQRScanned}
-              isScanning={false}
-              onClose={() => setIsScanning(false)}
-            />
-          </div>
-        );
+        return <QRCodeTollCollection 
+          onTransactionComplete={handleTransactionComplete}
+          onTransactionError={handleTransactionError}
+        />;
       default:
         return <Dashboard socket={socket} notifications={notifications} />;
     }
