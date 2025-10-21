@@ -26,7 +26,7 @@ const navigation = [
 
 export const TopNavigation: React.FC<TopNavigationProps> = ({ activeTab, onTabChange }) => {
   return (
-    <nav className="bg-gray-900 border-b border-gray-700">
+    <nav className="bg-black border-b border-gray-800">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
         <div className="flex space-x-1 py-2 overflow-x-auto nav-scroll">
           {navigation.map((item) => {

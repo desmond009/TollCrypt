@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
 
   return (
     <div className="sticky top-0 z-50">
-      <header className="bg-gray-900 shadow-lg border-b border-gray-700">
+      <header className="bg-black shadow-lg border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex justify-between items-center py-3">
             {/* Left side - Brand */}
@@ -69,8 +69,8 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
                 </button>
                 
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-lg shadow-xl z-50 border border-gray-700">
-                    <div className="p-4 border-b border-gray-700">
+                  <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-lg shadow-xl z-50 border border-gray-800">
+                    <div className="p-4 border-b border-gray-800">
                       <h3 className="text-lg font-medium text-white">Notifications</h3>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
@@ -82,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
                         notifications.slice(0, 10).map((notification, index) => (
                           <div
                             key={index}
-                            className={`p-4 border-b border-gray-700 last:border-b-0 ${
+                            className={`p-4 border-b border-gray-800 last:border-b-0 ${
                               notification.severity === 'error' ? 'bg-red-900/20' :
                               notification.severity === 'warning' ? 'bg-yellow-900/20' :
                               'bg-gray-800/20'
