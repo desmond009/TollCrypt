@@ -20,6 +20,11 @@ const qrRoutes_1 = __importDefault(require("./routes/qrRoutes"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const topUpWalletRoutes_1 = __importDefault(require("./routes/topUpWalletRoutes"));
 const aadhaarRoutes_1 = __importDefault(require("./routes/aadhaarRoutes"));
+const plazaRoutes_1 = __importDefault(require("./routes/plazaRoutes"));
+// Import models for dashboard stats
+const { TollTransaction } = require('./models/TollTransaction');
+const { Vehicle } = require('./models/Vehicle');
+const { TollPlaza } = require('./models/TollPlaza');
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -40,7 +45,10 @@ const corsOptions = {
         "http://127.0.0.1:3000",
         "http://localhost:3002",
         "http://127.0.0.1:3002",
-        process.env.FRONTEND_URL || "http://localhost:3000"
+        "http://localhost:3003",
+        "http://127.0.0.1:3003",
+        process.env.FRONTEND_URL || "http://localhost:3000",
+        process.env.ADMIN_DASHBOARD_URL || "http://localhost:3003"
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -61,7 +69,11 @@ app.use((req, res, next) => {
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3002",
-        "http://127.0.0.1:3002"
+        "http://127.0.0.1:3002",
+        "http://localhost:3003",
+        "http://127.0.0.1:3003",
+        process.env.FRONTEND_URL || "http://localhost:3000",
+        process.env.ADMIN_DASHBOARD_URL || "http://localhost:3003"
     ];
     if (origin && allowedOrigins.includes(origin)) {
         res.header('Access-Control-Allow-Origin', origin);
@@ -90,6 +102,94 @@ app.use('/api/hardware', hardwareRoutes_1.hardwareRoutes);
 app.use('/api/qr', qrRoutes_1.default);
 app.use('/api/topup-wallet', topUpWalletRoutes_1.default);
 app.use('/api/aadhaar', aadhaarRoutes_1.default);
+app.use('/api/plazas', plazaRoutes_1.default);
+// Dashboard routes - specific endpoints for frontend compatibility
+app.get('/api/dashboard/stats', async (req, res) => {
+    try {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Get transaction statistics
+        const todayTransactions = await TollTransaction.countDocuments({
+            timestamp: { $gte: today },
+            status: 'confirmed'
+        });
+        const thisMonthTransactions = await TollTransaction.countDocuments({
+            timestamp: { $gte: thisMonth },
+            status: 'confirmed'
+        });
+        // Get revenue statistics
+        const todayRevenue = await TollTransaction.aggregate([
+            {
+                $match: {
+                    timestamp: { $gte: today },
+                    status: 'confirmed'
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$amount' }
+                }
+            }
+        ]);
+        const thisMonthRevenue = await TollTransaction.aggregate([
+            {
+                $match: {
+                    timestamp: { $gte: thisMonth },
+                    status: 'confirmed'
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$amount' }
+                }
+            }
+        ]);
+        // Get vehicle statistics
+        const totalVehicles = await Vehicle.countDocuments({ isActive: true });
+        const blacklistedVehicles = await Vehicle.countDocuments({ isBlacklisted: true });
+        const newVehiclesToday = await Vehicle.countDocuments({
+            registrationTime: { $gte: today }
+        });
+        // Get active plazas
+        const activePlazas = await TollPlaza.countDocuments({ isActive: true });
+        // Get failed transactions
+        const failedTransactions = await TollTransaction.countDocuments({
+            timestamp: { $gte: today },
+            status: 'failed'
+        });
+        // Calculate success rate
+        const totalTodayTransactions = await TollTransaction.countDocuments({
+            timestamp: { $gte: today }
+        });
+        const successRate = totalTodayTransactions > 0 ?
+            ((todayTransactions / totalTodayTransactions) * 100) : 0;
+        // Calculate average wait time (mock data for now)
+        const averageWaitTime = 2.5; // minutes
+        res.json({
+            success: true,
+            data: {
+                totalVehicles,
+                totalRevenue: thisMonthRevenue[0]?.total || 0,
+                averageWaitTime,
+                successRate: Math.round(successRate * 100) / 100,
+                todayTransactions,
+                todayRevenue: todayRevenue[0]?.total || 0,
+                activePlazas,
+                failedTransactions
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch dashboard stats'
+        });
+    }
+});
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({

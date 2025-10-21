@@ -80,7 +80,7 @@ const dummyPlazas = [
       taxId: '27AABCM1234A1Z5',
       auditTrailHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
       rateApprovalDocumentHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      complianceStatus: 'compliant',
+      complianceStatus: 'compliant' as const,
       lastAuditDate: new Date('2024-01-15'),
       nextAuditDate: new Date('2024-07-15')
     },
@@ -167,7 +167,7 @@ const dummyPlazas = [
       taxId: '07AABCM1234A1Z6',
       auditTrailHash: '0x2345678901bcdef1234567890abcdef1234567890abcdef1234567890abcdef',
       rateApprovalDocumentHash: '0xbcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      complianceStatus: 'compliant',
+      complianceStatus: 'compliant' as const,
       lastAuditDate: new Date('2024-01-20'),
       nextAuditDate: new Date('2024-07-20')
     },
@@ -254,7 +254,7 @@ const dummyPlazas = [
       taxId: '29AABCM1234A1Z7',
       auditTrailHash: '0x3456789012cdef1234567890abcdef1234567890abcdef1234567890abcdef',
       rateApprovalDocumentHash: '0xcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      complianceStatus: 'compliant',
+      complianceStatus: 'compliant' as const,
       lastAuditDate: new Date('2024-01-25'),
       nextAuditDate: new Date('2024-07-25')
     },
@@ -341,7 +341,7 @@ const dummyPlazas = [
       taxId: '36AABCM1234A1Z8',
       auditTrailHash: '0x4567890123def1234567890abcdef1234567890abcdef1234567890abcdef',
       rateApprovalDocumentHash: '0xdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      complianceStatus: 'compliant',
+      complianceStatus: 'compliant' as const,
       lastAuditDate: new Date('2024-01-30'),
       nextAuditDate: new Date('2024-07-30')
     },
@@ -428,7 +428,7 @@ const dummyPlazas = [
       taxId: '33AABCM1234A1Z9',
       auditTrailHash: '0x5678901234ef1234567890abcdef1234567890abcdef1234567890abcdef',
       rateApprovalDocumentHash: '0xef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      complianceStatus: 'compliant',
+      complianceStatus: 'compliant' as const,
       lastAuditDate: new Date('2024-02-01'),
       nextAuditDate: new Date('2024-08-01')
     },
@@ -461,7 +461,7 @@ async function seedPlazaDatabase() {
 
     // Create admin users first (if they don't exist)
     const existingAdmin = await AdminUser.findOne({ email: 'superadmin@tollchain.com' });
-    let superAdminId = existingAdmin?._id.toString();
+    let superAdminId = (existingAdmin?._id as any)?.toString();
 
     if (!existingAdmin) {
       const adminUsers = [
@@ -483,7 +483,7 @@ async function seedPlazaDatabase() {
       ];
 
       const createdAdmins = await AdminUser.insertMany(adminUsers);
-      superAdminId = createdAdmins[0]._id.toString();
+      superAdminId = (createdAdmins[0]._id as any).toString();
       console.log('Created super admin user');
     }
 
@@ -496,7 +496,7 @@ async function seedPlazaDatabase() {
         const plaza = await PlazaService.createPlaza(plazaData);
         createdPlazas.push(plaza);
         console.log(`Created plaza: ${plaza.identification.name} (${plaza.identification.uniqueId})`);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Failed to create plaza ${plazaData.identification.name}:`, error.message);
       }
     }

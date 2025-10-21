@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TopUpWalletService = void 0;
 exports.getGlobalMockWallets = getGlobalMockWallets;
@@ -10,6 +43,7 @@ const TOPUP_WALLET_FACTORY_ABI = [
     "function deployTopUpWallet(address user) external returns (address)",
     "function getUserTopUpWallet(address user) external view returns (address)",
     "function hasUserTopUpWallet(address user) external view returns (bool)",
+    "function getUserWalletInfo(address user) external view returns (address walletAddress, bool exists, uint256 balance)",
     "event TopUpWalletCreated(address indexed user, address indexed walletAddress)"
 ];
 const TOPUP_WALLET_ABI = [
@@ -135,10 +169,22 @@ class TopUpWalletService {
     async createTopUpWallet(userAddress) {
         try {
             if (this.isMockMode) {
+                // Check if user already has a mock wallet
+                if (globalMockWallets.has(userAddress)) {
+                    const existingWalletAddress = globalMockWallets.get(userAddress);
+                    return {
+                        success: true,
+                        walletAddress: existingWalletAddress,
+                        privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
+                        publicKey: '0x' + 'mock_public_key_' + userAddress.slice(2, 10)
+                    };
+                }
                 // Mock implementation - create a fake wallet
                 console.log(`⚠️  Mock createTopUpWallet for ${userAddress}`);
                 const mockWallet = ethers_1.ethers.Wallet.createRandom();
                 const mockWalletAddress = mockWallet.address;
+                // Store in global mock wallets
+                globalMockWallets.set(userAddress, mockWalletAddress);
                 return {
                     success: true,
                     walletAddress: mockWalletAddress,
@@ -146,12 +192,15 @@ class TopUpWalletService {
                     publicKey: mockWallet.publicKey
                 };
             }
-            // Check if user already has a wallet
+            // Check if user already has a wallet on blockchain
             const existingWallet = await this.factoryContract.getUserTopUpWallet(userAddress);
             if (existingWallet !== ethers_1.ethers.ZeroAddress) {
+                console.log(`User ${userAddress} already has a top-up wallet: ${existingWallet}`);
                 return {
-                    success: false,
-                    error: 'User already has a top-up wallet'
+                    success: true,
+                    walletAddress: existingWallet,
+                    privateKey: '', // Private key is not stored on-chain
+                    publicKey: '' // Public key is not stored on-chain
                 };
             }
             // Deploy new wallet
@@ -254,11 +303,53 @@ class TopUpWalletService {
                 // Mock implementation for development
                 return globalMockWallets.has(userAddress);
             }
-            return await this.factoryContract.hasUserTopUpWallet(userAddress);
+            return await this.factoryContract.hasTopUpWallet(userAddress);
         }
         catch (error) {
             console.error('Error checking top-up wallet:', error);
             return false;
+        }
+    }
+    /**
+     * Get wallet info from blockchain (Tier 1 - Authoritative source)
+     * @param userAddress User's wallet address
+     * @returns Wallet info from blockchain or null if not found
+     */
+    async getWalletInfoFromBlockchain(userAddress) {
+        try {
+            if (this.isMockMode) {
+                // Mock implementation for development
+                const mockWalletAddress = globalMockWallets.get(userAddress);
+                if (!mockWalletAddress) {
+                    return null;
+                }
+                return {
+                    walletAddress: mockWalletAddress,
+                    privateKey: '0x' + 'mock_private_key_' + userAddress.slice(2, 10),
+                    publicKey: '0x' + 'mock_public_key_' + userAddress.slice(2, 10),
+                    balance: '0.0',
+                    isInitialized: true
+                };
+            }
+            // Use the new getUserWalletInfo function from the contract
+            const [walletAddress, exists, balance] = await this.factoryContract.getUserWalletInfo(userAddress);
+            if (!exists || walletAddress === ethers_1.ethers.ZeroAddress) {
+                return null;
+            }
+            // Get additional info from the wallet contract
+            const walletContract = new ethers_1.ethers.Contract(walletAddress, TOPUP_WALLET_ABI, this.provider);
+            const isInitialized = await walletContract.isInitialized();
+            return {
+                walletAddress,
+                privateKey: '', // Private key is not stored on-chain
+                publicKey: '', // Public key is not stored on-chain
+                balance: ethers_1.ethers.formatEther(balance),
+                isInitialized
+            };
+        }
+        catch (error) {
+            console.error('Error getting wallet info from blockchain:', error);
+            return null;
         }
     }
     /**
@@ -439,6 +530,69 @@ class TopUpWalletService {
         const message = ethers_1.ethers.solidityPackedKeccak256(['address', 'uint256', 'uint256'], [userAddress, ethers_1.ethers.parseEther(amount), nonce]);
         const wallet = new ethers_1.ethers.Wallet(privateKey);
         return await wallet.signMessage(ethers_1.ethers.getBytes(message));
+    }
+    /**
+     * Get user's existing top-up wallet from database
+     * @param userAddress User's wallet address
+     * @returns Top-up wallet information or null if not found
+     */
+    async getExistingTopUpWallet(userAddress) {
+        try {
+            // Import User model here to avoid circular dependency
+            const { User } = await Promise.resolve().then(() => __importStar(require('../models/User')));
+            const user = await User.findOne({ walletAddress: userAddress.toLowerCase() });
+            if (!user || !user.topUpWalletAddress) {
+                return null;
+            }
+            console.log(`Found existing top-up wallet in database: ${user.topUpWalletAddress}`);
+            // Return wallet info from database first
+            const walletInfo = {
+                walletAddress: user.topUpWalletAddress,
+                privateKey: '', // Don't store private keys in database for security
+                publicKey: '', // Don't store public keys in database for security
+                balance: '0', // Will be fetched from blockchain if needed
+                isInitialized: true
+            };
+            // Try to get balance from blockchain if possible
+            try {
+                if (process.env.NODE_ENV !== 'development' || process.env.MOCK_BLOCKCHAIN !== 'true') {
+                    const balance = await this.getTopUpWalletBalance(userAddress);
+                    walletInfo.balance = balance;
+                }
+            }
+            catch (blockchainError) {
+                console.warn('Could not fetch balance from blockchain, using default:', blockchainError);
+            }
+            return walletInfo;
+        }
+        catch (error) {
+            console.error('Error getting existing top-up wallet:', error);
+            return null;
+        }
+    }
+    /**
+     * Check if user has an existing top-up wallet
+     * @param userAddress User's wallet address
+     * @returns True if user has a wallet
+     */
+    async hasExistingTopUpWallet(userAddress) {
+        try {
+            // Import User model here to avoid circular dependency
+            const { User } = await Promise.resolve().then(() => __importStar(require('../models/User')));
+            const normalizedAddress = userAddress.toLowerCase();
+            console.log(`Looking for user with address: ${normalizedAddress}`);
+            const user = await User.findOne({ walletAddress: normalizedAddress });
+            console.log(`User found: ${!!user}`);
+            if (user) {
+                console.log(`User topUpWalletAddress: ${user.topUpWalletAddress}`);
+                console.log(`Has topUpWalletAddress: ${!!user.topUpWalletAddress}`);
+            }
+            return !!(user && user.topUpWalletAddress);
+        }
+        catch (error) {
+            console.error('Error checking existing top-up wallet:', error);
+            return false;
+        }
     }
 }
 exports.TopUpWalletService = TopUpWalletService;

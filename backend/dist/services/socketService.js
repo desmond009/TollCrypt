@@ -9,8 +9,18 @@ class SocketService {
         this.adminRooms = new Map(); // adminId -> socketIds
         this.io = new socket_io_1.Server(server, {
             cors: {
-                origin: process.env.FRONTEND_URL || "http://localhost:3000",
-                methods: ["GET", "POST"]
+                origin: [
+                    "http://localhost:3000",
+                    "http://127.0.0.1:3000",
+                    "http://localhost:3002",
+                    "http://127.0.0.1:3002",
+                    "http://localhost:3003",
+                    "http://127.0.0.1:3003",
+                    process.env.FRONTEND_URL || "http://localhost:3000",
+                    process.env.ADMIN_DASHBOARD_URL || "http://localhost:3003"
+                ],
+                methods: ["GET", "POST"],
+                credentials: true
             }
         });
         this.setupSocketHandlers();

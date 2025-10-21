@@ -50,6 +50,12 @@ export declare class TopUpWalletService {
      */
     hasTopUpWallet(userAddress: string): Promise<boolean>;
     /**
+     * Get wallet info from blockchain (Tier 1 - Authoritative source)
+     * @param userAddress User's wallet address
+     * @returns Wallet info from blockchain or null if not found
+     */
+    getWalletInfoFromBlockchain(userAddress: string): Promise<TopUpWalletInfo | null>;
+    /**
      * Get top-up wallet balance
      * @param userAddress User's wallet address
      * @returns Balance in ETH
@@ -114,5 +120,17 @@ export declare class TopUpWalletService {
      * @returns Signature
      */
     createWithdrawalSignature(userAddress: string, amount: string, nonce: number, privateKey: string): Promise<string>;
+    /**
+     * Get user's existing top-up wallet from database
+     * @param userAddress User's wallet address
+     * @returns Top-up wallet information or null if not found
+     */
+    getExistingTopUpWallet(userAddress: string): Promise<TopUpWalletInfo | null>;
+    /**
+     * Check if user has an existing top-up wallet
+     * @param userAddress User's wallet address
+     * @returns True if user has a wallet
+     */
+    hasExistingTopUpWallet(userAddress: string): Promise<boolean>;
 }
 //# sourceMappingURL=topUpWalletService.d.ts.map

@@ -129,7 +129,7 @@ export class PlazaService {
       await this.createInitialTollRates(plaza.identification.uniqueId, plazaData.tollRates);
 
       return plaza;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to create plaza: ${error.message}`);
     }
   }
@@ -140,7 +140,7 @@ export class PlazaService {
   static async getPlazaByUniqueId(uniqueId: string): Promise<ITollPlaza | null> {
     try {
       return await TollPlaza.findOne({ 'identification.uniqueId': uniqueId });
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get plaza: ${error.message}`);
     }
   }
@@ -151,7 +151,7 @@ export class PlazaService {
   static async getPlazaById(id: string): Promise<ITollPlaza | null> {
     try {
       return await TollPlaza.findById(id);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get plaza: ${error.message}`);
     }
   }
@@ -210,7 +210,7 @@ export class PlazaService {
         page,
         totalPages: Math.ceil(total / limit)
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to search plazas: ${error.message}`);
     }
   }
@@ -249,7 +249,7 @@ export class PlazaService {
       return plazasWithDistance
         .sort((a, b) => a.distance - b.distance)
         .map(item => item.plaza);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to find plazas by proximity: ${error.message}`);
     }
   }
@@ -276,7 +276,7 @@ export class PlazaService {
       await plaza.save();
 
       return plaza;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to update plaza: ${error.message}`);
     }
   }
@@ -292,7 +292,7 @@ export class PlazaService {
       await TollRate.deleteMany({ plazaUniqueId: uniqueId });
       
       return result.deletedCount > 0;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to delete plaza: ${error.message}`);
     }
   }
@@ -364,7 +364,7 @@ export class PlazaService {
         discountApplied: Number(discountApplied.toFixed(6)),
         currency: 'ETH'
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to calculate toll: ${error.message}`);
     }
   }
@@ -388,7 +388,7 @@ export class PlazaService {
         analytics: plaza.analytics,
         lastUpdated: plaza.updatedAt
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get plaza analytics: ${error.message}`);
     }
   }
@@ -410,7 +410,7 @@ export class PlazaService {
       await plaza.save();
 
       return plaza;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to update plaza analytics: ${error.message}`);
     }
   }
@@ -439,7 +439,7 @@ export class PlazaService {
       }));
 
       await TollRate.insertMany(tollRates);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to create initial toll rates: ${error.message}`);
     }
   }

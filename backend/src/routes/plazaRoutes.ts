@@ -20,7 +20,7 @@ router.post('/', authenticateAdmin, async (req: Request, res: Response) => {
       message: 'Plaza created successfully',
       data: plaza
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({
       success: false,
       message: error.message
@@ -67,7 +67,7 @@ router.get('/', async (req: Request, res: Response) => {
       success: true,
       data: result
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
       message: error.message
@@ -104,7 +104,7 @@ router.get('/proximity', async (req: Request, res: Response) => {
       success: true,
       data: plazas
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
       message: error.message
@@ -133,7 +133,7 @@ router.get('/:uniqueId', async (req: Request, res: Response) => {
       success: true,
       data: plaza
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
       message: error.message
@@ -165,7 +165,7 @@ router.put('/:uniqueId', authenticateAdmin, async (req: Request, res: Response) 
       message: 'Plaza updated successfully',
       data: plaza
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({
       success: false,
       message: error.message
@@ -203,7 +203,7 @@ router.delete('/:uniqueId', authenticateAdmin, async (req: Request, res: Respons
       success: true,
       message: 'Plaza deleted successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
       message: error.message
@@ -239,7 +239,7 @@ router.post('/:uniqueId/calculate-toll', async (req: Request, res: Response) => 
       success: true,
       data: tollCalculation
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({
       success: false,
       message: error.message
@@ -266,7 +266,7 @@ router.get('/:uniqueId/analytics', authenticateAdmin, async (req: Request, res: 
       success: true,
       data: analytics
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
       message: error.message
@@ -298,7 +298,7 @@ router.put('/:uniqueId/analytics', authenticateAdmin, async (req: Request, res: 
       message: 'Analytics updated successfully',
       data: plaza.analytics
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({
       success: false,
       message: error.message
@@ -346,7 +346,7 @@ router.get('/search/text', async (req: Request, res: Response) => {
         totalPages: Math.ceil(filteredPlazas.length / parseInt(limit as string))
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
       message: error.message

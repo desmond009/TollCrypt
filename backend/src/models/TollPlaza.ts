@@ -586,11 +586,9 @@ TollPlazaSchema.index({ assignedOperators: 1 });
 
 // Geospatial index for proximity searches
 TollPlazaSchema.index({ 
-  'location.gpsCoordinates.latitude': 1, 
-  'location.gpsCoordinates.longitude': 1 
+  'location.gpsCoordinates': '2dsphere'
 }, { 
-  name: 'location_2dsphere',
-  '2dsphere': true 
+  name: 'location_2dsphere'
 });
 
 // Text index for search functionality

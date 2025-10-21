@@ -905,4 +905,119 @@ router.get('/operators', async (req, res) => {
         });
     }
 });
+// Process toll payment from admin QR scan
+router.post('/process-toll', async (req, res) => {
+    try {
+        const { walletAddress, vehicleNumber, vehicleType, tollAmount, plazaId, timestamp, adminWallet, gasUsed, transactionHash } = req.body;
+        // Validate required fields
+        if (!walletAddress || !vehicleNumber || !vehicleType || !tollAmount || !plazaId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields'
+            });
+        }
+        // Find the vehicle
+        const vehicle = await Vehicle_1.Vehicle.findOne({
+            vehicleId: vehicleNumber,
+            isActive: true,
+            isBlacklisted: false
+        });
+        if (!vehicle) {
+            return res.status(404).json({
+                success: false,
+                error: 'Vehicle not registered or not eligible'
+            });
+        }
+        // Create transaction record
+        const transaction = new TollTransaction_1.TollTransaction({
+            transactionId: `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            vehicleId: vehicle._id,
+            payer: walletAddress,
+            amount: parseFloat(tollAmount),
+            currency: 'ETH',
+            tollLocation: `Plaza ${plazaId}`,
+            status: 'confirmed',
+            metadata: {
+                processedBy: 'admin',
+                adminWallet,
+                plazaId,
+                gasUsed,
+                transactionHash,
+                processedAt: new Date()
+            }
+        });
+        await transaction.save();
+        // Update vehicle's last toll time
+        await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId: vehicleNumber }, { lastTollTime: new Date() });
+        // Broadcast to admin dashboard
+        try {
+            const socketService = (0, socketInstance_1.getSocketService)();
+            await socketService.broadcastNewTransaction(transaction);
+        }
+        catch (socketError) {
+            console.error('Error broadcasting new transaction:', socketError);
+        }
+        res.json({
+            success: true,
+            message: 'Toll payment processed successfully',
+            data: {
+                transactionId: transaction.transactionId,
+                vehicleNumber,
+                amount: tollAmount,
+                plazaId,
+                timestamp: new Date(),
+                transactionHash
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error processing admin toll payment:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process toll payment'
+        });
+    }
+});
+// Get vehicle details for QR validation
+router.post('/validate-vehicle', async (req, res) => {
+    try {
+        const { vehicleNumber } = req.body;
+        if (!vehicleNumber) {
+            return res.status(400).json({
+                success: false,
+                error: 'Vehicle number is required'
+            });
+        }
+        const vehicle = await Vehicle_1.Vehicle.findOne({
+            vehicleId: vehicleNumber,
+            isActive: true,
+            isBlacklisted: false
+        });
+        if (!vehicle) {
+            return res.status(404).json({
+                success: false,
+                error: 'Vehicle not found or not eligible'
+            });
+        }
+        res.json({
+            success: true,
+            data: {
+                vehicleId: vehicle.vehicleId,
+                vehicleType: vehicle.vehicleType,
+                owner: vehicle.owner,
+                isRegistered: true,
+                isBlacklisted: false,
+                registrationTime: vehicle.registrationTime,
+                lastTollTime: vehicle.lastTollTime
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error validating vehicle:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to validate vehicle'
+        });
+    }
+});
 //# sourceMappingURL=adminRoutes.js.map
