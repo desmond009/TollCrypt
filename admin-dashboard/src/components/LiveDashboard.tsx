@@ -176,33 +176,33 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'success':
-        return 'text-green-600 bg-green-100';
+        return 'text-green-300 bg-green-900 border-green-700';
       case 'failed':
-        return 'text-red-600 bg-red-100';
+        return 'text-red-300 bg-red-900 border-red-700';
       case 'pending':
-        return 'text-yellow-600 bg-yellow-100';
+        return 'text-yellow-300 bg-yellow-900 border-yellow-700';
       default:
-        return 'text-gray-600 bg-gray-100';
+        return 'text-gray-300 bg-gray-700 border-gray-600';
     }
   };
 
   const getPlazaStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return 'text-green-600 bg-green-100';
+        return 'text-green-300 bg-green-900 border-green-700';
       case 'maintenance':
-        return 'text-yellow-600 bg-yellow-100';
+        return 'text-yellow-300 bg-yellow-900 border-yellow-700';
       case 'inactive':
-        return 'text-red-600 bg-red-100';
+        return 'text-red-300 bg-red-900 border-red-700';
       default:
-        return 'text-gray-600 bg-gray-100';
+        return 'text-gray-300 bg-gray-700 border-gray-600';
     }
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
       </div>
     );
   }
@@ -210,9 +210,9 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Live Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Live Dashboard</h1>
           <p className="text-gray-400">Real-time toll collection monitoring</p>
         </div>
         <div className="flex items-center space-x-2">
@@ -292,7 +292,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Chart */}
         <div className="admin-card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Trend (7 Days)</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">Revenue Trend (7 Days)</h3>
           {isValidChartData(revenueData) ? (
             <Line
               data={revenueData}
@@ -301,18 +301,33 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
                 plugins: {
                   legend: {
                     position: 'top' as const,
+                    labels: {
+                      color: '#ffffff'
+                    }
                   },
                   title: {
                     display: false,
                   },
                 },
                 scales: {
+                  x: {
+                    ticks: {
+                      color: '#9ca3af'
+                    },
+                    grid: {
+                      color: '#374151'
+                    }
+                  },
                   y: {
                     beginAtZero: true,
                     ticks: {
+                      color: '#9ca3af',
                       callback: function(value: any) {
                         return formatCurrency(Number(value));
                       }
+                    },
+                    grid: {
+                      color: '#374151'
                     }
                   }
                 }
@@ -320,14 +335,14 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
             />
           ) : (
             <div className="h-64 flex items-center justify-center">
-              <div className="text-gray-500">No revenue data available</div>
+              <div className="text-gray-400">No revenue data available</div>
             </div>
           )}
         </div>
 
         {/* Vehicle Type Distribution */}
         <div className="admin-card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Vehicle Type Distribution</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">Vehicle Type Distribution</h3>
           {isValidChartData(vehicleTypeData) ? (
             <Doughnut
               data={vehicleTypeData}
@@ -336,13 +351,16 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
                 plugins: {
                   legend: {
                     position: 'bottom' as const,
+                    labels: {
+                      color: '#ffffff'
+                    }
                   },
                 },
               }}
             />
           ) : (
             <div className="h-64 flex items-center justify-center">
-              <div className="text-gray-500">No vehicle type data available</div>
+              <div className="text-gray-400">No vehicle type data available</div>
             </div>
           )}
         </div>
@@ -351,39 +369,39 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
       {/* Recent Transactions and Plaza Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Transactions */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
+        <div className="bg-gray-800 rounded-lg shadow border border-gray-700">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-700">
+            <h3 className="text-lg font-semibold text-white">Recent Transactions</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-700">
             {recentTransactions && recentTransactions.length > 0 ? recentTransactions.map((transaction) => (
-              <div key={transaction.id} className="px-6 py-4">
+              <div key={transaction.id} className="px-4 sm:px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
                       <TruckIcon className="h-5 w-5 text-gray-400" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-white">
                         {transaction.vehicleId}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-400">
                         {formatTime(transaction.timestamp)}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-900">
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
+                    <span className="text-sm font-medium text-white">
                       {formatCurrency(transaction.amount)}
                     </span>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(transaction.status)}`}>
                       {transaction.status}
                     </span>
                   </div>
                 </div>
               </div>
             )) : (
-              <div className="px-6 py-4 text-center text-sm text-gray-500">
+              <div className="px-4 sm:px-6 py-4 text-center text-sm text-gray-400">
                 No recent transactions
               </div>
             )}
@@ -391,39 +409,39 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
         </div>
 
         {/* Plaza Status */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Toll Plaza Status</h3>
+        <div className="bg-gray-800 rounded-lg shadow border border-gray-700">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-700">
+            <h3 className="text-lg font-semibold text-white">Toll Plaza Status</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-700">
             {plazas && plazas.length > 0 ? plazas.map((plaza) => (
-              <div key={plaza.id} className="px-6 py-4">
+              <div key={plaza.id} className="px-4 sm:px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
                       <MapPinIcon className="h-5 w-5 text-gray-400" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-white">
                         {plaza.name}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-400">
                         {plaza.location}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
+                    <span className="text-sm text-gray-400">
                       {plaza.todayTransactions} transactions
                     </span>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPlazaStatusColor(plaza.status)}`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getPlazaStatusColor(plaza.status)}`}>
                       {plaza.status}
                     </span>
                   </div>
                 </div>
               </div>
             )) : (
-              <div className="px-6 py-4 text-center text-sm text-gray-500">
+              <div className="px-4 sm:px-6 py-4 text-center text-sm text-gray-400">
                 No plazas found
               </div>
             )}
@@ -433,18 +451,18 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
 
       {/* Alerts */}
       {notifications.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">System Alerts</h3>
+        <div className="bg-gray-800 rounded-lg shadow border border-gray-700">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-700">
+            <h3 className="text-lg font-semibold text-white">System Alerts</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-700">
             {notifications.slice(0, 5).map((notification, index) => (
-              <div key={index} className="px-6 py-4">
+              <div key={index} className="px-4 sm:px-6 py-4">
                 <div className="flex items-center">
                   <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-3" />
                   <div>
-                    <p className="text-sm text-gray-900">{notification.message}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm text-white">{notification.message}</p>
+                    <p className="text-xs text-gray-400">
                       {new Date(notification.timestamp).toLocaleString()}
                     </p>
                   </div>

@@ -34,11 +34,11 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
 
   return (
     <div className="sticky top-0 z-50">
-      <header className="admin-header shadow-lg border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="bg-gray-900 shadow-lg border-b border-gray-700">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex justify-between items-center py-3">
             {/* Left side - Brand */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
                 TollChain Admin
               </h1>

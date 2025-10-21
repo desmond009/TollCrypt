@@ -239,7 +239,7 @@ export const TransactionProcessor: React.FC<TransactionProcessorProps> = ({
           <div className="flex items-center">
             <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
             <div>
-              <p className="text-sm text-gray-500">Owner Wallet</p>
+              <p className="text-sm text-gray-500">Top-up Wallet Address</p>
               <p className="font-medium text-xs">{qrData.walletAddress}</p>
             </div>
           </div>

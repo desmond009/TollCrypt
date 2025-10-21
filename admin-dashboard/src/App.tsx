@@ -157,11 +157,11 @@ function AppContent() {
     if (isScanning) {
       return (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">QR Code Scanner</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">QR Code Scanner</h1>
             <button
               onClick={() => setIsScanning(false)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
             >
               Cancel Scanning
             </button>
@@ -209,7 +209,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-black text-white">
       <Header 
         user={user} 
         onLogout={logout} 
@@ -217,7 +217,7 @@ function AppContent() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
-      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 p-3 sm:p-4 lg:p-6">
         <div className="max-w-7xl mx-auto">
           {renderContent()}
         </div>

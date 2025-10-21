@@ -605,17 +605,17 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   // Render validation steps
   const renderValidationSteps = () => (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Code Validation Process</h3>
+      <h3 className="text-lg font-semibold text-white mb-4">QR Code Validation Process</h3>
       <div className="space-y-3">
         {validationSteps.map((step) => {
           const Icon = step.icon;
           return (
-            <div key={step.step} className="flex items-center p-3 bg-white rounded-lg border">
+            <div key={step.step} className="flex items-center p-3 bg-gray-800 rounded-lg border border-gray-700">
               <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                step.status === 'success' ? 'bg-green-100 text-green-600' :
-                step.status === 'error' ? 'bg-red-100 text-red-600' :
-                step.status === 'processing' ? 'bg-blue-100 text-blue-600' :
-                'bg-gray-100 text-gray-400'
+                step.status === 'success' ? 'bg-green-900 text-green-300' :
+                step.status === 'error' ? 'bg-red-900 text-red-300' :
+                step.status === 'processing' ? 'bg-blue-900 text-blue-300' :
+                'bg-gray-700 text-gray-400'
               }`}>
                 {step.status === 'success' ? (
                   <CheckCircleIcon className="h-5 w-5" />
@@ -629,12 +629,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-gray-900">{step.title}</h4>
-                  <span className="text-xs text-gray-500">Step {step.step}</span>
+                  <h4 className="text-sm font-medium text-white">{step.title}</h4>
+                  <span className="text-xs text-gray-400">Step {step.step}</span>
                 </div>
-                <p className="text-xs text-gray-600">{step.description}</p>
+                <p className="text-xs text-gray-400">{step.description}</p>
                 {step.error && (
-                  <p className="text-xs text-red-600 mt-1">{step.error}</p>
+                  <p className="text-xs text-red-400 mt-1">{step.error}</p>
                 )}
               </div>
             </div>
@@ -647,28 +647,28 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   // Render vehicle and payment information
   const renderVehicleInfo = () => (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Vehicle Information</h3>
+      <div className="bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-white mb-4">Vehicle Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex items-center">
             <TruckIcon className="h-5 w-5 text-gray-400 mr-2" />
             <div>
-              <p className="text-sm text-gray-500">Vehicle Number</p>
-              <p className="font-medium">{vehicleDetails?.vehicleId}</p>
+              <p className="text-sm text-gray-400">Vehicle Number</p>
+              <p className="font-medium text-white">{vehicleDetails?.vehicleId}</p>
             </div>
           </div>
           <div className="flex items-center">
             <TruckIcon className="h-5 w-5 text-gray-400 mr-2" />
             <div>
-              <p className="text-sm text-gray-500">Vehicle Type</p>
-              <p className="font-medium capitalize">{vehicleDetails?.vehicleType}</p>
+              <p className="text-sm text-gray-400">Vehicle Type</p>
+              <p className="font-medium text-white capitalize">{vehicleDetails?.vehicleType}</p>
             </div>
           </div>
           <div className="flex items-center">
             <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
             <div>
-              <p className="text-sm text-gray-500">Owner Wallet</p>
-              <p className="font-medium text-xs">{vehicleDetails?.owner}</p>
+              <p className="text-sm text-gray-400">Top-up Wallet Address</p>
+              <p className="font-medium text-xs text-white">{vehicleDetails?.owner}</p>
             </div>
           </div>
           <div className="flex items-center">
@@ -683,27 +683,27 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Toll Payment Summary</h3>
+      <div className="bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-white mb-4">Toll Payment Summary</h3>
         <div className="space-y-3">
           <div className="flex justify-between">
-            <span className="text-gray-600">Vehicle Type:</span>
-            <span className="font-medium capitalize">{vehicleDetails?.vehicleType}</span>
+            <span className="text-gray-400">Vehicle Type:</span>
+            <span className="font-medium text-white capitalize">{vehicleDetails?.vehicleType}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Toll Rate:</span>
-            <span className="font-medium">₹{tollRate}</span>
+            <span className="text-gray-400">Toll Rate:</span>
+            <span className="font-medium text-white">₹{tollRate}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Available Balance:</span>
-            <span className="font-medium">
+            <span className="text-gray-400">Available Balance:</span>
+            <span className="font-medium text-white">
               {walletInfo ? `₹${parseFloat(walletInfo.formattedBalance).toFixed(2)}` : 'Loading...'}
             </span>
           </div>
-          <div className="border-t pt-3">
+          <div className="border-t border-gray-700 pt-3">
             <div className="flex justify-between text-lg font-semibold">
-              <span>Total Amount:</span>
-              <span className="text-blue-600">₹{tollRate}</span>
+              <span className="text-white">Total Amount:</span>
+              <span className="text-blue-400">₹{tollRate}</span>
             </div>
           </div>
         </div>
@@ -717,7 +717,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               setWalletInfo(null);
               setQrData(null);
             }}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            className="flex-1 px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors"
           >
             Cancel
           </button>
@@ -735,10 +735,10 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   if (!isScanning && currentStep === 'scanning') {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-lg">
+      <div className="flex flex-col items-center justify-center p-8 bg-gray-800 rounded-lg border border-gray-700">
         <QrCodeIcon className="h-16 w-16 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">QR Scanner Ready</h3>
-        <p className="text-sm text-gray-500 text-center mb-4">
+        <h3 className="text-lg font-medium text-white mb-2">QR Scanner Ready</h3>
+        <p className="text-sm text-gray-400 text-center mb-4">
           Click "Start Scanning" to begin QR code detection
         </p>
         <button
@@ -756,11 +756,11 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Validating QR Code</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Validating QR Code</h1>
           {onClose && (
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors"
             >
               Cancel
             </button>
@@ -775,11 +775,11 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Vehicle Information</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Vehicle Information</h1>
           {onClose && (
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors"
             >
               Close
             </button>
@@ -794,7 +794,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Processing Payment</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Processing Payment</h1>
         </div>
         {renderValidationSteps()}
       </div>

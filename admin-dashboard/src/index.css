@@ -34,7 +34,7 @@
   }
   
   .card {
-    @apply bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg;
+    @apply bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-700 shadow-lg;
   }
   
   .input-field {
@@ -42,7 +42,7 @@
   }
   
   .admin-card {
-    @apply bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg hover:shadow-xl transition-all duration-200;
+    @apply bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-700 shadow-lg hover:shadow-xl transition-all duration-200;
   }
   
   .admin-sidebar {
@@ -50,7 +50,7 @@
   }
   
   .admin-header {
-    @apply bg-gray-800 border-b border-gray-700;
+    @apply bg-gray-900 border-b border-gray-700;
   }
   
   /* Custom scrollbar for navigation */
@@ -68,6 +68,24 @@
   
   .nav-scroll::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-400;
+  }
+  
+  /* Responsive table styles */
+  .table-responsive {
+    @apply overflow-x-auto;
+  }
+  
+  .table-responsive table {
+    @apply min-w-full;
+  }
+  
+  /* Mobile-first responsive utilities */
+  .mobile-hidden {
+    @apply hidden sm:block;
+  }
+  
+  .mobile-only {
+    @apply block sm:hidden;
   }
 }
 
