@@ -1,6 +1,15 @@
 import QRCode from 'qrcode';
 import { VehicleInfo } from './sessionManager';
-import { ethers } from 'ethers';
+import { keccak256, stringToBytes, hexToBytes, verifyMessage } from 'viem';
+import { createWalletClient, custom } from 'viem';
+import { sepolia } from 'viem/chains';
+
+// Extend Window interface to include ethereum
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 export interface QRCodeData {
   walletAddress: string;        // 42 characters - Top-Up Wallet Address
@@ -35,16 +44,16 @@ const VEHICLE_TYPE_MAP: Record<string, string> = {
 
 // Generate SHA-256 hash for user ID
 function generateUserIdHash(aadhaarNullifier: string): string {
-  return ethers.utils.sha256(ethers.utils.toUtf8Bytes(aadhaarNullifier)).slice(2); // Remove 0x prefix
+  return keccak256(stringToBytes(aadhaarNullifier)).slice(2); // Remove 0x prefix
 }
 
 // Generate ECDSA signature for QR data
 async function generateSignature(data: any, privateKey: string): Promise<string> {
   const message = JSON.stringify(data);
-  const messageHash = ethers.utils.sha256(ethers.utils.toUtf8Bytes(message));
-  const wallet = new ethers.Wallet(privateKey);
-  const signature = await wallet.signMessage(ethers.utils.arrayify(messageHash));
-  return signature;
+  const messageHash = keccak256(stringToBytes(message));
+  // Note: This function would need a wallet client implementation
+  // For now, we'll use the wallet signing approach in the main function
+  throw new Error('Use wallet signing instead of private key');
 }
 
 class QRService {
@@ -68,15 +77,51 @@ class QRService {
     // Generate user ID hash from session token (temporary solution)
     const userId = generateUserIdHash(sessionToken);
     
-    // Create QR data with mock signature for now
-    const qrData: QRCodeData = {
+    const timestamp = Math.floor(Date.now() / 1000);
+    
+    // Create base QR data (without signature)
+    const baseData = {
       walletAddress,
       vehicleNumber: vehicle.vehicleId,
       vehicleType: vehicleTypeCode,
       userId,
-      timestamp: Math.floor(Date.now() / 1000), // Unix timestamp
-      signature: '0x' + '0'.repeat(130), // Mock signature - will be replaced with real implementation
-      version: 'v1',
+      timestamp,
+      version: 'v1'
+    };
+    
+    // Generate real signature using wallet if available
+    let signature = '0x' + '0'.repeat(130); // Fallback to mock signature
+    
+    try {
+      // Try to get signature from wallet (if user has signed in with wallet)
+      if (window.ethereum) {
+        const walletClient = createWalletClient({
+          chain: sepolia,
+          transport: custom(window.ethereum)
+        });
+        
+        const [account] = await walletClient.getAddresses();
+        
+        // Only sign if the account address matches the wallet address
+        if (account.toLowerCase() === walletAddress.toLowerCase()) {
+          const message = JSON.stringify(baseData);
+          const messageHash = keccak256(stringToBytes(message));
+          signature = await walletClient.signMessage({
+            account,
+            message: { raw: hexToBytes(messageHash) }
+          });
+          console.log('Generated real signature for QR code');
+        }
+      }
+    } catch (error) {
+      console.warn('Could not generate real signature, using mock:', error);
+      // Keep mock signature as fallback
+    }
+    
+    // Create final QR data with signature
+    const qrData: QRCodeData = {
+      ...baseData,
+      signature,
       sessionToken, // Legacy field
       tollRate
     };
@@ -174,18 +219,19 @@ class QRService {
       };
 
       const message = JSON.stringify(baseData);
-      const messageHash = ethers.utils.sha256(ethers.utils.toUtf8Bytes(message));
+      const messageHash = keccak256(stringToBytes(message));
       
       try {
-        const recoveredAddress = ethers.utils.verifyMessage(
-          ethers.utils.arrayify(messageHash),
-          qrData.signature
-        );
+        const isValidSignature = verifyMessage({
+          address: qrData.walletAddress as `0x${string}`,
+          message: { raw: hexToBytes(messageHash) },
+          signature: qrData.signature as `0x${string}`
+        });
         
-        if (recoveredAddress.toLowerCase() !== qrData.walletAddress.toLowerCase()) {
+        if (!isValidSignature) {
           return {
             isValid: false,
-            error: 'Invalid signature - wallet address mismatch'
+            error: 'Invalid signature - verification failed'
           };
         }
       } catch (sigError) {
