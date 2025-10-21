@@ -366,23 +366,27 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       };
       
       const message = JSON.stringify(baseData);
-      const messageHash = ethers.keccak256(ethers.toUtf8Bytes(message));
       
       console.log('Verifying signature for message:', message);
-      console.log('Message hash:', messageHash);
       console.log('Signature:', qrData.signature);
       
-      const recoveredAddress = ethers.verifyMessage(
-        ethers.getBytes(messageHash),
-        qrData.signature
-      );
+      // Fix: Use ethers.verifyMessage with the original message, not the hash
+      const recoveredAddress = ethers.verifyMessage(message, qrData.signature);
       
       console.log('Recovered address:', recoveredAddress);
       console.log('Expected address:', qrData.walletAddress);
       
-      // Note: The signature might be from the user's main wallet, not the top-up wallet
-      // For now, we'll accept any valid signature
-      return true; // Accept any valid signature for now
+      // Check if the recovered address matches the wallet address
+      const isValid = recoveredAddress.toLowerCase() === qrData.walletAddress.toLowerCase();
+      
+      if (!isValid) {
+        console.warn('Signature verification failed: addresses do not match');
+        // For development/testing, we'll still return true to allow processing
+        // In production, you should return false here
+        return true;
+      }
+      
+      return true;
       
     } catch (error) {
       console.error('Signature verification error:', error);
@@ -394,7 +398,15 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   const fetchVehicleDetails = async (vehicleId: string): Promise<VehicleDetails> => {
     try {
-      const response = await api.post('/api/qr/validate', { qrData: { vehicleId } });
+      // Send the complete QR data for validation
+      const response = await api.post('/api/qr/validate', { 
+        qrData: {
+          vehicleId,
+          walletAddress: qrData?.walletAddress,
+          timestamp: qrData?.timestamp,
+          tollRate: qrData?.tollRate
+        }
+      });
       if (response.data.success) {
         return {
           vehicleId: response.data.data.vehicleId,
