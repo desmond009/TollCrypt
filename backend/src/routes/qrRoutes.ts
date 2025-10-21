@@ -8,7 +8,7 @@ import blockchainService from '../services/blockchainService';
 const router = express.Router();
 
 // QR Code verification endpoint
-router.post('/qr/verify', async (req, res) => {
+router.post('/verify', async (req, res) => {
   try {
     const { qrData, sessionToken } = req.body;
     
@@ -30,9 +30,9 @@ router.post('/qr/verify', async (req, res) => {
     }
 
     // Check if QR code is not too old (5 minutes)
-    const now = Date.now();
+    const now = Math.floor(Date.now() / 1000); // Convert to seconds
     const qrAge = now - timestamp;
-    const maxAge = 5 * 60 * 1000; // 5 minutes
+    const maxAge = 5 * 60; // 5 minutes in seconds
 
     if (qrAge > maxAge) {
       return res.status(400).json({ 
@@ -93,7 +93,7 @@ router.post('/qr/verify', async (req, res) => {
 });
 
 // Process toll payment via QR code
-router.post('/qr/payment', async (req, res) => {
+router.post('/payment', async (req, res) => {
   try {
     const { qrData, transactionHash, adminId } = req.body;
     
@@ -201,7 +201,7 @@ router.post('/qr/payment', async (req, res) => {
 });
 
 // Get QR payment statistics
-router.get('/qr/stats', authenticateAdmin, async (req, res) => {
+router.get('/stats', authenticateAdmin, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
@@ -256,7 +256,7 @@ router.get('/qr/stats', authenticateAdmin, async (req, res) => {
 });
 
 // Get recent QR payments
-router.get('/qr/recent', authenticateAdmin, async (req, res) => {
+router.get('/recent', authenticateAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
     
@@ -283,7 +283,7 @@ router.get('/qr/recent', authenticateAdmin, async (req, res) => {
 });
 
 // Validate QR code for admin scanning
-router.post('/qr/validate', async (req, res) => {
+router.post('/validate', async (req, res) => {
   try {
     const { qrData } = req.body;
     
@@ -297,9 +297,9 @@ router.post('/qr/validate', async (req, res) => {
     const { walletAddress, vehicleId, timestamp } = qrData;
 
     // Check QR code age
-    const now = Date.now();
+    const now = Math.floor(Date.now() / 1000); // Convert to seconds
     const qrAge = now - timestamp;
-    const maxAge = 5 * 60 * 1000; // 5 minutes
+    const maxAge = 5 * 60; // 5 minutes in seconds
 
     if (qrAge > maxAge) {
       return res.status(400).json({ 
