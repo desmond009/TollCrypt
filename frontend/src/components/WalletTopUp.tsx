@@ -296,8 +296,9 @@ export const WalletTopUp: React.FC = () => {
         setHasTopUpWallet(true);
         setFastagBalance(walletInfo.balance);
         
-        // Store private key securely (in a real app, you'd use a secure key management system)
-        localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
+        // Note: Private key is not stored for security reasons
+        // Top-up wallets are smart contracts, not EOA wallets
+        // Users send ETH from their main wallet to the top-up wallet address
         
         setWalletCreatedMessage('Wallet loaded successfully!');
         console.log('✅ Wallet loaded via persistence service:', walletInfo.walletAddress);
@@ -322,17 +323,8 @@ export const WalletTopUp: React.FC = () => {
     
     try {
       // Check if user has a top-up wallet
-      if (!hasTopUpWallet) {
+      if (!hasTopUpWallet || !topUpWalletInfo?.walletAddress) {
         setErrorMessage('Please create a top-up wallet first');
-        setIsProcessing(false);
-        setSelectedAmount('');
-        return;
-      }
-
-      // Get private key from localStorage
-      const privateKey = localStorage.getItem(`topup-private-key-${address}`);
-      if (!privateKey) {
-        setErrorMessage('Top-up wallet private key not found');
         setIsProcessing(false);
         setSelectedAmount('');
         return;
@@ -346,11 +338,13 @@ export const WalletTopUp: React.FC = () => {
         return;
       }
 
-      // Real blockchain transaction - send ETH from user's wallet to top-up wallet
+      // Real blockchain transaction - send ETH from user's main wallet to top-up wallet
       try {
-        // Send transaction from user's wallet to top-up wallet
+        console.log(`Sending ${amount} ETH from ${address} to top-up wallet ${topUpWalletInfo.walletAddress}`);
+        
+        // Send transaction from user's main wallet to top-up wallet
         await sendTransaction({
-          to: topUpWalletInfo!.walletAddress as `0x${string}`,
+          to: topUpWalletInfo.walletAddress as `0x${string}`,
           value: parseEther(amount),
         });
         

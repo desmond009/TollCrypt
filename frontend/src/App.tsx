@@ -79,8 +79,8 @@ function AppContent() {
         
         if (walletInfo) {
           console.log('✅ Wallet loaded successfully on startup:', walletInfo.walletAddress);
-          // Store private key for immediate access
-          localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
+          // Note: Private key is not stored for security reasons
+          // Top-up wallets are smart contracts, not EOA wallets
         } else {
           console.log('ℹ️ No wallet found on startup, will create when needed');
         }

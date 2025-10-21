@@ -132,8 +132,8 @@ export const VehicleRegistration: React.FC<VehicleRegistrationProps> = ({ onRegi
             isInitialized: true
           });
           
-          // Store private key securely
-          localStorage.setItem(`topup-private-key-${address}`, walletInfo.privateKey);
+          // Note: Private key is not stored for security reasons
+          // Top-up wallets are smart contracts, not EOA wallets
           
           // Store vehicle data in backend database
           const backendVehicleData: VehicleRegistrationData = {
