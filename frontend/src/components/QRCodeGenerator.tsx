@@ -89,8 +89,10 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     setError('');
 
     try {
-      const result = await qrService.generateTollQRCodeSimple(
-        topUpWalletInfo.walletAddress, // Use top-up wallet address instead of main wallet
+      // Use the new method that handles signature properly
+      const result = await qrService.generateTollQRCodeWithUserSignature(
+        topUpWalletInfo.walletAddress, // Top-up wallet address for QR data
+        address, // User's main wallet address for signing
         vehicle,
         session.sessionToken,
         0.001 // Default toll rate in ETH

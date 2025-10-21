@@ -81,7 +81,11 @@ export const TransactionProcessor: React.FC<TransactionProcessorProps> = ({
         }
 
         // Fetch vehicle registration
-        const registration = await blockchainService.getVehicleRegistration(qrData.vehicleId);
+        const vehicleId = qrData.vehicleId || qrData.vehicleNumber;
+        if (!vehicleId) {
+          throw new Error('Vehicle ID not found in QR code');
+        }
+        const registration = await blockchainService.getVehicleRegistration(vehicleId);
         setVehicleRegistration(registration);
 
         // Fetch wallet balance
@@ -140,7 +144,7 @@ export const TransactionProcessor: React.FC<TransactionProcessorProps> = ({
         // Generate receipt
         const receiptData: ReceiptData = {
           transactionId: result.transactionHash?.substring(0, 10) || Date.now().toString(),
-          vehicleNumber: qrData.vehicleId,
+          vehicleNumber: qrData.vehicleId || qrData.vehicleNumber || '',
           vehicleType: qrData.vehicleType,
           tollAmount: data.tollAmount,
           timestamp: Date.now(),
@@ -405,7 +409,7 @@ export const TransactionProcessor: React.FC<TransactionProcessorProps> = ({
               onClick={() => {
                 const receiptData: ReceiptData = {
                   transactionId: Date.now().toString(),
-                  vehicleNumber: qrData.vehicleId,
+                  vehicleNumber: qrData.vehicleId || qrData.vehicleNumber || '',
                   vehicleType: qrData.vehicleType,
                   tollAmount: tollAmount || '0',
                   timestamp: Date.now(),
@@ -423,7 +427,7 @@ export const TransactionProcessor: React.FC<TransactionProcessorProps> = ({
               onClick={() => {
                 const receiptData: ReceiptData = {
                   transactionId: Date.now().toString(),
-                  vehicleNumber: qrData.vehicleId,
+                  vehicleNumber: qrData.vehicleId || qrData.vehicleNumber || '',
                   vehicleType: qrData.vehicleType,
                   tollAmount: tollAmount || '0',
                   timestamp: Date.now(),

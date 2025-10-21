@@ -58,7 +58,7 @@ async function generateSignature(data: any, privateKey: string): Promise<string>
 
 class QRService {
   /**
-   * Generate QR code for toll payment (simplified version for current implementation)
+   * Generate QR code for toll payment with real signature
    * @param walletAddress User's wallet address (42 characters)
    * @param vehicle Vehicle information
    * @param sessionToken Current session token
@@ -89,32 +89,61 @@ class QRService {
       version: 'v1'
     };
     
-    // Generate real signature using wallet if available
+    // Generate real signature using wallet
     let signature = '0x' + '0'.repeat(130); // Fallback to mock signature
     
     try {
-      // Try to get signature from wallet (if user has signed in with wallet)
-      if (window.ethereum) {
-        const walletClient = createWalletClient({
-          chain: sepolia,
-          transport: custom(window.ethereum)
-        });
-        
-        const [account] = await walletClient.getAddresses();
-        
-        // Only sign if the account address matches the wallet address
-        if (account.toLowerCase() === walletAddress.toLowerCase()) {
-          const message = JSON.stringify(baseData);
-          const messageHash = keccak256(stringToBytes(message));
-          signature = await walletClient.signMessage({
-            account,
-            message: { raw: hexToBytes(messageHash) }
-          });
-          console.log('Generated real signature for QR code');
-        }
+      // Check if wallet is available
+      if (!window.ethereum) {
+        throw new Error('Wallet not available');
       }
+
+      // Get current accounts
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No wallet accounts found');
+      }
+
+      const currentAccount = accounts[0];
+      console.log('Current wallet account:', currentAccount);
+      console.log('Target wallet address:', walletAddress);
+
+      // Create wallet client
+      const walletClient = createWalletClient({
+        chain: sepolia,
+        transport: custom(window.ethereum)
+      });
+
+      // Get the account for signing
+      const [account] = await walletClient.getAddresses();
+      
+      // Check if we have the right account
+      if (!account) {
+        throw new Error('No account available for signing');
+      }
+
+      console.log('Wallet client account:', account);
+      console.log('Account matches target:', account.toLowerCase() === walletAddress.toLowerCase());
+
+      // Create the message to sign
+      const message = JSON.stringify(baseData);
+      const messageHash = keccak256(stringToBytes(message));
+      
+      console.log('Message to sign:', message);
+      console.log('Message hash:', messageHash);
+
+      // Sign the message
+      signature = await walletClient.signMessage({
+        account,
+        message: { raw: hexToBytes(messageHash) }
+      });
+      
+      console.log('Generated real signature:', signature);
+      console.log('Signature length:', signature.length);
+      
     } catch (error) {
-      console.warn('Could not generate real signature, using mock:', error);
+      console.error('Could not generate real signature:', error);
+      console.warn('Using mock signature as fallback');
       // Keep mock signature as fallback
     }
     
@@ -247,6 +276,130 @@ class QRService {
         isValid: false,
         error: 'Error validating QR code data'
       };
+    }
+  }
+
+  /**
+   * Generate QR code with user's main wallet signature (for top-up wallet scenarios)
+   * @param topUpWalletAddress Top-up wallet address to include in QR
+   * @param userWalletAddress User's main wallet address for signing
+   * @param vehicle Vehicle information
+   * @param sessionToken Current session token
+   * @param tollRate Current toll rate (optional)
+   * @returns Promise with QR code data URL and QR data
+   */
+  async generateTollQRCodeWithUserSignature(
+    topUpWalletAddress: string,
+    userWalletAddress: string,
+    vehicle: VehicleInfo,
+    sessionToken: string,
+    tollRate?: number
+  ): Promise<QRCodeResult> {
+    // Generate standardized vehicle type code
+    const vehicleTypeCode = VEHICLE_TYPE_MAP[vehicle.vehicleType.toLowerCase()] || '4W';
+    
+    // Generate user ID hash from session token
+    const userId = generateUserIdHash(sessionToken);
+    
+    const timestamp = Math.floor(Date.now() / 1000);
+    
+    // Create base QR data (without signature)
+    const baseData = {
+      walletAddress: topUpWalletAddress, // Use top-up wallet address in QR
+      vehicleNumber: vehicle.vehicleId,
+      vehicleType: vehicleTypeCode,
+      userId,
+      timestamp,
+      version: 'v1'
+    };
+    
+    // Generate signature using user's main wallet
+    let signature = '0x' + '0'.repeat(130); // Fallback to mock signature
+    
+    try {
+      // Check if wallet is available
+      if (!window.ethereum) {
+        throw new Error('Wallet not available');
+      }
+
+      // Get current accounts
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No wallet accounts found');
+      }
+
+      const currentAccount = accounts[0];
+      console.log('Current wallet account:', currentAccount);
+      console.log('User wallet address:', userWalletAddress);
+
+      // Verify the current account matches the user wallet address
+      if (currentAccount.toLowerCase() !== userWalletAddress.toLowerCase()) {
+        throw new Error('Current wallet account does not match user wallet address');
+      }
+
+      // Create wallet client
+      const walletClient = createWalletClient({
+        chain: sepolia,
+        transport: custom(window.ethereum)
+      });
+
+      // Get the account for signing
+      const [account] = await walletClient.getAddresses();
+      
+      if (!account) {
+        throw new Error('No account available for signing');
+      }
+
+      console.log('Signing with account:', account);
+
+      // Create the message to sign
+      const message = JSON.stringify(baseData);
+      const messageHash = keccak256(stringToBytes(message));
+      
+      console.log('Message to sign:', message);
+      console.log('Message hash:', messageHash);
+
+      // Sign the message
+      signature = await walletClient.signMessage({
+        account,
+        message: { raw: hexToBytes(messageHash) }
+      });
+      
+      console.log('Generated real signature:', signature);
+      console.log('Signature length:', signature.length);
+      
+    } catch (error) {
+      console.error('Could not generate real signature:', error);
+      console.warn('Using mock signature as fallback');
+      // Keep mock signature as fallback
+    }
+    
+    // Create final QR data with signature
+    const qrData: QRCodeData = {
+      ...baseData,
+      signature,
+      sessionToken, // Legacy field
+      tollRate
+    };
+
+    try {
+      const qrCodeDataUrl = await QRCode.toDataURL(JSON.stringify(qrData), {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        },
+        errorCorrectionLevel: 'M'
+      });
+
+      return {
+        dataUrl: qrCodeDataUrl,
+        qrData
+      };
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      throw new Error('Failed to generate QR code');
     }
   }
 
