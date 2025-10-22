@@ -104,6 +104,7 @@ interface AnalyticsReportingProps {
 export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }) => {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [plazas, setPlazas] = useState<any[]>([]);
   const [vehicleTypes] = useState([
     '2-wheeler', '4-wheeler', 'car', 'lcv', 'hcv', 'truck', 'bus'
@@ -129,6 +130,7 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         
         // Set default date range based on period
         let startDate: Date;
@@ -161,9 +163,16 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
         });
 
         const response = await api.get(`/api/analytics?${params}`);
-        setData(response.data.data);
-      } catch (error) {
+        
+        if (response.data && response.data.success) {
+          setData(response.data.data);
+        } else {
+          throw new Error('Invalid response format from analytics API');
+        }
+      } catch (error: any) {
         console.error('Failed to fetch analytics data:', error);
+        setError(error.message || 'Failed to fetch analytics data');
+        setData(null);
       } finally {
         setIsLoading(false);
       }
@@ -238,19 +247,19 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
       case 'revenue':
         csvContent = [
           ['Date', 'Revenue'],
-          ...data.revenue.daily.map(item => [item.date, item.amount.toString()])
+          ...(data.revenue?.daily || []).map(item => [item.date, item.amount.toString()])
         ].map(row => row.join(',')).join('\n');
         break;
       case 'transactions':
         csvContent = [
           ['Date', 'Transaction Count'],
-          ...data.transactions.daily.map(item => [item.date, item.count.toString()])
+          ...(data.transactions?.daily || []).map(item => [item.date, item.count.toString()])
         ].map(row => row.join(',')).join('\n');
         break;
       case 'vehicles':
         csvContent = [
           ['Date', 'New Registrations'],
-          ...data.vehicles.newRegistrations.map(item => [item.date, item.count.toString()])
+          ...(data.vehicles?.newRegistrations || []).map(item => [item.date, item.count.toString()])
         ].map(row => row.join(',')).join('\n');
         break;
       default:
@@ -275,11 +284,11 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
 
     switch (filters.reportType) {
       case 'revenue':
-        return processRevenueData(data.revenue);
+        return data.revenue ? processRevenueData(data.revenue) : null;
       case 'transactions':
-        return processTransactionData(data.transactions);
+        return data.transactions ? processTransactionData(data.transactions) : null;
       case 'vehicles':
-        return processVehicleRegistrationData(data.vehicles);
+        return data.vehicles ? processVehicleRegistrationData(data.vehicles) : null;
       default:
         return null;
     }
@@ -299,6 +308,36 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error loading analytics data</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="bg-red-100 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-200"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -423,10 +462,10 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(data.revenue.total)}
+                      {formatCurrency(data.revenue?.total || 0)}
                     </p>
                     <p className="text-sm text-green-600">
-                      {data.revenue.growth > 0 ? '+' : ''}{data.revenue.growth.toFixed(1)}% from previous period
+                      {data.revenue?.growth ? (data.revenue.growth > 0 ? '+' : '') + data.revenue.growth.toFixed(1) + '%' : '0%'} from previous period
                     </p>
                   </div>
                 </div>
@@ -439,9 +478,9 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Transactions</p>
-                    <p className="text-2xl font-semibold text-gray-900">{data.transactions.total}</p>
+                    <p className="text-2xl font-semibold text-gray-900">{data.transactions?.total || 0}</p>
                     <p className="text-sm text-blue-600">
-                      {data.transactions.successRate.toFixed(1)}% success rate
+                      {data.transactions?.successRate ? data.transactions.successRate.toFixed(1) : '0'}% success rate
                     </p>
                   </div>
                 </div>
@@ -454,9 +493,9 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Vehicles</p>
-                    <p className="text-2xl font-semibold text-gray-900">{data.vehicles.total}</p>
+                    <p className="text-2xl font-semibold text-gray-900">{data.vehicles?.total || 0}</p>
                     <p className="text-sm text-yellow-600">
-                      {data.vehicles.active} active, {data.vehicles.blacklisted} blacklisted
+                      {data.vehicles?.active || 0} active, {data.vehicles?.blacklisted || 0} blacklisted
                     </p>
                   </div>
                 </div>
@@ -470,10 +509,10 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Avg Wait Time</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {data.performance.averageWaitTime.toFixed(1)}s
+                      {data.performance?.averageWaitTime ? data.performance.averageWaitTime.toFixed(1) : '0'}s
                     </p>
                     <p className="text-sm text-purple-600">
-                      {data.performance.systemUptime.toFixed(1)}% uptime
+                      {data.performance?.systemUptime ? data.performance.systemUptime.toFixed(1) : '0'}% uptime
                     </p>
                   </div>
                 </div>
@@ -597,7 +636,7 @@ export const AnalyticsReporting: React.FC<AnalyticsReportingProps> = ({ socket }
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {data.performance.plazaPerformance.map((plaza, index) => (
+                      {(data.performance?.plazaPerformance || []).map((plaza, index) => (
                         <tr key={index}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {plaza.plaza}

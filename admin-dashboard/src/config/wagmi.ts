@@ -16,8 +16,8 @@ if (!projectId || projectId === 'your_walletconnect_project_id' || projectId ===
 const metadata = {
   name: 'TollChain Admin',
   description: 'Blockchain-based toll collection system - Admin Portal',
-  url: 'https://tollchain.com',
-  icons: ['https://tollchain.com/icon.png']
+  url: typeof window !== 'undefined' ? window.location.origin : 'https://tollchain.com',
+  icons: typeof window !== 'undefined' ? [`${window.location.origin}/logo192.png`] : ['https://tollchain.com/icon.png']
 }
 
 const chains = [sepolia, mainnet, polygon, polygonMumbai] as const
@@ -29,7 +29,8 @@ export const config = defaultWagmiConfig({
   enableWalletConnect: !!projectId,
   enableInjected: true,
   enableEIP6963: true,
-  enableCoinbase: true
+  enableCoinbase: true,
+  ssr: false, // Disable SSR to avoid hydration issues
 });
 
 declare module 'wagmi' {

@@ -4,6 +4,9 @@ import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from './config/wagmi';
 import './config/appkit'; // Initialize Web3Modal
+import { extensionConflictResolver } from './utils/extensionConflictResolver'; // Initialize conflict resolver
+import { walletErrorHandler } from './utils/walletErrorHandler'; // Initialize error handler
+import { browserExtensionHelper } from './utils/browserExtensionHelper'; // Initialize browser extension helper
 import { Dashboard } from './components/Dashboard';
 import { VehicleManagement } from './components/VehicleManagement';
 import { TransactionMonitoring } from './components/TransactionMonitoring';
@@ -28,6 +31,32 @@ function AppContent() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const { address } = useAccount();
   const [loginTrigger, setLoginTrigger] = useState(0);
+  
+  // Initialize extension conflict resolver and error handler
+  useEffect(() => {
+    console.log('🔧 Initializing extension conflict resolver and error handler...');
+    
+    // Force resolve conflicts immediately
+    extensionConflictResolver.forceResolveConflicts();
+    
+    // Clear any existing wallet errors
+    walletErrorHandler.clearErrors();
+    
+    // Detect and report conflicts
+    browserExtensionHelper.detectAndReportConflicts();
+    
+    // Log conflict status
+    const status = extensionConflictResolver.getConflictStatus();
+    console.log('📊 Extension conflict status:', status);
+    
+    // Set up periodic conflict resolution
+    const conflictInterval = setInterval(() => {
+      extensionConflictResolver.forceResolveConflicts();
+      browserExtensionHelper.detectAndReportConflicts();
+    }, 10000); // Every 10 seconds
+    
+    return () => clearInterval(conflictInterval);
+  }, []);
   
   console.log('AppContent - isAuthenticated:', isAuthenticated, 'user:', user, 'loginTrigger:', loginTrigger);
   

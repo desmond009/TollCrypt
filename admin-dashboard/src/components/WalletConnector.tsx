@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAccount, useBalance, useDisconnect } from 'wagmi';
 import { useWeb3Modal } from '@web3modal/wagmi/react';
 import { WalletIcon } from '@heroicons/react/24/outline';
+import { walletErrorHandler } from '../utils/walletErrorHandler';
+import { browserExtensionHelper } from '../utils/browserExtensionHelper';
 
 export const WalletConnector: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -11,7 +13,29 @@ export const WalletConnector: React.FC = () => {
   const { disconnect } = useDisconnect();
   const { open } = useWeb3Modal();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Monitor wallet connection errors
+  useEffect(() => {
+    const checkForErrors = () => {
+      const errorStats = walletErrorHandler.getErrorStats();
+      if (errorStats.unresolvedErrors > 0) {
+        const lastError = walletErrorHandler.getLastError();
+        if (lastError && !lastError.resolved) {
+          setConnectionError(lastError.message);
+        }
+      } else {
+        setConnectionError(null);
+      }
+    };
+
+    // Check for errors every 5 seconds
+    const interval = setInterval(checkForErrors, 5000);
+    checkForErrors(); // Initial check
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -27,15 +51,63 @@ export const WalletConnector: React.FC = () => {
     };
   }, []);
 
+  const handleConnect = async () => {
+    try {
+      setConnectionError(null);
+      
+      // Check for extension conflicts before connecting
+      const conflictReport = browserExtensionHelper.detectAndReportConflicts();
+      if (conflictReport.detectedConflicts.length > 0) {
+        console.warn('⚠️ Extension conflicts detected before wallet connection');
+        browserExtensionHelper.logError({
+          message: 'Extension conflicts detected during wallet connection',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      await open();
+    } catch (error: any) {
+      console.error('Wallet connection error:', error);
+      
+      // Log the error for analysis
+      browserExtensionHelper.logError(error);
+      
+      setConnectionError(error.message || 'Failed to connect wallet');
+    }
+  };
+
+  const handleDisconnect = () => {
+    try {
+      disconnect();
+      setShowDropdown(false);
+      setConnectionError(null);
+    } catch (error: any) {
+      console.error('Wallet disconnection error:', error);
+    }
+  };
+
   if (!isConnected) {
     return (
-      <button
-        onClick={() => open()}
-        className="btn-primary"
-      >
-        <WalletIcon className="w-5 h-5 mr-2" />
-        Connect Wallet
-      </button>
+      <div className="flex flex-col items-end">
+        <button
+          onClick={handleConnect}
+          className="btn-primary"
+        >
+          <WalletIcon className="w-5 h-5 mr-2" />
+          Connect Wallet
+        </button>
+        {connectionError && (
+          <div className="mt-2 text-xs text-red-400 max-w-xs text-right">
+            {connectionError}
+            <button
+              onClick={() => browserExtensionHelper.showConflictResolutionModal()}
+              className="block mt-1 text-yellow-400 hover:text-yellow-300 underline"
+            >
+              Need help with extension conflicts?
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -70,10 +142,7 @@ export const WalletConnector: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={() => {
-                disconnect();
-                setShowDropdown(false);
-              }}
+              onClick={handleDisconnect}
               className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20 transition-colors"
             >
               <svg className="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
