@@ -2,7 +2,7 @@ import express from 'express';
 import { TollTransaction } from '../models/TollTransaction';
 import { Vehicle } from '../models/Vehicle';
 import { AdminUser } from '../models/AdminUser';
-import { TollPlaza } from '../models/TollPlaza';
+import { SimplePlaza } from '../models/SimplePlaza';
 import { Notification } from '../models/Notification';
 import { AuditLog } from '../models/AuditLog';
 import { Dispute } from '../models/Dispute';
@@ -405,7 +405,7 @@ router.get('/analytics', async (req, res) => {
 // Get all toll plazas
 router.get('/plazas', async (req, res) => {
   try {
-    const plazas = await TollPlaza.find().sort({ createdAt: -1 });
+    const plazas = await SimplePlaza.find().sort({ createdAt: -1 });
     res.json({
       success: true,
       data: plazas
@@ -422,18 +422,43 @@ router.get('/plazas', async (req, res) => {
 // Create new toll plaza
 router.post('/plazas', async (req, res) => {
   try {
-    const { name, location, coordinates, tollRates, operatingHours, assignedOperators } = req.body;
+    const { name, location, coordinates, status, tollRates, operatingHours, assignedOperators } = req.body;
     
-    const plaza = new TollPlaza({
-      id: `plaza_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    // Generate a unique ID
+    const uniqueId = `PLAZA-${Math.random().toString(36).substr(2, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+    
+    // Create a simplified plaza object that matches the frontend expectations
+    const plazaData = {
+      id: uniqueId,
       name,
       location,
-      coordinates,
-      tollRates,
-      operatingHours,
-      assignedOperators: assignedOperators || []
-    });
+      coordinates: {
+        lat: parseFloat(coordinates.lat),
+        lng: parseFloat(coordinates.lng)
+      },
+      status: status || 'active',
+      tollRates: {
+        '2-wheeler': parseFloat(tollRates['2-wheeler']) || 0,
+        '4-wheeler': parseFloat(tollRates['4-wheeler']) || 0,
+        'car': parseFloat(tollRates['car']) || 0,
+        'lcv': parseFloat(tollRates['lcv']) || 0,
+        'hcv': parseFloat(tollRates['hcv']) || 0,
+        'truck': parseFloat(tollRates['truck']) || 0,
+        'bus': parseFloat(tollRates['bus']) || 0
+      },
+      operatingHours: {
+        start: operatingHours.start || '06:00',
+        end: operatingHours.end || '22:00'
+      },
+      assignedOperators: assignedOperators || [],
+      todayTransactions: 0,
+      todayRevenue: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
     
+    // Create the plaza using the simplified model
+    const plaza = new SimplePlaza(plazaData);
     await plaza.save();
     
     // Broadcast to all admins
@@ -453,7 +478,107 @@ router.post('/plazas', async (req, res) => {
     console.error('Error creating plaza:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Failed to create plaza' 
+      error: 'Failed to create plaza',
+      details: error.message
+    });
+  }
+});
+
+// Update toll plaza
+router.put('/plazas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, location, coordinates, status, tollRates, operatingHours, assignedOperators } = req.body;
+    
+    const updateData = {
+      name,
+      location,
+      coordinates: {
+        lat: parseFloat(coordinates.lat),
+        lng: parseFloat(coordinates.lng)
+      },
+      status: status || 'active',
+      tollRates: {
+        '2-wheeler': parseFloat(tollRates['2-wheeler']) || 0,
+        '4-wheeler': parseFloat(tollRates['4-wheeler']) || 0,
+        'car': parseFloat(tollRates['car']) || 0,
+        'lcv': parseFloat(tollRates['lcv']) || 0,
+        'hcv': parseFloat(tollRates['hcv']) || 0,
+        'truck': parseFloat(tollRates['truck']) || 0,
+        'bus': parseFloat(tollRates['bus']) || 0
+      },
+      operatingHours: {
+        start: operatingHours.start || '06:00',
+        end: operatingHours.end || '22:00'
+      },
+      assignedOperators: assignedOperators || [],
+      updatedAt: new Date()
+    };
+    
+    const plaza = await SimplePlaza.findByIdAndUpdate(id, updateData, { new: true });
+    
+    if (!plaza) {
+      return res.status(404).json({
+        success: false,
+        error: 'Plaza not found'
+      });
+    }
+    
+    // Broadcast to all admins
+    try {
+      const socketService = getSocketService();
+      socketService.emitToAdmins('plaza:updated', plaza);
+    } catch (socketError) {
+      console.error('Error broadcasting plaza update:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      data: plaza,
+      message: 'Plaza updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating plaza:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update plaza',
+      details: error.message
+    });
+  }
+});
+
+// Delete toll plaza
+router.delete('/plazas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const plaza = await SimplePlaza.findByIdAndDelete(id);
+    
+    if (!plaza) {
+      return res.status(404).json({
+        success: false,
+        error: 'Plaza not found'
+      });
+    }
+    
+    // Broadcast to all admins
+    try {
+      const socketService = getSocketService();
+      socketService.emitToAdmins('plaza:deleted', { id });
+    } catch (socketError) {
+      console.error('Error broadcasting plaza deletion:', socketError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Plaza deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting plaza:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete plaza',
+      details: error.message
     });
   }
 });

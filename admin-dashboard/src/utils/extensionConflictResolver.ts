@@ -147,8 +147,12 @@ class ExtensionConflictResolver {
         return; // Don't log the original error to reduce noise
       }
       
-      // Log other errors normally
-      originalConsoleError.apply(console, args);
+      // Log other errors normally, but avoid interfering with API calls
+      try {
+        originalConsoleError.apply(console, args);
+      } catch (error) {
+        // Silently handle any console error issues
+      }
     };
 
     // Also monitor for unhandled promise rejections
