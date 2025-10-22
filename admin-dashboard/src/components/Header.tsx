@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
   const [showNotifications, setShowNotifications] = useState(false);
 
   const unreadCount = notifications.filter(n => 
-    new Date().getTime() - n.timestamp.getTime() < 300000 // Last 5 minutes
+    new Date().getTime() - new Date(n.timestamp).getTime() < 300000 // Last 5 minutes
   ).length;
 
   return (
@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
                           >
                             <p className="text-sm text-white">{notification.message}</p>
                             <p className="text-xs text-gray-400 mt-1">
-                              {notification.timestamp.toLocaleTimeString()}
+                              {new Date(notification.timestamp).toLocaleTimeString()}
                             </p>
                           </div>
                         ))

@@ -135,7 +135,7 @@ export const QRCodeTollCollection: React.FC<QRCodeTollCollectionProps> = ({
       vehicleNumber: transaction.vehicleId,
       vehicleType: transaction.vehicleType,
       tollAmount: transaction.amount.toString(),
-      timestamp: transaction.timestamp.getTime(),
+      timestamp: new Date(transaction.timestamp).getTime(),
       transactionHash: `0x${transaction.id.toString(16)}`,
       adminWallet: '0x0000000000000000000000000000000000000000',
       plazaId: 'PLAZA-001'
@@ -150,7 +150,7 @@ export const QRCodeTollCollection: React.FC<QRCodeTollCollectionProps> = ({
       vehicleNumber: transaction.vehicleId,
       vehicleType: transaction.vehicleType,
       tollAmount: transaction.amount.toString(),
-      timestamp: transaction.timestamp.getTime(),
+      timestamp: new Date(transaction.timestamp).getTime(),
       transactionHash: `0x${transaction.id.toString(16)}`,
       adminWallet: '0x0000000000000000000000000000000000000000',
       plazaId: 'PLAZA-001'
@@ -263,7 +263,7 @@ export const QRCodeTollCollection: React.FC<QRCodeTollCollectionProps> = ({
                   <div className="text-right">
                     <p className="font-medium text-gray-900">₹{transaction.amount}</p>
                     <p className="text-sm text-gray-600">
-                      {transaction.timestamp.toLocaleTimeString()}
+                      {new Date(transaction.timestamp).toLocaleTimeString()}
                     </p>
                   </div>
                   <div className="flex space-x-2">
