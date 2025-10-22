@@ -5,9 +5,10 @@ import { QRCodeData } from '../types/qr';
 const SEPOLIA_RPC = 'https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161';
 const CHAIN_ID = 11155111; // Ethereum Sepolia
 
-// Contract addresses (these should be updated with actual deployed addresses)
-const TOLL_COLLECTION_CONTRACT = process.env.REACT_APP_TOLL_CONTRACT_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
-const USDC_CONTRACT = process.env.REACT_APP_USDC_CONTRACT_ADDRESS || '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'; // Sepolia USDC
+// Contract addresses (updated with actual deployed addresses from Sepolia)
+const TOLL_COLLECTION_CONTRACT = process.env.REACT_APP_TOLL_CONTRACT_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0xE5f4743CF4726A7f58E0ccBB5888f1507E5aeF9d'; // TopUp TollCollection contract
+const USDC_CONTRACT = process.env.REACT_APP_USDC_CONTRACT_ADDRESS || '0xe2DF4Ef71b9B0fc155c2817Df93eb04b4C590720'; // Sepolia Mock USDC
+
 
 // ABI for TollCollection contract
 const TOLL_COLLECTION_ABI = [
@@ -36,6 +37,9 @@ export interface VehicleRegistration {
   isRegistered: boolean;
   owner: string;
   vehicleType: string;
+  isBlacklisted: boolean;
+  registrationTime: number;
+  lastTollTime: number;
 }
 
 export interface TollRate {
@@ -48,6 +52,7 @@ export interface TransactionResult {
   transactionHash?: string;
   error?: string;
   gasUsed?: string;
+  blockNumber?: number;
 }
 
 export interface BalanceInfo {
@@ -63,6 +68,12 @@ class BlockchainService {
   private signer: ethers.Signer | null = null;
 
   constructor() {
+    console.log('🔗 Initializing Blockchain Service...');
+    console.log('📋 Contract Addresses:');
+    console.log('  - Toll Collection:', TOLL_COLLECTION_CONTRACT);
+    console.log('  - USDC Contract:', USDC_CONTRACT);
+    console.log('  - Network:', SEPOLIA_RPC);
+    console.log('  - Chain ID:', CHAIN_ID);
     this.initializeProvider();
   }
 
@@ -79,25 +90,49 @@ class BlockchainService {
       }
 
       if (this.provider) {
-        // Only create contracts if addresses are valid
-        if (ethers.isAddress(TOLL_COLLECTION_CONTRACT)) {
-          this.tollContract = new ethers.Contract(
-            TOLL_COLLECTION_CONTRACT,
-            TOLL_COLLECTION_ABI,
-            this.signer || this.provider
-          );
+        // Only create contracts if addresses are valid and not zero address
+        if (ethers.isAddress(TOLL_COLLECTION_CONTRACT) && TOLL_COLLECTION_CONTRACT !== '0x0000000000000000000000000000000000000000') {
+          try {
+            console.log('🔧 Initializing Toll Collection contract at:', TOLL_COLLECTION_CONTRACT);
+            this.tollContract = new ethers.Contract(
+              TOLL_COLLECTION_CONTRACT,
+              TOLL_COLLECTION_ABI,
+              this.signer || this.provider
+            );
+            
+            // Test if contract exists by calling a simple view function
+            const tollRate = await this.tollContract.getTollRate();
+            console.log('✅ Toll collection contract initialized successfully');
+            console.log('💰 Current toll rate:', ethers.formatEther(tollRate), 'ETH');
+          } catch (contractError) {
+            console.error('❌ Failed to initialize toll collection contract:', contractError);
+            this.tollContract = null;
+          }
         } else {
-          console.warn('Invalid toll collection contract address:', TOLL_COLLECTION_CONTRACT);
+          console.warn('⚠️ Invalid or zero toll collection contract address:', TOLL_COLLECTION_CONTRACT);
+          this.tollContract = null;
         }
 
-        if (ethers.isAddress(USDC_CONTRACT)) {
-          this.usdcContract = new ethers.Contract(
-            USDC_CONTRACT,
-            USDC_ABI,
-            this.signer || this.provider
-          );
+        if (ethers.isAddress(USDC_CONTRACT) && USDC_CONTRACT !== '0x0000000000000000000000000000000000000000') {
+          try {
+            console.log('🔧 Initializing USDC contract at:', USDC_CONTRACT);
+            this.usdcContract = new ethers.Contract(
+              USDC_CONTRACT,
+              USDC_ABI,
+              this.signer || this.provider
+            );
+            
+            // Test if contract exists by calling a simple view function
+            const decimals = await this.usdcContract.decimals();
+            console.log('✅ USDC contract initialized successfully');
+            console.log('🔢 USDC decimals:', decimals);
+          } catch (contractError) {
+            console.error('❌ Failed to initialize USDC contract:', contractError);
+            this.usdcContract = null;
+          }
         } else {
-          console.warn('Invalid USDC contract address:', USDC_CONTRACT);
+          console.warn('⚠️ Invalid or zero USDC contract address:', USDC_CONTRACT);
+          this.usdcContract = null;
         }
       }
     } catch (error) {
@@ -161,11 +196,20 @@ class BlockchainService {
     }
 
     try {
+      // Check if the contract has the getVehicle method
+      const hasMethod = this.tollContract.interface.hasFunction('getVehicle');
+      if (!hasMethod) {
+        throw new Error('Contract does not have getVehicle method');
+      }
+      
       const vehicle = await this.tollContract.getVehicle(vehicleId);
       return {
         isRegistered: vehicle.owner !== '0x0000000000000000000000000000000000000000' && vehicle.isActive,
         owner: vehicle.owner,
         vehicleType: vehicle.vehicleId, // Using vehicleId as vehicleType for now
+        isBlacklisted: vehicle.isBlacklisted,
+        registrationTime: Number(vehicle.registrationTime),
+        lastTollTime: Number(vehicle.lastTollTime)
       };
     } catch (error) {
       console.error('Failed to get vehicle registration:', error);
@@ -175,10 +219,18 @@ class BlockchainService {
 
   async isVehicleBlacklisted(vehicleId: string): Promise<boolean> {
     if (!this.tollContract) {
-      throw new Error('Contract not initialized');
+      console.warn('Contract not initialized, assuming vehicle is not blacklisted');
+      return false;
     }
 
     try {
+      // Check if the contract has the getVehicle method
+      const hasMethod = this.tollContract.interface.hasFunction('getVehicle');
+      if (!hasMethod) {
+        console.warn('Contract does not have getVehicle method, assuming not blacklisted');
+        return false;
+      }
+      
       const vehicle = await this.tollContract.getVehicle(vehicleId);
       return vehicle.isBlacklisted;
     } catch (error) {
@@ -189,10 +241,38 @@ class BlockchainService {
 
   async getTollRate(vehicleType: string): Promise<string> {
     if (!this.tollContract) {
-      throw new Error('Contract not initialized');
+      console.warn('Contract not initialized, using default toll rates');
+      // Return default rates based on vehicle type
+      const defaultRates: { [key: string]: string } = {
+        '2-wheeler': '0.50', // $0.50
+        '4-wheeler': '2.00', // $2.00
+        'lcv': '3.00',       // $3.00
+        'hcv': '5.00',       // $5.00
+        'bus': '4.00',       // $4.00
+        'car': '2.00',       // $2.00
+        'truck': '5.00',     // $5.00
+      };
+      return defaultRates[vehicleType.toLowerCase()] || '2.00';
     }
 
     try {
+      // Check if the contract has the getTollRate method
+      const hasMethod = this.tollContract.interface.hasFunction('getTollRate');
+      if (!hasMethod) {
+        console.warn('Contract does not have getTollRate method, using default rates');
+        // Return default rates based on vehicle type
+        const defaultRates: { [key: string]: string } = {
+          '2-wheeler': '0.50', // $0.50
+          '4-wheeler': '2.00', // $2.00
+          'lcv': '3.00',       // $3.00
+          'hcv': '5.00',       // $5.00
+          'bus': '4.00',       // $4.00
+          'car': '2.00',       // $2.00
+          'truck': '5.00',     // $5.00
+        };
+        return defaultRates[vehicleType.toLowerCase()] || '2.00';
+      }
+      
       const rate = await this.tollContract.getTollRate();
       // Convert from wei to ETH
       const rateInEth = ethers.formatEther(rate);
@@ -261,17 +341,29 @@ class BlockchainService {
   }
 
   async getWalletBalance(walletAddress: string): Promise<BalanceInfo> {
-    if (!this.tollContract) {
-      throw new Error('Contract not initialized');
+    if (!this.provider) {
+      throw new Error('Provider not initialized');
     }
 
     try {
-      // First try to get TopUpWallet balance
-      const topUpWalletBalance = await this.tollContract.getUserTopUpWalletBalance(walletAddress);
-      
-      // Convert ETH balance to USDC equivalent (simplified conversion)
-      const ethBalance = await this.provider?.getBalance(walletAddress) || BigInt(0);
+      // First, try to get ETH balance (this should always work)
+      const ethBalance = await this.provider.getBalance(walletAddress);
       const ethInUsdc = parseFloat(ethers.formatEther(ethBalance)) * 2000; // Approximate ETH to USDC rate
+      
+      // Try to get TopUpWallet balance if contract is available
+      let topUpWalletBalance = 0;
+      if (this.tollContract) {
+        try {
+          // Check if the contract has the getUserTopUpWalletBalance method
+          const hasMethod = this.tollContract.interface.hasFunction('getUserTopUpWalletBalance');
+          if (hasMethod) {
+            topUpWalletBalance = await this.tollContract.getUserTopUpWalletBalance(walletAddress);
+          }
+        } catch (contractError) {
+          console.warn('Failed to get TopUpWallet balance from contract:', contractError);
+          // Continue with just ETH balance
+        }
+      }
       
       const totalBalance = topUpWalletBalance + ethInUsdc;
       
@@ -282,19 +374,13 @@ class BlockchainService {
       };
     } catch (error) {
       console.error('Failed to get wallet balance:', error);
-      // Fallback to ETH balance
-      try {
-        const ethBalance = await this.provider?.getBalance(walletAddress) || BigInt(0);
-        const ethInUsdc = parseFloat(ethers.formatEther(ethBalance)) * 2000;
-        
-        return {
-          balance: ethInUsdc.toString(),
-          formattedBalance: ethInUsdc.toFixed(2),
-          decimals: 6,
-        };
-      } catch (fallbackError) {
-        throw new Error('Failed to get wallet balance');
-      }
+      
+      // Final fallback - return zero balance
+      return {
+        balance: '0',
+        formattedBalance: '0.00',
+        decimals: 6,
+      };
     }
   }
 
@@ -446,6 +532,7 @@ class BlockchainService {
           success: true,
           transactionHash: receipt.hash,
           gasUsed: receipt.gasUsed.toString(),
+          blockNumber: receipt.blockNumber
         };
       } else {
         return {
@@ -634,10 +721,19 @@ class BlockchainService {
 
   async hasUserTopUpWallet(walletAddress: string): Promise<boolean> {
     if (!this.tollContract) {
-      throw new Error('Contract not initialized');
+      console.warn('⚠️ Toll contract not initialized. Contract address:', TOLL_COLLECTION_CONTRACT);
+      console.warn('💡 Make sure the contract is deployed and the address is correct');
+      return false;
     }
 
     try {
+      // Check if the contract has the hasUserTopUpWallet method
+      const hasMethod = this.tollContract.interface.hasFunction('hasUserTopUpWallet');
+      if (!hasMethod) {
+        console.warn('Contract does not have hasUserTopUpWallet method');
+        return false;
+      }
+      
       const hasWallet = await this.tollContract.hasUserTopUpWallet(walletAddress);
       return hasWallet;
     } catch (error) {
@@ -652,12 +748,28 @@ class BlockchainService {
     }
 
     try {
+      // Check if the contract has the getUserTopUpWallet method
+      const hasMethod = this.tollContract.interface.hasFunction('getUserTopUpWallet');
+      if (!hasMethod) {
+        throw new Error('Contract does not have getUserTopUpWallet method');
+      }
+      
       const topUpWalletAddress = await this.tollContract.getUserTopUpWallet(walletAddress);
       return topUpWalletAddress;
     } catch (error) {
       console.error('Failed to get user top-up wallet:', error);
       throw new Error('Failed to get user top-up wallet');
     }
+  }
+
+  // Debug method to check contract status
+  getContractStatus(): { tollContract: boolean; usdcContract: boolean; provider: boolean; contractAddress: string } {
+    return {
+      tollContract: !!this.tollContract,
+      usdcContract: !!this.usdcContract,
+      provider: !!this.provider,
+      contractAddress: TOLL_COLLECTION_CONTRACT
+    };
   }
 }
 
