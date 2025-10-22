@@ -43,15 +43,17 @@ echo "🔧 Environment Configuration:"
 echo "   NODE_ENV: $NODE_ENV"
 echo "   MONGODB_URI: $MONGODB_URI"
 
-# Run the plaza seeding script
-echo "🌱 Seeding plaza database..."
-npx ts-node src/scripts/seedPlazaDatabase.ts
+# Run the comprehensive plaza seeding script
+echo "🌱 Seeding plaza database (both collections)..."
+npx ts-node src/scripts/seedAllPlazas.ts
 
 if [ $? -eq 0 ]; then
     echo "✅ Plaza database seeding completed successfully!"
     echo ""
     echo "📊 Summary:"
     echo "   - 5 production-ready plazas created"
+    echo "   - SimplePlaza collection (for admin dashboard)"
+    echo "   - TollPlaza collection (for comprehensive system)"
     echo "   - Toll rates configured for all vehicle categories"
     echo "   - Compliance and operational data populated"
     echo "   - Smart contract addresses assigned"
@@ -61,13 +63,13 @@ if [ $? -eq 0 ]; then
     echo "   Password: admin123"
     echo ""
     echo "🌐 API Endpoints Available:"
-    echo "   GET    /api/plazas                    - List all plazas"
-    echo "   GET    /api/plazas/:uniqueId           - Get specific plaza"
-    echo "   GET    /api/plazas/proximity           - Find nearby plazas"
-    echo "   POST   /api/plazas/:uniqueId/calculate-toll - Calculate toll"
+    echo "   GET    /api/admin/plazas               - List all plazas (admin dashboard)"
+    echo "   POST   /api/admin/plazas                - Create new plaza"
+    echo "   PUT    /api/admin/plazas/:id           - Update plaza"
+    echo "   DELETE /api/admin/plazas/:id           - Delete plaza"
     echo ""
     echo "🎯 Test the API:"
-    echo "   curl http://localhost:3001/api/plazas"
+    echo "   curl http://localhost:3001/api/admin/plazas"
 else
     echo "❌ Plaza database seeding failed!"
     echo "   Check the error messages above for details."

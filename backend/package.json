@@ -9,7 +9,9 @@
     "start": "node dist/index.js",
     "test": "jest",
     "seed": "ts-node src/scripts/seedDatabase.ts",
-    "seed:plazas": "ts-node src/scripts/seedPlazaDatabase.ts"
+    "seed:plazas": "ts-node src/scripts/seedPlazaDatabase.ts",
+    "seed:simple-plazas": "ts-node src/scripts/seedSimplePlazas.ts",
+    "seed:all-plazas": "ts-node src/scripts/seedAllPlazas.ts"
   },
   "keywords": [
     "blockchain",

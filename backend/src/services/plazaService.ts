@@ -445,6 +445,426 @@ export class PlazaService {
   }
 
   /**
+   * Seed multiple plazas with predefined data
+   */
+  static async seedPlazas(plazaDataArray: PlazaCreateData[]): Promise<{
+    success: number;
+    failed: number;
+    errors: string[];
+  }> {
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[]
+    };
+
+    for (const plazaData of plazaDataArray) {
+      try {
+        await this.createPlaza(plazaData);
+        results.success++;
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push(`Failed to create plaza ${plazaData.identification.uniqueId}: ${error.message}`);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Seed plazas with predefined Indian toll plaza data
+   */
+  static async seedIndianPlazas(): Promise<{
+    success: number;
+    failed: number;
+    errors: string[];
+  }> {
+    const indianPlazas: PlazaCreateData[] = [
+      {
+        identification: {
+          uniqueId: 'PLAZA-MH-001',
+          name: 'Mumbai-Pune Expressway - Khalapur Plaza',
+          regionCode: 'MH-PU',
+          operatorName: 'Maharashtra State Road Development Corporation',
+          licenseNumber: 'MSRDC-LIC-001'
+        },
+        location: {
+          gpsCoordinates: {
+            latitude: 18.5204,
+            longitude: 73.8567
+          },
+          physicalAddress: {
+            street: 'Mumbai-Pune Expressway',
+            city: 'Khalapur',
+            state: 'Maharashtra',
+            postalCode: '410202',
+            country: 'India'
+          },
+          nearestLandmark: 'Khalapur Toll Plaza',
+          travelDirection: TravelDirection.EAST
+        },
+        tollRates: {
+          vehicleCategories: {
+            [VehicleCategory.TWO_WHEELER]: 0.0001,
+            [VehicleCategory.FOUR_WHEELER]: 0.0003,
+            [VehicleCategory.LCV]: 0.0005,
+            [VehicleCategory.HCV]: 0.0008,
+            [VehicleCategory.BUS]: 0.0006,
+            [VehicleCategory.MAV]: 0.0012
+          },
+          timeBasedMultipliers: {
+            peakHourMultiplier: 1.5,
+            offPeakMultiplier: 1.0,
+            peakHours: {
+              start: '07:00',
+              end: '19:00'
+            }
+          },
+          discountCodes: [],
+          returnJourneyValidity: 24
+        },
+        operational: {
+          operatingHours: {
+            is24x7: true
+          },
+          laneConfiguration: {
+            totalLanes: 8,
+            etcEnabledLanes: 6,
+            manualLanes: 2
+          },
+          paymentMethods: [PaymentMethod.ETH_WALLET, PaymentMethod.POLYGON_WALLET, PaymentMethod.UPI],
+          smartContractAddress: '0x1234567890123456789012345678901234567890',
+          lastRateRevisionDate: new Date(),
+          nextRevisionDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        },
+        compliance: {
+          governmentAuthorizationNumber: 'GOV-MH-2024-001',
+          taxId: '27AABCU9603R1ZX',
+          auditTrailHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          rateApprovalDocumentHash: '0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321',
+          complianceStatus: 'compliant',
+          lastAuditDate: new Date(),
+          nextAuditDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+        }
+      },
+      {
+        identification: {
+          uniqueId: 'PLAZA-KA-001',
+          name: 'Bangalore-Mysore Highway - Ramanagara Plaza',
+          regionCode: 'KA-BG',
+          operatorName: 'Karnataka State Highways Development Corporation',
+          licenseNumber: 'KSHDC-LIC-001'
+        },
+        location: {
+          gpsCoordinates: {
+            latitude: 12.7159,
+            longitude: 77.2771
+          },
+          physicalAddress: {
+            street: 'Bangalore-Mysore Highway',
+            city: 'Ramanagara',
+            state: 'Karnataka',
+            postalCode: '562159',
+            country: 'India'
+          },
+          nearestLandmark: 'Ramanagara Toll Plaza',
+          travelDirection: TravelDirection.SOUTH
+        },
+        tollRates: {
+          vehicleCategories: {
+            [VehicleCategory.TWO_WHEELER]: 0.00008,
+            [VehicleCategory.FOUR_WHEELER]: 0.00025,
+            [VehicleCategory.LCV]: 0.0004,
+            [VehicleCategory.HCV]: 0.0007,
+            [VehicleCategory.BUS]: 0.0005,
+            [VehicleCategory.MAV]: 0.001
+          },
+          timeBasedMultipliers: {
+            peakHourMultiplier: 1.3,
+            offPeakMultiplier: 1.0,
+            peakHours: {
+              start: '08:00',
+              end: '20:00'
+            }
+          },
+          discountCodes: [],
+          returnJourneyValidity: 24
+        },
+        operational: {
+          operatingHours: {
+            is24x7: true
+          },
+          laneConfiguration: {
+            totalLanes: 6,
+            etcEnabledLanes: 4,
+            manualLanes: 2
+          },
+          paymentMethods: [PaymentMethod.ETH_WALLET, PaymentMethod.POLYGON_WALLET, PaymentMethod.UPI],
+          smartContractAddress: '0x2345678901234567890123456789012345678901',
+          lastRateRevisionDate: new Date(),
+          nextRevisionDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        },
+        compliance: {
+          governmentAuthorizationNumber: 'GOV-KA-2024-001',
+          taxId: '29ABCDE1234F1Z5',
+          auditTrailHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+          rateApprovalDocumentHash: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
+          complianceStatus: 'compliant',
+          lastAuditDate: new Date(),
+          nextAuditDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+        }
+      },
+      {
+        identification: {
+          uniqueId: 'PLAZA-TN-001',
+          name: 'Chennai-Bangalore Highway - Krishnagiri Plaza',
+          regionCode: 'TN-CH',
+          operatorName: 'Tamil Nadu Highways Department',
+          licenseNumber: 'TNHD-LIC-001'
+        },
+        location: {
+          gpsCoordinates: {
+            latitude: 12.5207,
+            longitude: 78.2138
+          },
+          physicalAddress: {
+            street: 'Chennai-Bangalore Highway',
+            city: 'Krishnagiri',
+            state: 'Tamil Nadu',
+            postalCode: '635001',
+            country: 'India'
+          },
+          nearestLandmark: 'Krishnagiri Toll Plaza',
+          travelDirection: TravelDirection.WEST
+        },
+        tollRates: {
+          vehicleCategories: {
+            [VehicleCategory.TWO_WHEELER]: 0.00009,
+            [VehicleCategory.FOUR_WHEELER]: 0.00028,
+            [VehicleCategory.LCV]: 0.00045,
+            [VehicleCategory.HCV]: 0.00075,
+            [VehicleCategory.BUS]: 0.00055,
+            [VehicleCategory.MAV]: 0.0011
+          },
+          timeBasedMultipliers: {
+            peakHourMultiplier: 1.4,
+            offPeakMultiplier: 1.0,
+            peakHours: {
+              start: '07:30',
+              end: '19:30'
+            }
+          },
+          discountCodes: [],
+          returnJourneyValidity: 24
+        },
+        operational: {
+          operatingHours: {
+            is24x7: true
+          },
+          laneConfiguration: {
+            totalLanes: 10,
+            etcEnabledLanes: 8,
+            manualLanes: 2
+          },
+          paymentMethods: [PaymentMethod.ETH_WALLET, PaymentMethod.POLYGON_WALLET, PaymentMethod.UPI],
+          smartContractAddress: '0x3456789012345678901234567890123456789012',
+          lastRateRevisionDate: new Date(),
+          nextRevisionDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        },
+        compliance: {
+          governmentAuthorizationNumber: 'GOV-TN-2024-001',
+          taxId: '33ABCDE1234F1Z5',
+          auditTrailHash: '0x2345678901bcdef2345678901bcdef2345678901bcdef2345678901bcdef234567',
+          rateApprovalDocumentHash: '0x8765432109edcba8765432109edcba8765432109edcba8765432109edcba876543',
+          complianceStatus: 'compliant',
+          lastAuditDate: new Date(),
+          nextAuditDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+        }
+      },
+      {
+        identification: {
+          uniqueId: 'PLAZA-GJ-001',
+          name: 'Ahmedabad-Vadodara Expressway - Anand Plaza',
+          regionCode: 'GJ-AH',
+          operatorName: 'Gujarat State Road Development Corporation',
+          licenseNumber: 'GSRDC-LIC-001'
+        },
+        location: {
+          gpsCoordinates: {
+            latitude: 22.5645,
+            longitude: 72.9289
+          },
+          physicalAddress: {
+            street: 'Ahmedabad-Vadodara Expressway',
+            city: 'Anand',
+            state: 'Gujarat',
+            postalCode: '388001',
+            country: 'India'
+          },
+          nearestLandmark: 'Anand Toll Plaza',
+          travelDirection: TravelDirection.NORTH
+        },
+        tollRates: {
+          vehicleCategories: {
+            [VehicleCategory.TWO_WHEELER]: 0.00007,
+            [VehicleCategory.FOUR_WHEELER]: 0.00022,
+            [VehicleCategory.LCV]: 0.00035,
+            [VehicleCategory.HCV]: 0.0006,
+            [VehicleCategory.BUS]: 0.00045,
+            [VehicleCategory.MAV]: 0.0009
+          },
+          timeBasedMultipliers: {
+            peakHourMultiplier: 1.2,
+            offPeakMultiplier: 1.0,
+            peakHours: {
+              start: '08:00',
+              end: '20:00'
+            }
+          },
+          discountCodes: [],
+          returnJourneyValidity: 24
+        },
+        operational: {
+          operatingHours: {
+            is24x7: true
+          },
+          laneConfiguration: {
+            totalLanes: 8,
+            etcEnabledLanes: 6,
+            manualLanes: 2
+          },
+          paymentMethods: [PaymentMethod.ETH_WALLET, PaymentMethod.POLYGON_WALLET, PaymentMethod.UPI],
+          smartContractAddress: '0x4567890123456789012345678901234567890123',
+          lastRateRevisionDate: new Date(),
+          nextRevisionDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        },
+        compliance: {
+          governmentAuthorizationNumber: 'GOV-GJ-2024-001',
+          taxId: '24ABCDE1234F1Z5',
+          auditTrailHash: '0x3456789012cdef3456789012cdef3456789012cdef3456789012cdef3456789012',
+          rateApprovalDocumentHash: '0x7654321098dcba7654321098dcba7654321098dcba7654321098dcba7654321098',
+          complianceStatus: 'compliant',
+          lastAuditDate: new Date(),
+          nextAuditDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+        }
+      },
+      {
+        identification: {
+          uniqueId: 'PLAZA-DL-001',
+          name: 'Delhi-Gurgaon Expressway - Kherki Daula Plaza',
+          regionCode: 'DL-GG',
+          operatorName: 'Delhi-Gurgaon Expressway Limited',
+          licenseNumber: 'DGEL-LIC-001'
+        },
+        location: {
+          gpsCoordinates: {
+            latitude: 28.4595,
+            longitude: 77.0266
+          },
+          physicalAddress: {
+            street: 'Delhi-Gurgaon Expressway',
+            city: 'Gurgaon',
+            state: 'Haryana',
+            postalCode: '122001',
+            country: 'India'
+          },
+          nearestLandmark: 'Kherki Daula Toll Plaza',
+          travelDirection: TravelDirection.SOUTH
+        },
+        tollRates: {
+          vehicleCategories: {
+            [VehicleCategory.TWO_WHEELER]: 0.00012,
+            [VehicleCategory.FOUR_WHEELER]: 0.00035,
+            [VehicleCategory.LCV]: 0.00055,
+            [VehicleCategory.HCV]: 0.0009,
+            [VehicleCategory.BUS]: 0.0007,
+            [VehicleCategory.MAV]: 0.0013
+          },
+          timeBasedMultipliers: {
+            peakHourMultiplier: 1.6,
+            offPeakMultiplier: 1.0,
+            peakHours: {
+              start: '07:00',
+              end: '21:00'
+            }
+          },
+          discountCodes: [],
+          returnJourneyValidity: 24
+        },
+        operational: {
+          operatingHours: {
+            is24x7: true
+          },
+          laneConfiguration: {
+            totalLanes: 12,
+            etcEnabledLanes: 10,
+            manualLanes: 2
+          },
+          paymentMethods: [PaymentMethod.ETH_WALLET, PaymentMethod.POLYGON_WALLET, PaymentMethod.UPI],
+          smartContractAddress: '0x5678901234567890123456789012345678901234',
+          lastRateRevisionDate: new Date(),
+          nextRevisionDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        },
+        compliance: {
+          governmentAuthorizationNumber: 'GOV-DL-2024-001',
+          taxId: '07ABCDE1234F1Z5',
+          auditTrailHash: '0x4567890123def4567890123def4567890123def4567890123def4567890123def456',
+          rateApprovalDocumentHash: '0x6543210987cba6543210987cba6543210987cba6543210987cba6543210987cba654',
+          complianceStatus: 'compliant',
+          lastAuditDate: new Date(),
+          nextAuditDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+        }
+      }
+    ];
+
+    return await this.seedPlazas(indianPlazas);
+  }
+
+  /**
+   * Clear all plazas (for testing purposes)
+   */
+  static async clearAllPlazas(): Promise<{ deletedCount: number }> {
+    try {
+      const result = await TollPlaza.deleteMany({});
+      await TollRate.deleteMany({});
+      return { deletedCount: result.deletedCount };
+    } catch (error: any) {
+      throw new Error(`Failed to clear plazas: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get plaza seeding statistics
+   */
+  static async getSeedingStats(): Promise<{
+    totalPlazas: number;
+    activePlazas: number;
+    inactivePlazas: number;
+    maintenancePlazas: number;
+    regions: string[];
+  }> {
+    try {
+      const [totalPlazas, activePlazas, inactivePlazas, maintenancePlazas, regions] = await Promise.all([
+        TollPlaza.countDocuments(),
+        TollPlaza.countDocuments({ status: PlazaStatus.ACTIVE }),
+        TollPlaza.countDocuments({ status: PlazaStatus.INACTIVE }),
+        TollPlaza.countDocuments({ status: PlazaStatus.MAINTENANCE }),
+        TollPlaza.distinct('identification.regionCode')
+      ]);
+
+      return {
+        totalPlazas,
+        activePlazas,
+        inactivePlazas,
+        maintenancePlazas,
+        regions
+      };
+    } catch (error: any) {
+      throw new Error(`Failed to get seeding stats: ${error.message}`);
+    }
+  }
+
+  /**
    * Calculate distance between two coordinates using Haversine formula
    */
   private static calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

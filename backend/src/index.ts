@@ -19,6 +19,7 @@ import authRoutes from './routes/authRoutes';
 import topUpWalletRoutes from './routes/topUpWalletRoutes';
 import aadhaarRoutes from './routes/aadhaarRoutes';
 import plazaRoutes from './routes/plazaRoutes';
+import simplePlazaRoutes from './routes/simplePlazaRoutes';
 // Import models for dashboard stats
 const { TollTransaction } = require('./models/TollTransaction');
 const { Vehicle } = require('./models/Vehicle');
@@ -112,6 +113,7 @@ app.use('/api/qr', qrRoutes);
 app.use('/api/topup-wallet', topUpWalletRoutes);
 app.use('/api/aadhaar', aadhaarRoutes);
 app.use('/api/plazas', plazaRoutes);
+app.use('/api/simple-plazas', simplePlazaRoutes);
 
 // Analytics route - direct endpoint for frontend compatibility
 app.get('/api/analytics', async (req, res) => {

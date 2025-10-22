@@ -354,4 +354,124 @@ router.get('/search/text', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @route POST /api/plazas/seed/indian
+ * @desc Seed plazas with predefined Indian toll plaza data
+ * @access Private (Super Admin only)
+ */
+router.post('/seed/indian', authenticateAdmin, async (req: Request, res: Response) => {
+  try {
+    // Check if user is super admin
+    if (req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only super admins can seed plazas'
+      });
+    }
+
+    const result = await PlazaService.seedIndianPlazas();
+
+    res.json({
+      success: true,
+      message: `Seeding completed. ${result.success} plazas created successfully, ${result.failed} failed.`,
+      data: result
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route POST /api/plazas/seed/custom
+ * @desc Seed plazas with custom data
+ * @access Private (Super Admin only)
+ */
+router.post('/seed/custom', authenticateAdmin, async (req: Request, res: Response) => {
+  try {
+    // Check if user is super admin
+    if (req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only super admins can seed plazas'
+      });
+    }
+
+    const { plazas } = req.body;
+
+    if (!plazas || !Array.isArray(plazas)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Plazas array is required'
+      });
+    }
+
+    const result = await PlazaService.seedPlazas(plazas);
+
+    res.json({
+      success: true,
+      message: `Seeding completed. ${result.success} plazas created successfully, ${result.failed} failed.`,
+      data: result
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/plazas/seed/clear
+ * @desc Clear all plazas (for testing purposes)
+ * @access Private (Super Admin only)
+ */
+router.delete('/seed/clear', authenticateAdmin, async (req: Request, res: Response) => {
+  try {
+    // Check if user is super admin
+    if (req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only super admins can clear plazas'
+      });
+    }
+
+    const result = await PlazaService.clearAllPlazas();
+
+    res.json({
+      success: true,
+      message: `Cleared ${result.deletedCount} plazas successfully`,
+      data: result
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/plazas/seed/stats
+ * @desc Get plaza seeding statistics
+ * @access Private (Admin only)
+ */
+router.get('/seed/stats', authenticateAdmin, async (req: Request, res: Response) => {
+  try {
+    const stats = await PlazaService.getSeedingStats();
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 export default router;
