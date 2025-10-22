@@ -410,7 +410,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       // Send the complete QR data for validation
       const response = await api.post('/api/qr/validate', { 
         qrData: {
-          vehicleId,
+          vehicleId: vehicleId, // Use vehicleId from the QR code (which is vehicleNumber)
           walletAddress: qrData?.walletAddress,
           timestamp: qrData?.timestamp,
           tollRate: qrData?.tollRate

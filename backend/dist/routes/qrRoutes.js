@@ -272,12 +272,21 @@ router.post('/validate', async (req, res) => {
                 message: 'QR code has expired'
             });
         }
-        // Verify vehicle
-        const vehicle = await Vehicle_1.Vehicle.findOne({
+        // Verify vehicle - first try exact match, then try by vehicleId only
+        // This handles cases where QR contains top-up wallet address but vehicle is registered to main wallet
+        let vehicle = await Vehicle_1.Vehicle.findOne({
             vehicleId,
             owner: walletAddress,
             isActive: true
         });
+        // If not found by exact owner match, try to find by vehicleId only
+        // This is the correct behavior for top-up wallet scenarios
+        if (!vehicle) {
+            vehicle = await Vehicle_1.Vehicle.findOne({
+                vehicleId,
+                isActive: true
+            });
+        }
         if (!vehicle) {
             return res.status(404).json({
                 success: false,

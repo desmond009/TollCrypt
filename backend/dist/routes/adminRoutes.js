@@ -935,8 +935,12 @@ router.post('/process-toll', async (req, res) => {
             payer: walletAddress,
             amount: parseFloat(tollAmount),
             currency: 'ETH',
+            zkProofHash: transactionHash || `admin_${Date.now()}`, // Use transactionHash as zkProofHash for admin transactions
             tollLocation: `Plaza ${plazaId}`,
             status: 'confirmed',
+            blockchainTxHash: transactionHash,
+            gasUsed: gasUsed ? parseInt(gasUsed) : undefined,
+            processedAt: new Date(),
             metadata: {
                 processedBy: 'admin',
                 adminWallet,

@@ -308,12 +308,22 @@ router.post('/validate', async (req, res) => {
       });
     }
 
-    // Verify vehicle
-    const vehicle = await Vehicle.findOne({ 
+    // Verify vehicle - first try exact match, then try by vehicleId only
+    // This handles cases where QR contains top-up wallet address but vehicle is registered to main wallet
+    let vehicle = await Vehicle.findOne({ 
       vehicleId, 
       owner: walletAddress,
       isActive: true 
     });
+
+    // If not found by exact owner match, try to find by vehicleId only
+    // This is the correct behavior for top-up wallet scenarios
+    if (!vehicle) {
+      vehicle = await Vehicle.findOne({ 
+        vehicleId, 
+        isActive: true 
+      });
+    }
 
     if (!vehicle) {
       return res.status(404).json({ 
