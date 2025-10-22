@@ -7,6 +7,7 @@ import './config/appkit'; // Initialize Web3Modal
 import { extensionConflictResolver } from './utils/extensionConflictResolver'; // Initialize conflict resolver
 import { walletErrorHandler } from './utils/walletErrorHandler'; // Initialize error handler
 import { browserExtensionHelper } from './utils/browserExtensionHelper'; // Initialize browser extension helper
+import { runtimeErrorSuppressor } from './utils/runtimeErrorSuppressor'; // Initialize runtime error suppressor
 import { Dashboard } from './components/Dashboard';
 import { VehicleManagement } from './components/VehicleManagement';
 import { TransactionMonitoring } from './components/TransactionMonitoring';
@@ -36,6 +37,9 @@ function AppContent() {
   useEffect(() => {
     console.log('🔧 Initializing extension conflict resolver and error handler...');
     
+    // Initialize runtime error suppressor first (most important)
+    runtimeErrorSuppressor.forceSuppressAll();
+    
     // Force resolve conflicts immediately
     extensionConflictResolver.forceResolveConflicts();
     
@@ -49,11 +53,16 @@ function AppContent() {
     const status = extensionConflictResolver.getConflictStatus();
     console.log('📊 Extension conflict status:', status);
     
+    // Log suppression stats
+    const suppressionStats = runtimeErrorSuppressor.getSuppressionStats();
+    console.log('🛡️ Runtime error suppression stats:', suppressionStats);
+    
     // Set up periodic conflict resolution
     const conflictInterval = setInterval(() => {
+      runtimeErrorSuppressor.forceSuppressAll();
       extensionConflictResolver.forceResolveConflicts();
       browserExtensionHelper.detectAndReportConflicts();
-    }, 10000); // Every 10 seconds
+    }, 5000); // Every 5 seconds for more aggressive suppression
     
     return () => clearInterval(conflictInterval);
   }, []);

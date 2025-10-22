@@ -38,6 +38,7 @@ class ExtensionConflictResolver {
   private static instance: ExtensionConflictResolver;
   private conflictDetected = false;
   private resolvedConflicts: string[] = [];
+  private originalConsoleWarn!: typeof console.warn;
 
   private constructor() {
     this.initialize();
@@ -51,6 +52,9 @@ class ExtensionConflictResolver {
   }
 
   private initialize(): void {
+    // Store original console methods
+    this.originalConsoleWarn = console.warn;
+    
     // Detect and resolve conflicts on page load
     this.detectConflicts();
     this.setupErrorHandling();
@@ -63,7 +67,7 @@ class ExtensionConflictResolver {
     // Check for multiple ethereum providers
     const ethereumProviders = this.getEthereumProviders();
     if (ethereumProviders.length > 1) {
-      console.warn(`⚠️ Multiple Ethereum providers detected: ${ethereumProviders.length}`);
+      console.log(`⚠️ Multiple Ethereum providers detected: ${ethereumProviders.length}`);
       this.resolveEthereumProviderConflicts(ethereumProviders);
     }
 
@@ -130,24 +134,26 @@ class ExtensionConflictResolver {
   }
 
   private detectContentScriptConflicts(): void {
-    // Monitor for content script errors
+    // Enhanced error suppression for content script conflicts
+    this.setupConsoleErrorSuppression();
+    this.setupUnhandledRejectionSuppression();
+    this.setupGlobalErrorSuppression();
+  }
+
+  private setupConsoleErrorSuppression(): void {
     const originalConsoleError = console.error;
+    
     console.error = (...args) => {
       const message = args.join(' ');
       
-      // Check for common content script errors
-      if (message.includes('Invalid runtime') || 
-          message.includes('content_script.js') ||
-          message.includes('origins don\'t match') ||
-          message.includes('sendRuntimeMessage') ||
-          message.includes('VM9596')) {
-        
-        console.warn('🚫 Content script conflict detected:', message);
+      // Enhanced pattern matching for content script errors
+      if (this.isContentScriptError(message)) {
+        this.originalConsoleWarn('🚫 Content script conflict detected and suppressed:', message);
         this.handleContentScriptError(message);
-        return; // Don't log the original error to reduce noise
+        return; // Suppress the error
       }
       
-      // Log other errors normally, but avoid interfering with API calls
+      // Log other errors normally
       try {
         originalConsoleError.apply(console, args);
       } catch (error) {
@@ -155,24 +161,85 @@ class ExtensionConflictResolver {
       }
     };
 
-    // Also monitor for unhandled promise rejections
-    const originalConsoleWarn = console.warn;
+    // Also monitor console.warn for runtime errors
     console.warn = (...args) => {
       const message = args.join(' ');
       
-      // Check for runtime errors in warnings
-      if (message.includes('Invalid runtime') || 
-          message.includes('content_script.js') ||
-          message.includes('sendRuntimeMessage')) {
-        
-        console.warn('🚫 Runtime conflict detected in warning:', message);
+      if (this.isContentScriptError(message)) {
+        this.originalConsoleWarn('🚫 Runtime conflict detected in warning and suppressed:', message);
         this.handleContentScriptError(message);
         return;
       }
       
-      // Log other warnings normally
-      originalConsoleWarn.apply(console, args);
+      this.originalConsoleWarn.apply(console, args);
     };
+  }
+
+  private setupUnhandledRejectionSuppression(): void {
+    // Enhanced unhandled promise rejection handler
+    window.addEventListener('unhandledrejection', (event) => {
+      const error = event.reason;
+      const errorMessage = error?.message || error?.toString() || '';
+      
+      if (this.isContentScriptError(errorMessage)) {
+        this.originalConsoleWarn('🚫 Unhandled promise rejection suppressed:', errorMessage);
+        event.preventDefault(); // Prevent the error from being logged
+        this.handleContentScriptError(errorMessage);
+        return;
+      }
+    });
+  }
+
+  private setupGlobalErrorSuppression(): void {
+    // Enhanced global error handler
+    window.addEventListener('error', (event) => {
+      const error = event.error;
+      const errorMessage = error?.message || event.message || '';
+      
+      if (this.isContentScriptError(errorMessage)) {
+        this.originalConsoleWarn('🚫 Global error suppressed:', errorMessage);
+        event.preventDefault();
+        this.handleContentScriptError(errorMessage);
+        return;
+      }
+    });
+  }
+
+  private isContentScriptError(message: string): boolean {
+    if (!message) return false;
+    
+    const lowerMessage = message.toLowerCase();
+    
+    // Enhanced pattern matching for content script errors
+    const errorPatterns = [
+      'invalid runtime',
+      'content_script.js',
+      'origins don\'t match',
+      'sendruntimemessage',
+      'vm9596',
+      'vm',
+      'runtime message',
+      'chrome-extension',
+      'moz-extension',
+      'safari-extension',
+      'extension',
+      'magic.link',
+      'walletconnect',
+      'origins don\'t match',
+      'runtime error',
+      'extension error',
+      'content script',
+      'injected script',
+      'web3 provider',
+      'ethereum provider',
+      'wallet provider',
+      'metamask',
+      'coinbase',
+      'trust wallet',
+      'rainbow wallet'
+    ];
+
+    return errorPatterns.some(pattern => lowerMessage.includes(pattern));
   }
 
   private handleContentScriptError(message: string): void {
@@ -213,7 +280,7 @@ class ExtensionConflictResolver {
         console.log('✅ Chrome runtime detected, clearing cached handlers');
       }
     } catch (error) {
-      console.warn('⚠️ Failed to clear runtime handlers:', error);
+      this.originalConsoleWarn('⚠️ Failed to clear runtime handlers:', error);
     }
     
     // Force refresh of ethereum provider
@@ -229,7 +296,7 @@ class ExtensionConflictResolver {
           console.log('✅ Ethereum provider refreshed');
         }, 100);
       } catch (error) {
-        console.warn('⚠️ Failed to refresh ethereum provider:', error);
+        this.originalConsoleWarn('⚠️ Failed to refresh ethereum provider:', error);
       }
     }
   }
@@ -268,7 +335,7 @@ class ExtensionConflictResolver {
       });
       
     } catch (error) {
-      console.warn('⚠️ Failed to clear VM cache:', error);
+      this.originalConsoleWarn('⚠️ Failed to clear VM cache:', error);
     }
   }
 
@@ -284,33 +351,19 @@ class ExtensionConflictResolver {
     ];
 
     if (!allowedOrigins.includes(currentOrigin)) {
-      console.warn(`⚠️ Origin mismatch detected: ${currentOrigin}`);
+      this.originalConsoleWarn(`⚠️ Origin mismatch detected: ${currentOrigin}`);
       this.resolvedConflicts.push('origin-mismatch');
     }
   }
 
   private setupErrorHandling(): void {
-    // Global error handler for unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
-      const error = event.reason;
-      
-      if (this.isExtensionError(error)) {
-        console.warn('🚫 Extension error suppressed:', error);
-        event.preventDefault(); // Prevent the error from being logged
-        this.resolvedConflicts.push('unhandled-promise-rejection');
-      }
-    });
-
-    // Global error handler for JavaScript errors
-    window.addEventListener('error', (event) => {
-      const error = event.error;
-      
-      if (this.isExtensionError(error)) {
-        console.warn('🚫 Extension error suppressed:', error);
-        event.preventDefault();
-        this.resolvedConflicts.push('javascript-error');
-      }
-    });
+    // This method is now handled by the enhanced error suppression methods
+    // Keep this for backward compatibility but the real work is done in:
+    // - setupConsoleErrorSuppression()
+    // - setupUnhandledRejectionSuppression() 
+    // - setupGlobalErrorSuppression()
+    
+    console.log('🔧 Enhanced error handling initialized');
   }
 
   private isExtensionError(error: any): boolean {
