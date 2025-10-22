@@ -456,24 +456,84 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   };
 
   const handleAuthorizeWallet = async () => {
-    if (!walletInfo?.topUpWalletAddress) return;
+    if (!qrData?.walletAddress) return;
     
     setIsProcessing(true);
     
     try {
-      const result = await blockchainService.authorizeTopUpWallet(walletInfo.topUpWalletAddress);
+      console.log('🔐 Starting wallet authorization process...');
+      
+      // First check if wallet is connected
+      const connectionCheck = await blockchainService.checkWalletConnection();
+      if (!connectionCheck.connected) {
+        onError?.(connectionCheck.error || 'Wallet connection issue');
+        return;
+      }
+      
+      // Use the simpler authorization method for testing
+      const result = await blockchainService.authorizeWalletForTesting(qrData.walletAddress);
       
       if (result.success) {
-        // Refresh wallet info to get updated authorization status
-        const updatedWalletInfo = await fetchWalletInfo(qrData?.walletAddress || '');
+        console.log('✅ Wallet authorized and funded successfully');
+        
+        // Refresh wallet info to get updated status
+        const updatedWalletInfo = await fetchWalletInfo(qrData.walletAddress);
         setWalletInfo(updatedWalletInfo);
         
-        onError?.('Wallet authorized successfully!');
+        onError?.('✅ Wallet authorized and funded successfully! Ready for toll collection.');
       } else {
-        onError?.(result.error || 'Authorization failed');
+        console.log('❌ Authorization failed, trying mock authorization:', result.error);
+        
+        // Try mock authorization as fallback
+        const mockResult = await blockchainService.mockAuthorizeWalletForTesting(qrData.walletAddress);
+        
+        if (mockResult.success) {
+          console.log('✅ Mock authorization successful');
+          
+          // Refresh wallet info to get updated status
+          const updatedWalletInfo = await fetchWalletInfo(qrData.walletAddress);
+          setWalletInfo(updatedWalletInfo);
+          
+          onError?.('✅ Wallet funded successfully! (Mock authorization for testing)');
+        } else {
+          console.log('❌ Mock authorization also failed:', mockResult.error);
+          onError?.(mockResult.error || 'Authorization failed');
+        }
       }
     } catch (error: any) {
+      console.error('Authorization process failed:', error);
       onError?.(error.message || 'Authorization failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCreateAndSetupWallet = async () => {
+    if (!qrData?.walletAddress) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      console.log('🏭 Creating and setting up new top-up wallet...');
+      
+      // Create, authorize, and fund a new top-up wallet
+      const result = await blockchainService.createAndAuthorizeTopUpWallet(qrData.walletAddress);
+      
+      if (result.success) {
+        console.log('✅ Top-up wallet created, authorized, and funded successfully');
+        
+        // Refresh wallet info to get updated status
+        const updatedWalletInfo = await fetchWalletInfo(qrData.walletAddress);
+        setWalletInfo(updatedWalletInfo);
+        
+        onError?.('✅ New top-up wallet created, authorized, and funded! Ready for toll collection.');
+      } else {
+        console.log('❌ Wallet setup failed:', result.error);
+        onError?.(result.error || 'Wallet setup failed');
+      }
+    } catch (error: any) {
+      console.error('Wallet setup process failed:', error);
+      onError?.(error.message || 'Wallet setup failed');
     } finally {
       setIsProcessing(false);
     }
@@ -497,6 +557,13 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       
       // Step 9: Backend Calls Smart Contract
       updateStepStatus(9, 'processing');
+      
+      // First check if wallet is connected and contracts are initialized
+      const connectionCheck = await blockchainService.checkWalletConnection();
+      if (!connectionCheck.connected) {
+        throw new Error(connectionCheck.error || 'Wallet connection issue');
+      }
+      
       const currentPlazaId = 3; // This should come from admin's session
       const adminWallet = '0x0000000000000000000000000000000000000000'; // Admin wallet placeholder
       
@@ -554,10 +621,22 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         throw new Error(result.error || 'Transaction failed');
       }
     } catch (error: any) {
+      console.error('Toll collection failed:', error);
       updateStepStatus(9, 'error', error.message);
       updateStepStatus(10, 'error', error.message);
       updateStepStatus(11, 'error', error.message);
-      onError?.(error.message || 'Transaction failed');
+      
+      // Provide more specific error messages
+      let errorMessage = error.message || 'Transaction failed';
+      if (error.message.includes('Contract or signer not initialized')) {
+        errorMessage = 'Blockchain connection issue. Please refresh the page and ensure MetaMask is connected.';
+      } else if (error.message.includes('Wallet connection issue')) {
+        errorMessage = 'Please connect your MetaMask wallet and try again.';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for transaction. Please add ETH to your wallet.';
+      }
+      
+      onError?.(errorMessage);
       setCurrentStep('displaying');
     } finally {
       setIsProcessing(false);
@@ -819,6 +898,29 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
         {/* Action Buttons */}
         <div className="mt-6 space-y-3">
+          {/* Helpful message for testing */}
+          {!walletInfo?.isAuthorized && (
+            <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-300">
+                    Wallet Not Authorized for Testing
+                  </h3>
+                  <div className="mt-2 text-sm text-yellow-200">
+                    <p>To test toll collection, you need to:</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Authorize the wallet for automatic toll collection</li>
+                      <li>Fund the wallet with test ETH (0.01 ETH)</li>
+                      <li>Then you can process toll payments</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <button
             onClick={handleCollectToll}
             disabled={
@@ -836,40 +938,56 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             }
           </button>
           
-          <div className="grid grid-cols-3 gap-3">
-            {!walletInfo?.isAuthorized && walletInfo?.hasTopUpWallet && (
-              <button
-                onClick={handleAuthorizeWallet}
-                disabled={isProcessing}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Authorize Wallet
-              </button>
+          <div className="grid grid-cols-2 gap-3">
+            {!walletInfo?.isAuthorized && (
+              <div className="space-y-2">
+                {/* Always show authorization button for existing wallet */}
+                <button
+                  onClick={handleAuthorizeWallet}
+                  disabled={isProcessing}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isProcessing ? 'Processing...' : '🔐 Authorize & Fund Wallet'}
+                </button>
+                
+                {/* Only show create button if really no wallet exists */}
+                {!walletInfo?.hasTopUpWallet && (
+                  <button
+                    onClick={handleCreateAndSetupWallet}
+                    disabled={isProcessing}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                  >
+                    {isProcessing ? 'Processing...' : '🏭 Create New Wallet (if needed)'}
+                  </button>
+                )}
+              </div>
             )}
-            <button
-              onClick={() => {
-                setCurrentStep('scanning');
-                setValidationSteps([]);
-                setVehicleDetails(null);
-                setWalletInfo(null);
-                setQrData(null);
-              }}
-              className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors"
-            >
-              Collect Cash
-            </button>
-            <button
-              onClick={() => {
-                setCurrentStep('scanning');
-                setValidationSteps([]);
-                setVehicleDetails(null);
-                setWalletInfo(null);
-                setQrData(null);
-              }}
-              className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  setCurrentStep('scanning');
+                  setValidationSteps([]);
+                  setVehicleDetails(null);
+                  setWalletInfo(null);
+                  setQrData(null);
+                }}
+                className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors"
+              >
+                Collect Cash
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentStep('scanning');
+                  setValidationSteps([]);
+                  setVehicleDetails(null);
+                  setWalletInfo(null);
+                  setQrData(null);
+                }}
+                className="px-4 py-2 border border-gray-600 rounded-md text-gray-300 hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>
