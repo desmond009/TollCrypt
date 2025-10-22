@@ -58,32 +58,55 @@ export const VehicleManagement: React.FC<VehicleManagementProps> = ({ socket }) 
   const [sortConfig, setSortConfig] = useState<{ key: keyof Vehicle; direction: 'asc' | 'desc' } | null>(null);
 
   const { register, handleSubmit, watch, reset } = useForm<VehicleFilters>();
-  const filters = watch();
+  const watchedFilters = watch();
 
   // Fetch vehicles data
-  useEffect(() => {
-    const fetchVehicles = async () => {
-      try {
-        setIsLoading(true);
-        const response = await api.get('/api/admin/vehicles');
-        setVehicles(response.data.data);
-      } catch (error) {
-        console.error('Failed to fetch vehicles:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchVehicles = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get('/api/admin/vehicles');
+      setVehicles(response.data.data);
+    } catch (error) {
+      console.error('Failed to fetch vehicles:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchVehicles();
   }, []);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    if (socket) {
+      // Listen for toll payment completion
+      socket.on('toll_payment_completed', (data: any) => {
+        console.log('Toll payment completed, refreshing vehicle data:', data);
+        // Refresh vehicle data to update transaction counts
+        fetchVehicles();
+      });
+
+      // Listen for new transactions
+      socket.on('new_transaction', (data: any) => {
+        console.log('New transaction received, refreshing vehicle data:', data);
+        fetchVehicles();
+      });
+
+      return () => {
+        socket.off('toll_payment_completed');
+        socket.off('new_transaction');
+      };
+    }
+  }, [socket]);
 
   // Filter and sort vehicles
   useEffect(() => {
     let filtered = [...vehicles];
 
     // Apply search filter
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
+    if (watchedFilters.search) {
+      const searchTerm = watchedFilters.search.toLowerCase();
       filtered = filtered.filter(vehicle =>
         vehicle.vehicleId.toLowerCase().includes(searchTerm) ||
         vehicle.owner.toLowerCase().includes(searchTerm) ||
@@ -92,19 +115,19 @@ export const VehicleManagement: React.FC<VehicleManagementProps> = ({ socket }) 
     }
 
     // Apply vehicle type filter
-    if (filters.vehicleType) {
-      filtered = filtered.filter(vehicle => vehicle.vehicleType === filters.vehicleType);
+    if (watchedFilters.vehicleType) {
+      filtered = filtered.filter(vehicle => vehicle.vehicleType === watchedFilters.vehicleType);
     }
 
     // Apply status filter
-    if (filters.status) {
-      filtered = filtered.filter(vehicle => vehicle.status === filters.status);
+    if (watchedFilters.status) {
+      filtered = filtered.filter(vehicle => vehicle.status === watchedFilters.status);
     }
 
     // Apply date range filter
-    if (filters.dateRange?.start && filters.dateRange?.end) {
-      const startDate = new Date(filters.dateRange.start);
-      const endDate = new Date(filters.dateRange.end);
+    if (watchedFilters.dateRange?.start && watchedFilters.dateRange?.end) {
+      const startDate = new Date(watchedFilters.dateRange.start);
+      const endDate = new Date(watchedFilters.dateRange.end);
       filtered = filtered.filter(vehicle => {
         const regDate = new Date(vehicle.registrationDate);
         return regDate >= startDate && regDate <= endDate;
@@ -132,7 +155,7 @@ export const VehicleManagement: React.FC<VehicleManagementProps> = ({ socket }) 
     }
 
     setFilteredVehicles(filtered);
-  }, [vehicles, filters, sortConfig]);
+  }, [vehicles, watchedFilters.search, watchedFilters.vehicleType, watchedFilters.status, watchedFilters.dateRange?.start, watchedFilters.dateRange?.end, sortConfig]);
 
   const handleSort = (key: keyof Vehicle) => {
     setSortConfig(prev => ({
@@ -235,6 +258,14 @@ export const VehicleManagement: React.FC<VehicleManagementProps> = ({ socket }) 
           <p className="text-gray-400">Manage registered vehicles and monitor their status</p>
         </div>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+          <button
+            onClick={fetchVehicles}
+            disabled={isLoading}
+            className="inline-flex items-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50"
+          >
+            <ArrowUpTrayIcon className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
           <button
             onClick={exportToCSV}
             className="inline-flex items-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors"

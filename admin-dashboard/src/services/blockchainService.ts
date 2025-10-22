@@ -1012,24 +1012,14 @@ class BlockchainService {
         }
         
         if (hasTopUpWallet && isAuthorized) {
-          // Check if the contract has the TopUpWallet payment method
-          const hasTopUpMethod = this.tollContract.interface.hasFunction('processTollPaymentFromTopUpWallet');
-          if (hasTopUpMethod) {
-            // Process payment from TopUpWallet
-            console.log('💳 Processing payment from TopUpWallet:', topUpWalletAddress);
-            tx = await this.tollContract.processTollPaymentFromTopUpWallet(
-              vehicleNumber,
-              transactionHash,
-              amountInWei,
-              {
-                from: adminWallet,
-                gasLimit: 300000,
-              }
-            );
-          } else {
-            console.warn('⚠️ Contract does not have TopUpWallet payment method, falling back to direct payment');
-            hasTopUpWallet = false; // Force direct payment
-          }
+          // The contract design requires the top-up wallet to call processTollPaymentFromTopUpWallet directly
+          // Since we're admin-initiated, we need to use a different approach
+          console.log('💳 Top-up wallet is authorized but admin-initiated payments require different approach');
+          console.log('ℹ️ Note: Contract requires top-up wallet to initiate the transaction directly');
+          
+          // For now, we'll use direct payment method as the contract doesn't support admin-initiated top-up wallet payments
+          console.log('🔄 Using direct payment method for admin-initiated transaction');
+          hasTopUpWallet = false; // Force direct payment
         } else {
           console.warn('⚠️ TopUpWallet not available or not authorized, falling back to direct payment');
           hasTopUpWallet = false; // Force direct payment
@@ -1043,16 +1033,54 @@ class BlockchainService {
         // Check if the contract has the direct payment method
         const hasDirectMethod = this.tollContract.interface.hasFunction('processTollPayment');
         if (hasDirectMethod) {
-          // Process direct payment (fallback)
-          tx = await this.tollContract.processTollPayment(
-            vehicleNumber,
-            transactionHash,
-            amountInWei,
-            {
-              from: adminWallet,
-              gasLimit: 300000,
+          // For ETH payments, we need to send ETH directly to the contract
+          // Since the contract doesn't have native ETH payment support, we'll send ETH and record manually
+          console.log('💳 Processing ETH payment (admin-initiated)...');
+          
+          try {
+            // Check admin wallet ETH balance
+            const adminBalance = await this.provider!.getBalance(adminWallet);
+            console.log('💰 Admin ETH balance:', ethers.formatEther(adminBalance));
+            
+            // Check top-up wallet ETH balance
+            const topUpWalletBalance = await this.provider!.getBalance(topUpWalletAddress);
+            console.log('💰 Top-up wallet ETH balance:', ethers.formatEther(topUpWalletBalance));
+            
+            if (topUpWalletBalance >= amountInWei) {
+              console.log('✅ Top-up wallet has sufficient ETH balance, processing payment...');
+              
+              // Use the TopUpWallet contract's processTollPayment method
+              // This will transfer ETH from the top-up wallet to the toll collection contract
+              console.log('📤 Processing payment through TopUpWallet contract');
+              console.log('  - Top-up wallet:', topUpWalletAddress);
+              console.log('  - Amount:', ethers.formatEther(amountInWei), 'ETH');
+              
+              // Create TopUpWallet contract instance
+              const topUpWalletContract = new ethers.Contract(
+                topUpWalletAddress,
+                TOPUP_WALLET_ABI,
+                this.signer
+              );
+              
+              // Call processTollPayment on the TopUpWallet contract
+              // This will transfer ETH from the top-up wallet to the toll collection contract
+              tx = await topUpWalletContract.processTollPayment(
+                amountInWei,
+                vehicleNumber,
+                transactionHash,
+                {
+                  gasLimit: 200000, // Higher gas limit for contract interaction
+                }
+              );
+              
+              console.log('✅ Payment processed through TopUpWallet contract');
+            } else {
+              throw new Error(`Insufficient ETH balance in top-up wallet. Required: ${ethers.formatEther(amountInWei)} ETH, Available: ${ethers.formatEther(topUpWalletBalance)} ETH`);
             }
-          );
+          } catch (paymentError: any) {
+            console.error('❌ Payment processing failed:', paymentError);
+            throw new Error(`Payment failed: ${paymentError.message}`);
+          }
         } else {
           throw new Error('Contract does not have processTollPayment method. Please check contract deployment.');
         }
@@ -1073,7 +1101,7 @@ class BlockchainService {
       // Wait for transaction confirmation
       const receipt = await tx.wait();
       
-      if (receipt.status === 1) {
+      if (receipt && receipt.status === 1) {
         console.log('✅ Transaction successful!');
         console.log('📊 Gas Used:', receipt.gasUsed.toString());
         console.log('🔢 Block Number:', receipt.blockNumber);
@@ -1085,7 +1113,7 @@ class BlockchainService {
           blockNumber: receipt.blockNumber
         };
       } else {
-        console.error('❌ Transaction failed with status:', receipt.status);
+        console.error('❌ Transaction failed with status:', receipt?.status);
         return {
           success: false,
           error: 'Transaction failed',

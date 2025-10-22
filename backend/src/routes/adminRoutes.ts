@@ -138,11 +138,28 @@ router.get('/vehicles', async (req, res) => {
     const total = await Vehicle.countDocuments(query);
     
     // Transform vehicles data to match admin dashboard format
-    const transformedVehicles = vehicles.map(vehicle => {
+    const transformedVehicles = await Promise.all(vehicles.map(async (vehicle) => {
       // Calculate transaction stats for this vehicle
-      const totalTransactions = 0; // This would need to be calculated from TollTransaction model
-      const totalAmount = 0; // This would need to be calculated from TollTransaction model
-      const currentBalance = 0; // This would need to be calculated from wallet balance
+      const TollTransaction = require('../models/TollTransaction').TollTransaction;
+      const transactions = await TollTransaction.find({ vehicleId: vehicle._id });
+      const totalTransactions = transactions.length;
+      const totalAmount = transactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+      
+      // Get top-up wallet address from blockchain service
+      let topUpWalletAddress = vehicle.fastagWalletAddress || vehicle.owner;
+      let currentBalance = 0;
+      
+      try {
+        const { TopUpWalletService } = require('../services/topUpWalletService');
+        const topUpService = new TopUpWalletService();
+        const walletInfo = await topUpService.getTopUpWalletInfo(vehicle.owner);
+        if (walletInfo) {
+          topUpWalletAddress = walletInfo.walletAddress;
+          currentBalance = parseFloat(walletInfo.balance) || 0;
+        }
+      } catch (error) {
+        console.error(`Error fetching wallet info for ${vehicle.owner}:`, error);
+      }
       
       return {
         id: (vehicle._id as any).toString(),
@@ -150,7 +167,7 @@ router.get('/vehicles', async (req, res) => {
         vehicleType: vehicle.vehicleType,
         owner: vehicle.owner,
         ownerHash: vehicle.owner.slice(0, 8) + '...' + vehicle.owner.slice(-8), // Simple hash for display
-        walletAddress: vehicle.fastagWalletAddress || vehicle.owner,
+        walletAddress: topUpWalletAddress,
         isActive: vehicle.isActive,
         isBlacklisted: vehicle.isBlacklisted,
         registrationDate: vehicle.registrationTime.toISOString(),
@@ -163,7 +180,7 @@ router.get('/vehicles', async (req, res) => {
         documents: vehicle.documents || [],
         metadata: vehicle.metadata || {}
       };
-    });
+    }));
     
     res.json({
       success: true,
