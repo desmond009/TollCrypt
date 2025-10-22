@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { QRCodeData } from '../types/qr';
+import { BlockchainErrorHandler, ErrorContext } from '../utils/errorHandler';
 
 // Ethereum Sepolia testnet configuration - Updated with reliable RPC endpoints
 const SEPOLIA_RPC = 'https://sepolia.infura.io/v3/2896a592f4a34b96b1cfbf0eb2224be5';
@@ -33,7 +34,7 @@ const TOLL_COLLECTION_ABI = [
   'function processTollPaymentFromTopUpWallet(string memory vehicleId, bytes32 zkProofHash, uint256 amount) external returns (bool)',
   'function registerVehicle(string memory vehicleId, address owner) external',
   'function setOperatorAuthorization(address operator, bool isAuthorized) external',
-  'function getVehicle(string memory vehicleId) external view returns (address owner, string memory vehicleId, bool isActive, bool isBlacklisted, uint256 registrationTime, uint256 lastTollTime)',
+  'function vehicles(string memory vehicleId) external view returns (address owner, string memory vehicleId, bool isActive, bool isBlacklisted, uint256 registrationTime, uint256 lastTollTime)',
   'function tollRate() external view returns (uint256)', // This is the automatic getter for the public variable
   'function isTopUpWalletAuthorized(address topUpWallet) external view returns (bool isAuthorized)',
   'function authorizeTopUpWalletFromFactory(address topUpWallet) external',
@@ -75,10 +76,12 @@ const TOPUP_WALLET_ABI = [
 // ABI for TopUpWalletFactory contract
 const TOPUP_WALLET_FACTORY_ABI = [
   'function deployTopUpWallet(address user) external returns (address walletAddress)',
+  'function createTopUpWallet(address user) external returns (address walletAddress)',
   'function getUserTopUpWallet(address user) external view returns (address walletAddress)',
   'function hasTopUpWallet(address user) external view returns (bool hasWallet)',
   'function getUserWalletInfo(address user) external view returns (address walletAddress, bool exists, uint256 balance)',
   'function getTotalDeployedWallets() external view returns (uint256 count)',
+  'function getWalletCount() external view returns (uint256 count)',
   'function getAllDeployedWallets() external view returns (address[] memory wallets)',
   'function tollCollectionContract() external view returns (address)',
 ];
@@ -267,18 +270,51 @@ class BlockchainService {
         if (ethers.isAddress(TOPUP_WALLET_FACTORY) && TOPUP_WALLET_FACTORY !== '0x0000000000000000000000000000000000000000') {
           try {
             console.log('🔧 Initializing TopUp Wallet Factory at:', TOPUP_WALLET_FACTORY);
+            
+            // First check if contract has code at this address with timeout
+            const codePromise = this.provider.getCode(TOPUP_WALLET_FACTORY);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Factory contract code check timeout')), 15000)
+            );
+            
+            const contractCode = await Promise.race([codePromise, timeoutPromise]) as string;
+            console.log('📋 Factory contract code length:', contractCode.length);
+            
+            if (contractCode === '0x') {
+              throw new Error(`No TopUpWalletFactory contract found at address ${TOPUP_WALLET_FACTORY}. Please verify the factory is deployed.`);
+            }
+            
             this.topUpWalletFactory = new ethers.Contract(
               TOPUP_WALLET_FACTORY,
               TOPUP_WALLET_FACTORY_ABI,
               this.signer || this.provider
             );
             
-            // Test if contract exists by calling a simple view function
-            const walletCount = await this.topUpWalletFactory.getWalletCount();
+            // Test if contract exists by calling a simple view function with timeout
+            console.log('🧪 Testing TopUpWalletFactory by calling getTotalDeployedWallets()...');
+            const walletCountPromise = this.topUpWalletFactory.getTotalDeployedWallets();
+            const walletCountTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Factory contract call timeout')), 10000)
+            );
+            
+            const walletCount = await Promise.race([walletCountPromise, walletCountTimeoutPromise]) as bigint;
             console.log('✅ TopUp Wallet Factory initialized successfully');
             console.log('📊 Total wallets created:', walletCount.toString());
-          } catch (contractError) {
+          } catch (contractError: any) {
             console.error('❌ Failed to initialize TopUp Wallet Factory:', contractError);
+            console.error('❌ Factory address:', TOPUP_WALLET_FACTORY);
+            console.error('❌ Error details:', contractError.message);
+            console.error('❌ Error code:', contractError.code);
+            
+            // Provide more specific error messages
+            if (contractError.message.includes('timeout')) {
+              console.error('💡 This might be due to RPC endpoint issues. Try refreshing the page.');
+            } else if (contractError.message.includes('No TopUpWalletFactory contract found')) {
+              console.error('💡 The factory contract address might be incorrect or the contract is not deployed.');
+            } else if (contractError.code === 'NETWORK_ERROR') {
+              console.error('💡 Network connection issue. Please check your internet connection.');
+            }
+            
             this.topUpWalletFactory = null;
           }
         } else {
@@ -346,25 +382,49 @@ class BlockchainService {
       throw new Error('Contract not initialized');
     }
 
+    const context: ErrorContext = {
+      operation: 'getVehicleRegistration',
+      contractAddress: TOLL_COLLECTION_CONTRACT,
+      methodName: 'vehicles',
+      parameters: [vehicleId]
+    };
+
+    const fallbackRegistration: VehicleRegistration = {
+      isRegistered: false,
+      owner: '0x0000000000000000000000000000000000000000',
+      vehicleType: vehicleId,
+      isBlacklisted: false,
+      registrationTime: 0,
+      lastTollTime: 0
+    };
+
     try {
-      // Check if the contract has the getVehicle method
-      const hasMethod = this.tollContract.interface.hasFunction('getVehicle');
+      // Check if the contract has the vehicles method
+      const hasMethod = this.tollContract.interface.hasFunction('vehicles');
       if (!hasMethod) {
-        throw new Error('Contract does not have getVehicle method');
+        console.warn('Contract does not have vehicles method, returning default registration status');
+        return fallbackRegistration;
       }
       
-      const vehicle = await this.tollContract.getVehicle(vehicleId);
+      const [owner, vehicleIdFromContract, isActive, isBlacklisted, registrationTime, lastTollTime] = await BlockchainErrorHandler.retryOperation(
+        () => this.tollContract!.vehicles(vehicleId),
+        context
+      );
+      
       return {
-        isRegistered: vehicle.owner !== '0x0000000000000000000000000000000000000000' && vehicle.isActive,
-        owner: vehicle.owner,
-        vehicleType: vehicle.vehicleId, // Using vehicleId as vehicleType for now
-        isBlacklisted: vehicle.isBlacklisted,
-        registrationTime: Number(vehicle.registrationTime),
-        lastTollTime: Number(vehicle.lastTollTime)
+        isRegistered: owner !== '0x0000000000000000000000000000000000000000' && isActive,
+        owner: owner,
+        vehicleType: vehicleIdFromContract,
+        isBlacklisted: isBlacklisted,
+        registrationTime: Number(registrationTime),
+        lastTollTime: Number(lastTollTime)
       };
-    } catch (error) {
-      console.error('Failed to get vehicle registration:', error);
-      throw new Error('Failed to verify vehicle registration');
+    } catch (error: any) {
+      BlockchainErrorHandler.logError(error, context);
+      
+      // Return fallback registration for any error
+      console.warn('Using fallback registration data due to error');
+      return fallbackRegistration;
     }
   }
 
@@ -374,20 +434,18 @@ class BlockchainService {
       return false;
     }
 
-    try {
-      // Check if the contract has the getVehicle method
-      const hasMethod = this.tollContract.interface.hasFunction('getVehicle');
-      if (!hasMethod) {
-        console.warn('Contract does not have getVehicle method, assuming not blacklisted');
-        return false;
-      }
-      
-      const vehicle = await this.tollContract.getVehicle(vehicleId);
-      return vehicle.isBlacklisted;
-    } catch (error) {
-      console.error('Failed to check blacklist status:', error);
-      return false;
-    }
+    const context: ErrorContext = {
+      operation: 'isVehicleBlacklisted',
+      contractAddress: TOLL_COLLECTION_CONTRACT,
+      methodName: 'vehicles',
+      parameters: [vehicleId]
+    };
+
+    return await BlockchainErrorHandler.callContractMethod(
+      () => this.tollContract!.vehicles(vehicleId).then(([owner, vehicleIdFromContract, isActive, isBlacklisted, registrationTime, lastTollTime]) => isBlacklisted),
+      false, // fallback value
+      context
+    );
   }
 
   async getTollRate(vehicleType: string): Promise<string> {
@@ -701,14 +759,19 @@ class BlockchainService {
       console.log('  - Owner Address:', ownerAddress);
       console.log('  - Contract Address:', TOLL_COLLECTION_CONTRACT);
 
-      // Check if vehicle is already registered
-      const vehicleInfo = await this.tollContract.getVehicle(vehicleId);
-      if (vehicleInfo.owner !== '0x0000000000000000000000000000000000000000') {
-        console.log('✅ Vehicle already registered on contract');
-        return {
-          success: true,
-          message: 'Vehicle already registered'
-        };
+      // Check if vehicle is already registered with enhanced error handling
+      try {
+        const [owner, vehicleIdFromContract, isActive, isBlacklisted, registrationTime, lastTollTime] = await this.tollContract.vehicles(vehicleId);
+        if (owner !== '0x0000000000000000000000000000000000000000') {
+          console.log('✅ Vehicle already registered on contract');
+          return {
+            success: true,
+            message: 'Vehicle already registered'
+          };
+        }
+      } catch (checkError: any) {
+        console.warn('⚠️ Could not check existing vehicle registration, proceeding with registration:', checkError.message);
+        // Continue with registration even if check fails
       }
 
       // Register the vehicle
@@ -806,43 +869,67 @@ class BlockchainService {
       );
       console.log('🔐 Transaction Hash:', transactionHash);
 
-      // Check if vehicle is registered on the smart contract
+      // Check if vehicle is registered on the smart contract with enhanced error handling
       console.log('🔍 Checking if vehicle is registered on smart contract...');
-      try {
-        const vehicleInfo = await this.tollContract.getVehicle(vehicleNumber);
-        if (vehicleInfo.owner === '0x0000000000000000000000000000000000000000') {
-          console.log('⚠️ Vehicle not registered on smart contract, registering now...');
-          const registrationResult = await this.registerVehicleOnContract(vehicleNumber, walletAddress);
-          if (!registrationResult.success) {
-            throw new Error(`Failed to register vehicle on smart contract: ${registrationResult.error}`);
-          }
+      
+      const vehicleCheckContext: ErrorContext = {
+        operation: 'checkVehicleRegistration',
+        contractAddress: TOLL_COLLECTION_CONTRACT,
+        methodName: 'vehicles',
+        parameters: [vehicleNumber],
+        walletAddress
+      };
+
+      const isVehicleRegistered = await BlockchainErrorHandler.callContractMethod(
+        async () => {
+          const [owner, vehicleIdFromContract, isActive, isBlacklisted, registrationTime, lastTollTime] = await this.tollContract!.vehicles(vehicleNumber);
+          return owner !== '0x0000000000000000000000000000000000000000';
+        },
+        false, // fallback: assume not registered
+        vehicleCheckContext
+      );
+
+      if (!isVehicleRegistered) {
+        console.log('⚠️ Vehicle not registered on smart contract, attempting to register...');
+        const registrationContext: ErrorContext = {
+          operation: 'registerVehicle',
+          contractAddress: TOLL_COLLECTION_CONTRACT,
+          methodName: 'registerVehicle',
+          parameters: [vehicleNumber, walletAddress],
+          walletAddress
+        };
+
+        const registrationResult = await BlockchainErrorHandler.handleVehicleRegistration(
+          vehicleNumber,
+          () => this.registerVehicleOnContract(vehicleNumber, walletAddress),
+          registrationContext
+        );
+
+        if (registrationResult.success) {
           console.log('✅ Vehicle registered successfully on smart contract');
         } else {
-          console.log('✅ Vehicle already registered on smart contract');
+          console.warn('⚠️ Vehicle registration failed, but continuing with payment:', registrationResult.error);
         }
-      } catch (vehicleCheckError: any) {
-        console.error('❌ Failed to check vehicle registration:', vehicleCheckError);
-        // Try to register the vehicle anyway
-        console.log('🔄 Attempting to register vehicle on smart contract...');
-        const registrationResult = await this.registerVehicleOnContract(vehicleNumber, walletAddress);
-        if (!registrationResult.success) {
-          throw new Error(`Failed to register vehicle on smart contract: ${registrationResult.error}`);
-        }
-        console.log('✅ Vehicle registered successfully on smart contract');
+      } else {
+        console.log('✅ Vehicle already registered on smart contract');
       }
 
       // Check if admin wallet is authorized as operator
       console.log('🔍 Checking if admin wallet is authorized as operator...');
       try {
-        // Note: We can't directly check authorization from the contract without additional ABI functions
-        // For now, we'll assume the admin wallet needs to be authorized and try to authorize it
-        console.log('🔄 Attempting to authorize admin wallet as operator...');
-        const authResult = await this.authorizeOperator(adminWallet);
-        if (!authResult.success) {
-          console.warn('⚠️ Failed to authorize admin wallet, but continuing with transaction...');
-          console.warn('⚠️ This might cause the transaction to fail if the wallet is not already authorized');
+        // Check if the contract has the authorization method
+        const hasAuthMethod = this.tollContract.interface.hasFunction('setOperatorAuthorization');
+        if (hasAuthMethod) {
+          console.log('🔄 Attempting to authorize admin wallet as operator...');
+          const authResult = await this.authorizeOperator(adminWallet);
+          if (!authResult.success) {
+            console.warn('⚠️ Failed to authorize admin wallet, but continuing with transaction...');
+            console.warn('⚠️ This might cause the transaction to fail if the wallet is not already authorized');
+          } else {
+            console.log('✅ Admin wallet authorized successfully');
+          }
         } else {
-          console.log('✅ Admin wallet authorized successfully');
+          console.warn('⚠️ Contract does not have operator authorization method, skipping authorization');
         }
       } catch (authError: any) {
         console.warn('⚠️ Authorization check failed, but continuing with transaction...');
@@ -852,8 +939,12 @@ class BlockchainService {
       // Check if user has a TopUpWallet using the factory
       console.log('🔍 Checking if user has TopUpWallet...');
       let hasTopUpWallet = false;
+      let topUpWalletAddress = '';
+      
       try {
         if (this.topUpWalletFactory) {
+          console.log('🏭 TopUpWalletFactory is available, checking user wallet...');
+          
           // Add timeout for the contract call
           const hasWalletPromise = this.topUpWalletFactory.hasTopUpWallet(walletAddress);
           const timeoutPromise = new Promise((_, reject) => 
@@ -862,6 +953,39 @@ class BlockchainService {
           
           hasTopUpWallet = await Promise.race([hasWalletPromise, timeoutPromise]) as boolean;
           console.log('📊 Has TopUpWallet:', hasTopUpWallet);
+          
+          if (hasTopUpWallet) {
+            // Get the top-up wallet address
+            const walletAddressPromise = this.topUpWalletFactory.getUserTopUpWallet(walletAddress);
+            const walletTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('getUserTopUpWallet call timeout')), 10000)
+            );
+            
+            topUpWalletAddress = await Promise.race([walletAddressPromise, walletTimeoutPromise]) as string;
+            console.log('📍 TopUpWallet Address:', topUpWalletAddress);
+            
+            if (topUpWalletAddress === '0x0000000000000000000000000000000000000000') {
+              console.warn('⚠️ TopUpWallet address is zero, falling back to direct payment');
+              hasTopUpWallet = false;
+            }
+          } else {
+            // Try to create a TopUpWallet for the user if it doesn't exist
+            console.log('🔄 User does not have TopUpWallet, attempting to create one...');
+            try {
+              const createResult = await this.createAndAuthorizeTopUpWallet(walletAddress);
+              if (createResult.success) {
+                console.log('✅ TopUpWallet created and authorized successfully');
+                hasTopUpWallet = true;
+                topUpWalletAddress = createResult.walletAddress || walletAddress;
+              } else {
+                console.warn('⚠️ Failed to create TopUpWallet:', createResult.error);
+                hasTopUpWallet = false;
+              }
+            } catch (createError: any) {
+              console.error('❌ TopUpWallet creation failed:', createError);
+              hasTopUpWallet = false;
+            }
+          }
         } else {
           console.warn('⚠️ TopUpWalletFactory not available, assuming no TopUpWallet');
           hasTopUpWallet = false;
@@ -879,38 +1003,39 @@ class BlockchainService {
         console.log('💳 Processing payment from TopUpWallet...');
         
         // Check if the top-up wallet is authorized with timeout
-        let topUpWalletAddress = '';
         let isAuthorized = false;
         
         try {
-          if (this.topUpWalletFactory) {
-            const walletAddressPromise = this.topUpWalletFactory.getUserTopUpWallet(walletAddress);
-            const walletTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('getUserTopUpWallet call timeout')), 10000)
+          if (topUpWalletAddress && topUpWalletAddress !== '0x0000000000000000000000000000000000000000') {
+            console.log('🔐 Checking TopUpWallet authorization...');
+            
+            const authPromise = this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
+            const authTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('isTopUpWalletAuthorized call timeout')), 10000)
             );
             
-            topUpWalletAddress = await Promise.race([walletAddressPromise, walletTimeoutPromise]) as string;
-            console.log('📍 TopUpWallet Address:', topUpWalletAddress);
+            isAuthorized = await Promise.race([authPromise, authTimeoutPromise]) as boolean;
+            console.log('🔐 TopUpWallet Authorized:', isAuthorized);
             
-            if (topUpWalletAddress === '0x0000000000000000000000000000000000000000') {
-              console.warn('⚠️ TopUpWallet address is zero, falling back to direct payment');
-              hasTopUpWallet = false;
-            } else {
-              const authPromise = this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
-              const authTimeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('isTopUpWalletAuthorized call timeout')), 10000)
-              );
+            if (!isAuthorized) {
+              console.warn('⚠️ TopUpWallet not authorized, attempting to authorize...');
               
-              isAuthorized = await Promise.race([authPromise, authTimeoutPromise]) as boolean;
-              console.log('🔐 TopUpWallet Authorized:', isAuthorized);
-              
-              if (!isAuthorized) {
-                console.warn('⚠️ TopUpWallet not authorized, falling back to direct payment');
+              try {
+                const authResult = await this.authorizeTopUpWallet(topUpWalletAddress);
+                if (authResult.success) {
+                  console.log('✅ TopUpWallet authorized successfully');
+                  isAuthorized = true;
+                } else {
+                  console.warn('⚠️ Failed to authorize TopUpWallet:', authResult.error);
+                  hasTopUpWallet = false; // Force direct payment
+                }
+              } catch (authError: any) {
+                console.error('❌ Authorization attempt failed:', authError);
                 hasTopUpWallet = false; // Force direct payment
               }
             }
           } else {
-            console.warn('⚠️ TopUpWalletFactory not available, falling back to direct payment');
+            console.warn('⚠️ Invalid TopUpWallet address, falling back to direct payment');
             hasTopUpWallet = false;
           }
         } catch (authCheckError: any) {
@@ -919,9 +1044,40 @@ class BlockchainService {
           hasTopUpWallet = false; // Force direct payment
         }
         
-        if (hasTopUpWallet) {
-          // Process payment from TopUpWallet
-          tx = await this.tollContract.processTollPaymentFromTopUpWallet(
+        if (hasTopUpWallet && isAuthorized) {
+          // Check if the contract has the TopUpWallet payment method
+          const hasTopUpMethod = this.tollContract.interface.hasFunction('processTollPaymentFromTopUpWallet');
+          if (hasTopUpMethod) {
+            // Process payment from TopUpWallet
+            console.log('💳 Processing payment from TopUpWallet:', topUpWalletAddress);
+            tx = await this.tollContract.processTollPaymentFromTopUpWallet(
+              vehicleNumber,
+              transactionHash,
+              amountInWei,
+              {
+                from: adminWallet,
+                gasLimit: 300000,
+              }
+            );
+          } else {
+            console.warn('⚠️ Contract does not have TopUpWallet payment method, falling back to direct payment');
+            hasTopUpWallet = false; // Force direct payment
+          }
+        } else {
+          console.warn('⚠️ TopUpWallet not available or not authorized, falling back to direct payment');
+          hasTopUpWallet = false; // Force direct payment
+        }
+      }
+      
+      // If we don't have a transaction yet, process direct payment
+      if (!tx) {
+        console.log('💳 Processing direct payment (fallback)...');
+        
+        // Check if the contract has the direct payment method
+        const hasDirectMethod = this.tollContract.interface.hasFunction('processTollPayment');
+        if (hasDirectMethod) {
+          // Process direct payment (fallback)
+          tx = await this.tollContract.processTollPayment(
             vehicleNumber,
             transactionHash,
             amountInWei,
@@ -931,20 +1087,8 @@ class BlockchainService {
             }
           );
         } else {
-          throw new Error('TopUpWallet authorization failed, cannot process payment');
+          throw new Error('Contract does not have processTollPayment method. Please check contract deployment.');
         }
-      } else {
-        console.log('💳 Processing direct payment (fallback)...');
-        // Process direct payment (fallback)
-        tx = await this.tollContract.processTollPayment(
-          vehicleNumber,
-          transactionHash,
-          amountInWei,
-          {
-            from: adminWallet,
-            gasLimit: 300000,
-          }
-        );
       }
 
       console.log('⏳ Waiting for transaction confirmation...');
@@ -981,43 +1125,23 @@ class BlockchainService {
         };
       }
     } catch (error: any) {
-      console.error('❌ Admin toll payment processing failed:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        code: error.code,
-        reason: error.reason,
-        data: error.data
-      });
-      
-      // Provide more specific error messages
-      let errorMessage = error.message || 'Transaction failed';
-      if (error.code === 'CALL_EXCEPTION') {
-        if (error.message.includes('missing revert data')) {
-          errorMessage = 'Contract call failed with missing revert data. This usually indicates:\n' +
-                        '1. The contract method does not exist\n' +
-                        '2. The contract is not properly deployed\n' +
-                        '3. Insufficient authorization or permissions\n' +
-                        '4. Invalid parameters passed to the contract\n\n' +
-                        'Please check:\n' +
-                        '- Contract address: ' + TOLL_COLLECTION_CONTRACT + '\n' +
-                        '- Wallet authorization status\n' +
-                        '- Contract deployment verification';
-        } else {
-          errorMessage = 'Contract call failed. This might be due to insufficient authorization or invalid parameters.';
-        }
-      } else if (error.message.includes('TopUpWallet') && error.message.includes('not authorized')) {
-        errorMessage = 'TopUpWallet is not authorized. Please authorize the wallet first.';
-      } else if (error.message.includes('insufficient funds')) {
-        errorMessage = 'Insufficient funds in the TopUpWallet for this transaction.';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Contract call timed out. This might be due to RPC endpoint issues. Please try again.';
-      } else if (error.message.includes('No contract found')) {
-        errorMessage = 'No contract found at the specified address. Please verify the contract is deployed correctly.';
-      }
-      
+      const paymentContext: ErrorContext = {
+        operation: 'processAdminTollPayment',
+        contractAddress: TOLL_COLLECTION_CONTRACT,
+        methodName: 'processTollPayment',
+        parameters: [vehicleNumber, 'unknown', 'unknown'],
+        walletAddress: adminWallet
+      };
+
+      const result = await BlockchainErrorHandler.handleTollPayment(
+        () => Promise.reject(error),
+        paymentContext
+      );
+
       return {
-        success: false,
-        error: errorMessage,
+        success: result.success,
+        error: result.error,
+        transactionHash: result.transactionHash
       };
     }
   }
@@ -1459,10 +1583,24 @@ class BlockchainService {
     try {
       console.log('🏭 Creating top-up wallet for user:', userAddress);
       
-      // Create the top-up wallet
-      const tx = await this.topUpWalletFactory.createTopUpWallet(userAddress, {
-        gasLimit: 500000,
-      });
+      // Check if the factory has the createTopUpWallet method
+      const hasCreateMethod = this.topUpWalletFactory.interface.hasFunction('createTopUpWallet');
+      const hasDeployMethod = this.topUpWalletFactory.interface.hasFunction('deployTopUpWallet');
+      
+      let tx;
+      if (hasCreateMethod) {
+        // Create the top-up wallet using createTopUpWallet
+        tx = await this.topUpWalletFactory.createTopUpWallet(userAddress, {
+          gasLimit: 500000,
+        });
+      } else if (hasDeployMethod) {
+        // Create the top-up wallet using deployTopUpWallet
+        tx = await this.topUpWalletFactory.deployTopUpWallet(userAddress, {
+          gasLimit: 500000,
+        });
+      } else {
+        throw new Error('Factory contract does not have createTopUpWallet or deployTopUpWallet method');
+      }
 
       console.log('⏳ Waiting for wallet creation transaction confirmation...');
       const receipt = await tx.wait();
@@ -1693,6 +1831,32 @@ class BlockchainService {
     }
     
     console.log('✅ All components initialized successfully');
+  }
+
+  // Retry mechanism for failed blockchain calls
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    delayMs: number = 1000
+  ): Promise<T> {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`⚠️ Operation failed (attempt ${attempt}/${maxRetries}):`, error.message);
+        
+        if (attempt < maxRetries) {
+          console.log(`🔄 Retrying in ${delayMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          delayMs *= 2; // Exponential backoff
+        }
+      }
+    }
+    
+    throw lastError!;
   }
 
   // Get the connected wallet address
