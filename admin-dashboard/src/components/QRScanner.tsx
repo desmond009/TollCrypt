@@ -24,6 +24,7 @@ interface QRScannerProps {
   onError?: (error: string) => void;
   isScanning: boolean;
   onClose?: () => void;
+  onStartScanning?: () => void;
 }
 
 interface ValidationStep {
@@ -59,6 +60,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   onError,
   isScanning,
   onClose,
+  onStartScanning,
 }) => {
   const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -166,28 +168,43 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   ];
 
   const initializeScanner = () => {
-    if (scannerRef.current && !isInitialized) {
-      const html5QrcodeScanner = new Html5QrcodeScanner(
-        'qr-reader',
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        },
-        false
-      );
+    if (!isInitialized) {
+      // Create a unique ID for this scanner instance
+      const scannerId = `qr-reader-${Date.now()}`;
+      
+      // Create the scanner div dynamically
+      const scannerDiv = document.createElement('div');
+      scannerDiv.id = scannerId;
+      scannerDiv.className = 'w-full h-64 bg-gray-900 rounded-lg';
+      
+      // Find the container and append the scanner div
+      const container = document.querySelector('[data-scanner-container]');
+      if (container) {
+        container.innerHTML = '';
+        container.appendChild(scannerDiv);
+        
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+          scannerId,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+          },
+          false
+        );
 
-      html5QrcodeScanner.render(
-        (decodedText: string, decodedResult: any) => {
-          handleQRCodeSuccess(decodedText);
-        },
-        (error: any) => {
-          // Silent error handling - don't show every scan attempt error
-        }
-      );
+        html5QrcodeScanner.render(
+          (decodedText: string, decodedResult: any) => {
+            handleQRCodeSuccess(decodedText);
+          },
+          (error: any) => {
+            // Silent error handling - don't show every scan attempt error
+          }
+        );
 
-      setScanner(html5QrcodeScanner);
-      setIsInitialized(true);
+        setScanner(html5QrcodeScanner);
+        setIsInitialized(true);
+      }
     }
   };
 
@@ -815,6 +832,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   };
 
   const startScanner = () => {
+    // Call the parent component's callback to start scanning
+    if (onStartScanning) {
+      onStartScanning();
+    }
+    
+    // Also initialize the scanner if not already initialized
     if (!isInitialized) {
       initializeScanner();
     }
@@ -1195,7 +1218,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   return (
     <div className="relative">
       {/* Scanner Container */}
-      <div className="relative bg-black rounded-lg overflow-hidden">
+      <div className="relative bg-black rounded-lg overflow-hidden" data-scanner-container>
         <div id="qr-reader" ref={scannerRef} className="w-full"></div>
         
         {/* Overlay with scanning indicator */}

@@ -227,7 +227,7 @@ export const QRCodeTollCollection: React.FC<QRCodeTollCollectionProps> = ({
             <CurrencyDollarIcon className="h-8 w-8 text-yellow-600" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">₹{transactionStats.totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900">{transactionStats.totalRevenue.toFixed(4)} ETH</p>
             </div>
           </div>
         </div>
@@ -240,6 +240,7 @@ export const QRCodeTollCollection: React.FC<QRCodeTollCollectionProps> = ({
           onError={handleScanError}
           isScanning={isScanning}
           onClose={handleStopScanning}
+          onStartScanning={handleStartScanning}
         />
       </div>
 
@@ -261,7 +262,7 @@ export const QRCodeTollCollection: React.FC<QRCodeTollCollectionProps> = ({
                 </div>
                 <div className="flex items-center space-x-4">
                   <div className="text-right">
-                    <p className="font-medium text-gray-900">₹{transaction.amount}</p>
+                    <p className="font-medium text-gray-900">{transaction.amount} ETH</p>
                     <p className="text-sm text-gray-600">
                       {new Date(transaction.timestamp).toLocaleTimeString()}
                     </p>
