@@ -91,7 +91,7 @@ export const WalletConnector: React.FC = () => {
       <div className="flex flex-col items-end">
         <button
           onClick={handleConnect}
-          className="btn-primary"
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           <WalletIcon className="w-5 h-5 mr-2" />
           Connect Wallet
@@ -115,29 +115,29 @@ export const WalletConnector: React.FC = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center bg-gray-800 rounded-lg px-3 py-2 hover:bg-gray-700 transition-colors"
+        className="flex items-center bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 hover:bg-gray-700 transition-colors shadow-sm"
       >
         <div className="w-6 h-6 bg-gradient-to-r from-green-400 to-orange-400 rounded-full mr-2"></div>
         <div className="text-right">
           <div className="text-sm font-medium text-white">
             {address?.slice(0, 6)}...{address?.slice(-4)}
           </div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-300">
             {balance ? `${parseFloat(balance.formatted).toFixed(4)} ${balance.symbol}` : '0 ETH'}
           </div>
         </div>
-        <svg className="w-4 h-4 text-gray-400 ml-2" fill="currentColor" viewBox="0 0 20 20">
+        <svg className="w-4 h-4 text-gray-300 ml-2" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
         </svg>
       </button>
       
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-64 bg-gray-900 rounded-lg shadow-lg border border-gray-800 z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-lg border border-gray-600 z-50">
           <div className="py-2">
-            <div className="px-4 py-3 border-b border-gray-800">
+            <div className="px-4 py-3 border-b border-gray-600">
               <div className="text-sm font-medium text-white">Wallet Connected</div>
-              <div className="text-xs text-gray-400 font-mono mt-1">{address}</div>
-              <div className="text-xs text-gray-400 mt-1">
+              <div className="text-xs text-gray-300 font-mono mt-1">{address}</div>
+              <div className="text-xs text-gray-300 mt-1">
                 Balance: {balance ? `${parseFloat(balance.formatted).toFixed(6)} ${balance.symbol}` : '0 ETH'}
               </div>
             </div>

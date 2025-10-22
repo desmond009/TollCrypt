@@ -4,8 +4,8 @@
 
 @layer base {
   body {
-    @apply bg-black text-white font-sans;
-    background-color: #000000;
+    @apply bg-gray-900 text-white font-sans;
+    background-color: #111827;
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -21,6 +21,11 @@
   code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
       monospace;
+  }
+  
+  /* Dark theme overrides */
+  .dark {
+    @apply bg-gray-900 text-white;
   }
 }
 
@@ -38,7 +43,7 @@
   }
   
   .input-field {
-    @apply bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all duration-200;
+    @apply bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all duration-200;
   }
   
   .admin-card {

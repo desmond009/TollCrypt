@@ -241,7 +241,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 text-white dark">
       <Header 
         user={user} 
         onLogout={logout} 

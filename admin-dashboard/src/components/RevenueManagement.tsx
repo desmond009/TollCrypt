@@ -145,19 +145,19 @@ const RevenueManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Revenue Management</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-3xl font-bold text-white">Revenue Management</h1>
+          <p className="mt-2 text-gray-300">
             Manage toll collection revenue and treasury wallet operations
           </p>
         </div>
 
         {/* Error and Success Messages */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="mb-6 bg-red-900/20 border border-red-700 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -165,14 +165,14 @@ const RevenueManagement: React.FC = () => {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-red-300">{error}</p>
               </div>
             </div>
           </div>
         )}
 
         {success && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-md p-4">
+          <div className="mb-6 bg-green-900/20 border border-green-700 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
@@ -180,7 +180,7 @@ const RevenueManagement: React.FC = () => {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-green-800">{success}</p>
+                <p className="text-sm text-green-300">{success}</p>
               </div>
             </div>
           </div>
@@ -188,38 +188,38 @@ const RevenueManagement: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Contract Statistics */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Contract Statistics</h2>
+          <div className="bg-gray-800 rounded-lg shadow p-6 border border-gray-700">
+            <h2 className="text-xl font-semibold text-white mb-4">Contract Statistics</h2>
             
             {isLoading && !contractStats ? (
               <div className="animate-pulse space-y-4">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-700 rounded w-2/3"></div>
               </div>
             ) : contractStats ? (
               <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Total Revenue</span>
-                  <span className="font-semibold text-green-600">
+                <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                  <span className="text-gray-300">Total Revenue</span>
+                  <span className="font-semibold text-green-400">
                     {contractStats.formattedRevenue} ETH
                   </span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Total Transactions</span>
-                  <span className="font-semibold">{contractStats.totalTransactions}</span>
+                <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                  <span className="text-gray-300">Total Transactions</span>
+                  <span className="font-semibold text-white">{contractStats.totalTransactions}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Total Vehicles</span>
-                  <span className="font-semibold">{contractStats.totalVehicles}</span>
+                <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                  <span className="text-gray-300">Total Vehicles</span>
+                  <span className="font-semibold text-white">{contractStats.totalVehicles}</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-gray-600">Current Toll Rate</span>
-                  <span className="font-semibold">{contractStats.formattedTollRate} ETH</span>
+                  <span className="text-gray-300">Current Toll Rate</span>
+                  <span className="font-semibold text-blue-400">{contractStats.formattedTollRate} ETH</span>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">Failed to load contract statistics</p>
+              <p className="text-gray-400">Failed to load contract statistics</p>
             )}
 
             <button

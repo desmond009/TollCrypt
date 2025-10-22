@@ -34,15 +34,15 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
 
   return (
     <div className="sticky top-0 z-50">
-      <header className="bg-black shadow-lg border-b border-gray-800">
+      <header className="bg-gray-800 shadow-lg border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex justify-between items-center py-3">
             {/* Left side - Brand */}
             <div className="flex items-center space-x-2 sm:space-x-3">
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white font-serif">
                 TollChain Admin
               </h1>
-              <span className="hidden sm:inline-flex items-center px-2 py-1 text-xs font-medium text-gray-300 bg-gray-800 rounded-full">
+              <span className="hidden sm:inline-flex items-center px-2 py-1 text-xs font-medium text-blue-300 bg-blue-900 rounded-full">
                 {user.role.replace('_', ' ').toUpperCase()}
               </span>
             </div>
@@ -58,7 +58,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-2 text-gray-400 hover:text-white relative transition-colors rounded-lg hover:bg-gray-800"
+                  className="p-2 text-gray-300 hover:text-white relative transition-colors rounded-lg hover:bg-gray-700"
                 >
                   <BellIcon className="h-5 w-5 sm:h-6 sm:w-6" />
                   {unreadCount > 0 && (
@@ -69,8 +69,8 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
                 </button>
                 
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-lg shadow-xl z-50 border border-gray-800">
-                    <div className="p-4 border-b border-gray-800">
+                  <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-xl z-50 border border-gray-700">
+                    <div className="p-4 border-b border-gray-700">
                       <h3 className="text-lg font-medium text-white">Notifications</h3>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
@@ -82,10 +82,10 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
                         notifications.slice(0, 10).map((notification, index) => (
                           <div
                             key={index}
-                            className={`p-4 border-b border-gray-800 last:border-b-0 ${
+                            className={`p-4 border-b border-gray-700 last:border-b-0 ${
                               notification.severity === 'error' ? 'bg-red-900/20' :
                               notification.severity === 'warning' ? 'bg-yellow-900/20' :
-                              'bg-gray-800/20'
+                              'bg-gray-700/50'
                             }`}
                           >
                             <p className="text-sm text-white">{notification.message}</p>
@@ -102,14 +102,14 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
 
               {/* User menu */}
               <div className="flex items-center space-x-2">
-                <UserCircleIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                <UserCircleIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-300" />
                 <div className="hidden sm:block text-sm">
                   <p className="font-medium text-white">{user.name}</p>
                   <p className="text-gray-400 text-xs">{user.email}</p>
                 </div>
                 <button
                   onClick={onLogout}
-                  className="text-sm text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-800"
+                  className="text-sm text-gray-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-700"
                 >
                   Logout
                 </button>

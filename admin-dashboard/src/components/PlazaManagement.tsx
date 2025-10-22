@@ -15,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { api } from '../services/api';
 import { format } from 'date-fns';
+import './PlazaManagement.css';
 
 interface Plaza {
   id: string;
@@ -299,18 +300,31 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
 
   const getStatusBadge = (status: Plaza['status']) => {
     const statusConfig = {
-      active: { color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
-      maintenance: { color: 'bg-yellow-100 text-yellow-800', icon: ExclamationTriangleIcon },
-      inactive: { color: 'bg-red-100 text-red-800', icon: XCircleIcon },
+      active: { 
+        color: 'bg-green-900/30 text-green-300 border-green-700', 
+        icon: CheckCircleIcon,
+        dotColor: 'bg-green-400'
+      },
+      maintenance: { 
+        color: 'bg-yellow-900/30 text-yellow-300 border-yellow-700', 
+        icon: ExclamationTriangleIcon,
+        dotColor: 'bg-yellow-400'
+      },
+      inactive: { 
+        color: 'bg-red-900/30 text-red-300 border-red-700', 
+        icon: XCircleIcon,
+        dotColor: 'bg-red-400'
+      },
     };
 
     const config = statusConfig[status];
     const Icon = config.icon;
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+      <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border ${config.color} shadow-sm`}>
+        <div className={`w-2 h-2 ${config.dotColor} rounded-full mr-2 status-dot`}></div>
         <Icon className="w-3 h-3 mr-1" />
-        {status}
+        {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
   };
@@ -327,102 +341,213 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-gray-700 rounded-full animate-spin spinner"></div>
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
+          </div>
+          <p className="mt-4 text-lg font-medium text-gray-300">Loading plazas...</p>
+          <p className="mt-2 text-sm text-gray-400">Please wait while we fetch the latest data</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Toll Plaza Management</h1>
-          <p className="text-gray-600">Manage toll plazas, rates, and operator assignments</p>
-        </div>
-        <button
-          onClick={() => {
-            setShowModal(true);
-            setIsEditing(false);
-            setSelectedPlaza(null);
-            reset();
-          }}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-        >
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Add Plaza
-        </button>
-      </div>
-
-      {/* Plazas Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {plazas.map((plaza) => (
-          <div key={plaza.id} className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center">
-                <MapPinIcon className="h-6 w-6 text-gray-400 mr-2" />
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{plaza.name}</h3>
-                  <p className="text-sm text-gray-500">{plaza.location}</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-4 sm:mb-0">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-blue-300 to-indigo-300 bg-clip-text text-transparent font-serif">
+                Toll Plaza Management
+              </h1>
+              <p className="mt-2 text-lg text-gray-300 font-medium">
+                Manage toll plazas, rates, and operator assignments
+              </p>
+              <div className="mt-3 flex items-center text-sm text-gray-400">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                  <span className="font-medium">{plazas.length} Active Plazas</span>
+                </div>
+                <div className="ml-4 flex items-center">
+                  <CurrencyDollarIcon className="h-4 w-4 mr-1" />
+                  <span className="font-medium">
+                    {plazas.reduce((sum, plaza) => sum + plaza.todayRevenue, 0).toFixed(4)} ETH Today
+                  </span>
                 </div>
               </div>
-              {getStatusBadge(plaza.status)}
             </div>
-
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Today's Transactions:</span>
-                <span className="font-medium">{plaza.todayTransactions}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Today's Revenue:</span>
-                <span className="font-medium">${plaza.todayRevenue.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Operators:</span>
-                <span className="font-medium">{plaza.assignedOperators.length}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div className="text-xs text-gray-500">
-                Created {format(new Date(plaza.createdAt), 'MMM d, yyyy')}
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleViewPlaza(plaza)}
-                  className="text-blue-600 hover:text-blue-900"
-                >
-                  <EyeIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleEditPlaza(plaza)}
-                  className="text-yellow-600 hover:text-yellow-900"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleDeletePlaza(plaza.id)}
-                  className="text-red-600 hover:text-red-900"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+            <button
+              onClick={() => {
+                setShowModal(true);
+                setIsEditing(false);
+                setSelectedPlaza(null);
+                reset();
+              }}
+              className="inline-flex items-center px-6 py-3 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              Add New Plaza
+            </button>
           </div>
-        ))}
+        </div>
+
+        {/* Plazas Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+          {plazas.map((plaza) => (
+            <div key={plaza.id} className="group bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-700 overflow-hidden card-hover">
+              {/* Card Header */}
+              <div className="bg-gradient-to-r from-gray-700 to-gray-600 px-6 py-4 border-b border-gray-700">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center flex-1">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
+                        <MapPinIcon className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="ml-4 flex-1 min-w-0">
+                      <h3 className="text-lg font-bold text-white truncate font-serif">
+                        {plaza.name}
+                      </h3>
+                      <p className="text-sm text-gray-300 mt-1 line-clamp-2">
+                        {plaza.location}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-shrink-0">
+                    {getStatusBadge(plaza.status)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Body */}
+              <div className="px-6 py-5">
+                <div className="space-y-4">
+                  {/* Today's Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-green-900/20 rounded-xl p-4 border border-green-700/50">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                            <ClockIcon className="h-4 w-4 text-white" />
+                          </div>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-xs font-medium text-green-300 uppercase tracking-wide">Transactions</p>
+                          <p className="text-lg font-bold text-green-100">{plaza.todayTransactions}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-900/20 rounded-xl p-4 border border-blue-700/50">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                            <CurrencyDollarIcon className="h-4 w-4 text-white" />
+                          </div>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-xs font-medium text-blue-300 uppercase tracking-wide">Revenue</p>
+                          <p className="text-lg font-bold text-blue-100">{plaza.todayRevenue.toFixed(4)} ETH</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Operators */}
+                  <div className="bg-gray-700/50 rounded-xl p-4 border border-gray-600">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 bg-gray-500 rounded-lg flex items-center justify-center">
+                          <UsersIcon className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-xs font-medium text-gray-300 uppercase tracking-wide">Assigned Operators</p>
+                        <p className="text-lg font-bold text-white">{plaza.assignedOperators.length}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Footer */}
+              <div className="px-6 py-4 bg-gray-700/50 border-t border-gray-600">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-gray-400 font-medium">
+                    Created {format(new Date(plaza.createdAt), 'MMM d, yyyy')}
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleViewPlaza(plaza)}
+                      className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
+                      title="View Details"
+                    >
+                      <EyeIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEditPlaza(plaza)}
+                      className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20 rounded-lg transition-colors duration-200"
+                      title="Edit Plaza"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeletePlaza(plaza.id)}
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-colors duration-200"
+                      title="Delete Plaza"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {plazas.length === 0 && (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+              <MapPinIcon className="h-12 w-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">No plazas found</h3>
+            <p className="text-gray-400 mb-6">Get started by creating your first toll plaza.</p>
+            <button
+              onClick={() => {
+                setShowModal(true);
+                setIsEditing(false);
+                setSelectedPlaza(null);
+                reset();
+              }}
+              className="inline-flex items-center px-6 py-3 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-200"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              Add Your First Plaza
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Plaza Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  {isEditing ? 'Edit Plaza' : selectedPlaza ? 'Plaza Details' : 'Add New Plaza'}
-                </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto modal-scroll border border-gray-700">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-gray-700 to-gray-600 px-6 py-4 border-b border-gray-700 rounded-t-2xl">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-2xl font-bold text-white font-serif">
+                    {isEditing ? 'Edit Plaza' : selectedPlaza ? 'Plaza Details' : 'Add New Plaza'}
+                  </h3>
+                  <p className="text-sm text-gray-300 mt-1">
+                    {isEditing ? 'Update plaza information' : selectedPlaza ? 'View plaza details' : 'Create a new toll plaza'}
+                  </p>
+                </div>
                 <button
                   onClick={() => {
                     setShowModal(false);
@@ -430,45 +555,48 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                     setIsEditing(false);
                     reset();
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-600 rounded-lg transition-colors duration-200"
                 >
                   <XCircleIcon className="h-6 w-6" />
                 </button>
               </div>
+            </div>
 
+            {/* Modal Body */}
+            <div className="p-6">
               {isEditing || !selectedPlaza ? (
-                <form onSubmit={handleSubmit(isEditing ? handleUpdatePlaza : handleCreatePlaza)} className="space-y-6 bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit(isEditing ? handleUpdatePlaza : handleCreatePlaza)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">Plaza Name</label>
+                      <label className="block text-sm font-semibold text-gray-200 mb-3">Plaza Name</label>
                       <input
                         {...register('name', { required: 'Plaza name is required' })}
                         type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-500"
+                        className="w-full px-4 py-3 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white placeholder-gray-400 transition-all duration-200 input-focus"
                         placeholder="Enter plaza name"
                       />
                       {errors.name && (
-                        <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+                        <p className="mt-2 text-sm text-red-400 font-medium">{errors.name.message}</p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">Location</label>
+                      <label className="block text-sm font-semibold text-gray-200 mb-3">Location</label>
                       <input
                         {...register('location', { required: 'Location is required' })}
                         type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-500"
+                        className="w-full px-4 py-3 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white placeholder-gray-400 transition-all duration-200 input-focus"
                         placeholder="Enter location"
                       />
                       {errors.location && (
-                        <p className="mt-1 text-sm text-red-600">{errors.location.message}</p>
+                        <p className="mt-2 text-sm text-red-400 font-medium">{errors.location.message}</p>
                       )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">Latitude</label>
+                      <label className="block text-sm font-semibold text-gray-200 mb-3">Latitude</label>
                       <input
                         {...register('coordinates.lat', { 
                           required: 'Latitude is required',
@@ -478,16 +606,16 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                         })}
                         type="number"
                         step="any"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-500"
+                        className="w-full px-4 py-3 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white placeholder-gray-400 transition-all duration-200 input-focus"
                         placeholder="0.000000"
                       />
                       {errors.coordinates?.lat && (
-                        <p className="mt-1 text-sm text-red-600">{errors.coordinates.lat.message}</p>
+                        <p className="mt-2 text-sm text-red-400 font-medium">{errors.coordinates.lat.message}</p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">Longitude</label>
+                      <label className="block text-sm font-semibold text-gray-200 mb-3">Longitude</label>
                       <input
                         {...register('coordinates.lng', { 
                           required: 'Longitude is required',
@@ -497,20 +625,20 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                         })}
                         type="number"
                         step="any"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-500"
+                        className="w-full px-4 py-3 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white placeholder-gray-400 transition-all duration-200 input-focus"
                         placeholder="0.000000"
                       />
                       {errors.coordinates?.lng && (
-                        <p className="mt-1 text-sm text-red-600">{errors.coordinates.lng.message}</p>
+                        <p className="mt-2 text-sm text-red-400 font-medium">{errors.coordinates.lng.message}</p>
                       )}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-2">Status</label>
+                    <label className="block text-sm font-semibold text-gray-200 mb-2">Status</label>
                     <select
                       {...register('status')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
                     >
                       <option value="active">Active</option>
                       <option value="maintenance">Maintenance</option>
@@ -520,30 +648,30 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">Operating Hours Start</label>
+                      <label className="block text-sm font-semibold text-gray-200 mb-2">Operating Hours Start</label>
                       <input
                         {...register('operatingHours.start')}
                         type="time"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">Operating Hours End</label>
+                      <label className="block text-sm font-semibold text-gray-200 mb-2">Operating Hours End</label>
                       <input
                         {...register('operatingHours.end')}
                         type="time"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-3">Toll Rates (ETH)</label>
+                    <label className="block text-sm font-semibold text-gray-200 mb-3">Toll Rates (ETH)</label>
                     <div className="grid grid-cols-2 gap-4">
                       {vehicleTypes.map((type) => (
                         <div key={type}>
-                          <label className="block text-xs text-gray-600 mb-1 capitalize">{type}</label>
+                          <label className="block text-xs text-gray-300 mb-1 capitalize">{type}</label>
                           <input
                             {...register(`tollRates.${type}` as any, { 
                               required: `Rate for ${type} is required`,
@@ -553,7 +681,7 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                             type="number"
                             step="0.0001"
                             min="0"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-500"
+                            className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white placeholder-gray-400"
                             placeholder="0.0000"
                           />
                         </div>
@@ -562,17 +690,17 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-3">Assigned Operators</label>
-                    <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-md p-3 bg-gray-50">
+                    <label className="block text-sm font-semibold text-gray-200 mb-3">Assigned Operators</label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-600 rounded-md p-3 bg-gray-700">
                       {operators.map((operator) => (
-                        <label key={operator.id} className="flex items-center hover:bg-white hover:shadow-sm rounded p-2 transition-colors">
+                        <label key={operator.id} className="flex items-center hover:bg-gray-600 hover:shadow-sm rounded p-2 transition-colors">
                           <input
                             {...register('assignedOperators')}
                             type="checkbox"
                             value={operator.id}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-500 rounded bg-gray-700"
                           />
-                          <span className="ml-2 text-sm text-gray-700 font-medium">
+                          <span className="ml-2 text-sm text-gray-200 font-medium">
                             {operator.name} ({operator.email})
                           </span>
                         </label>
@@ -580,7 +708,7 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                     </div>
                   </div>
 
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                  <div className="flex justify-end space-x-4 pt-6 border-t border-gray-700">
                     <button
                       type="button"
                       onClick={() => {
@@ -589,13 +717,13 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                         setIsEditing(false);
                         reset();
                       }}
-                      className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                      className="px-6 py-3 border border-gray-600 rounded-xl text-sm font-semibold text-gray-300 hover:bg-gray-700 hover:border-gray-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="px-6 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 shadow-lg"
                     >
                       {isEditing ? 'Update Plaza' : 'Create Plaza'}
                     </button>
@@ -605,54 +733,54 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Name</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedPlaza.name}</p>
+                      <label className="block text-sm font-medium text-gray-300">Name</label>
+                      <p className="mt-1 text-sm text-white">{selectedPlaza.name}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Status</label>
+                      <label className="block text-sm font-medium text-gray-300">Status</label>
                       <div className="mt-1">{getStatusBadge(selectedPlaza.status)}</div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Location</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedPlaza.location}</p>
+                    <label className="block text-sm font-medium text-gray-300">Location</label>
+                    <p className="mt-1 text-sm text-white">{selectedPlaza.location}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Coordinates</label>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <label className="block text-sm font-medium text-gray-300">Coordinates</label>
+                      <p className="mt-1 text-sm text-white">
                         {selectedPlaza.coordinates.lat}, {selectedPlaza.coordinates.lng}
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Operating Hours</label>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <label className="block text-sm font-medium text-gray-300">Operating Hours</label>
+                      <p className="mt-1 text-sm text-white">
                         {selectedPlaza.operatingHours.start} - {selectedPlaza.operatingHours.end}
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Toll Rates</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Toll Rates</label>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.entries(selectedPlaza.tollRates).map(([type, rate]) => (
                         <div key={type} className="flex justify-between text-sm">
-                          <span className="capitalize">{type}:</span>
-                          <span className="font-medium">${rate.toFixed(2)}</span>
+                          <span className="capitalize text-gray-300">{type}:</span>
+                          <span className="font-medium text-white">${rate.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Operators</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Assigned Operators</label>
                     <div className="space-y-1">
                       {selectedPlaza.assignedOperators.map((operatorId) => {
                         const operator = operators.find(op => op.id === operatorId);
                         return operator ? (
-                          <div key={operatorId} className="text-sm text-gray-900">
+                          <div key={operatorId} className="text-sm text-white">
                             {operator.name} ({operator.email})
                           </div>
                         ) : null;
@@ -666,7 +794,7 @@ export const PlazaManagement: React.FC<PlazaManagementProps> = ({ socket }) => {
                         setShowModal(false);
                         setSelectedPlaza(null);
                       }}
-                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700"
                     >
                       Close
                     </button>

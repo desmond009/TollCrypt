@@ -9,6 +9,7 @@ export declare class SocketService {
     emitToUser(userId: string, event: string, data: any): void;
     emitToRole(role: string, event: string, data: any): void;
     broadcastNewTransaction(transaction: any): Promise<void>;
+    broadcastTransactionStatusUpdate(transactionId: string, newStatus: string, oldStatus: string): Promise<void>;
     broadcastVehicleRegistration(vehicle: any): Promise<void>;
     broadcastVehicleBlacklist(vehicle: any, isBlacklisted: boolean): Promise<void>;
     broadcastSystemAlert(title: string, message: string, priority?: 'low' | 'medium' | 'high' | 'critical'): Promise<void>;
