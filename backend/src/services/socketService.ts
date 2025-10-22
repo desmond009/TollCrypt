@@ -140,11 +140,50 @@ export class SocketService {
       });
       await notification.save();
 
-      // Emit to all admins
+      // Emit to all admins with multiple event types for compatibility
       this.emitToAdmins('transaction:new', populatedTransaction);
+      this.emitToAdmins('new_transaction', populatedTransaction);
+      this.emitToAdmins('toll_payment_completed', populatedTransaction);
       this.emitToAdmins('notification:new', notification);
     } catch (error) {
       console.error('Error broadcasting new transaction:', error);
+    }
+  }
+
+  // Broadcast transaction status update
+  public async broadcastTransactionStatusUpdate(transactionId: string, newStatus: string, oldStatus: string) {
+    try {
+      const transaction = await TollTransaction.findById(transactionId)
+        .populate('vehicleId', 'vehicleId vehicleType owner')
+        .lean();
+
+      if (!transaction) return;
+
+      // Create notification
+      const notification = new Notification({
+        type: 'transaction',
+        title: 'Transaction Status Updated',
+        message: `Transaction ${transaction.transactionId} status changed from ${oldStatus} to ${newStatus}`,
+        recipientRole: 'admin',
+        priority: 'medium',
+        metadata: {
+          transactionId: transaction._id,
+          oldStatus,
+          newStatus
+        }
+      });
+      await notification.save();
+
+      // Emit to all admins
+      this.emitToAdmins('transaction_status_updated', {
+        transactionId: transaction._id,
+        transaction,
+        oldStatus,
+        newStatus
+      });
+      this.emitToAdmins('notification:new', notification);
+    } catch (error) {
+      console.error('Error broadcasting transaction status update:', error);
     }
   }
 

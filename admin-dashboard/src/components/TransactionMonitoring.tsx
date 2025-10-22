@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { api } from '../services/api';
 
 interface Transaction {
   _id: string;
@@ -13,6 +14,8 @@ interface Transaction {
   timestamp: string;
   blockchainTxHash?: string;
   blockNumber?: number;
+  tollLocation?: string;
+  gasUsed?: number;
 }
 
 export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ socket }) => {
@@ -22,9 +25,11 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalTransactions, setTotalTransactions] = useState(0);
 
   const fetchTransactions = useCallback(async () => {
     try {
+      setIsLoading(true);
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: '20',
@@ -32,24 +37,24 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
         ...(statusFilter !== 'all' && { status: statusFilter })
       });
 
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/admin/transactions?${params}`
-      );
-      const data = await response.json();
+      const response = await api.get(`/api/admin/transactions?${params}`);
+      const data = response.data;
       
-      // Handle both success and error responses
       if (data.success !== false) {
         setTransactions(data.transactions || []);
         setTotalPages(data.totalPages || 1);
+        setTotalTransactions(data.total || 0);
       } else {
         console.error('API Error:', data.message);
         setTransactions([]);
         setTotalPages(1);
+        setTotalTransactions(0);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setTransactions([]);
       setTotalPages(1);
+      setTotalTransactions(0);
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +63,43 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
+
+  // Real-time updates via socket
+  useEffect(() => {
+    if (socket) {
+      // Listen for new transactions
+      socket.on('new_transaction', (data: any) => {
+        console.log('New transaction received:', data);
+        // Refresh transactions to show the new one
+        fetchTransactions();
+      });
+
+      // Listen for transaction status updates
+      socket.on('transaction_status_updated', (data: any) => {
+        console.log('Transaction status updated:', data);
+        // Update the specific transaction in the list
+        setTransactions(prev => 
+          prev.map(tx => 
+            tx._id === data.transactionId 
+              ? { ...tx, status: data.newStatus }
+              : tx
+          )
+        );
+      });
+
+      // Listen for toll payment completion
+      socket.on('toll_payment_completed', (data: any) => {
+        console.log('Toll payment completed:', data);
+        fetchTransactions();
+      });
+
+      return () => {
+        socket.off('new_transaction');
+        socket.off('transaction_status_updated');
+        socket.off('toll_payment_completed');
+      };
+    }
+  }, [socket, fetchTransactions]);
 
   const handleStatusUpdate = async (transactionId: string, newStatus: string) => {
     try {
@@ -116,11 +158,21 @@ export const TransactionMonitoring: React.FC<{ socket: Socket | null }> = ({ soc
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Transaction Monitoring</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Monitor and manage toll transactions
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Transaction Monitoring</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Monitor and manage toll transactions • {totalTransactions} total transactions
+          </p>
+        </div>
+        <button
+          onClick={fetchTransactions}
+          disabled={isLoading}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+        >
+          <ArrowPathIcon className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </button>
       </div>
 
       {/* Filters */}

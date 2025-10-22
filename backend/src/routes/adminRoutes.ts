@@ -201,30 +201,84 @@ router.get('/vehicles', async (req, res) => {
 // Get all transactions (admin view)
 router.get('/transactions', async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, vehicleId, payer } = req.query;
+    const { page = 1, limit = 20, status, search } = req.query;
     
     let query: any = {};
     
+    // Apply status filter
     if (status) query.status = status;
-    if (vehicleId) query.vehicleId = vehicleId;
-    if (payer) query.payer = { $regex: payer, $options: 'i' };
+    
+    // Apply search filter
+    if (search) {
+      // First, try to find vehicles that match the search term
+      const Vehicle = require('../models/Vehicle').Vehicle;
+      const matchingVehicles = await Vehicle.find({
+        $or: [
+          { vehicleId: { $regex: search, $options: 'i' } },
+          { vehicleType: { $regex: search, $options: 'i' } }
+        ]
+      }).select('_id');
+      
+      const vehicleIds = matchingVehicles.map((v: any) => v._id);
+      
+      query.$or = [
+        { transactionId: { $regex: search, $options: 'i' } },
+        { payer: { $regex: search, $options: 'i' } },
+        { blockchainTxHash: { $regex: search, $options: 'i' } },
+        { tollLocation: { $regex: search, $options: 'i' } },
+        ...(vehicleIds.length > 0 ? [{ vehicleId: { $in: vehicleIds } }] : [])
+      ];
+    }
     
     const transactions = await TollTransaction.find(query)
+      .populate('vehicleId', 'vehicleId vehicleType')
       .sort({ timestamp: -1 })
       .limit(Number(limit) * 1)
       .skip((Number(page) - 1) * Number(limit));
     
     const total = await TollTransaction.countDocuments(query);
     
+    // Transform transactions for better display
+    const transformedTransactions = transactions.map(tx => {
+      // Handle populated vehicleId properly
+      const vehicleData = tx.vehicleId as any;
+      const vehicleId = vehicleData?.vehicleId || 'Unknown';
+      const vehicleType = vehicleData?.vehicleType || 'Unknown';
+      
+      return {
+        _id: tx._id,
+        transactionId: tx.transactionId,
+        vehicleId: vehicleId,
+        vehicleType: vehicleType,
+        payer: tx.payer,
+        amount: tx.amount || 0,
+        currency: tx.currency || 'ETH',
+        status: tx.status,
+        timestamp: tx.timestamp || tx.createdAt,
+        blockchainTxHash: tx.blockchainTxHash,
+        blockNumber: tx.blockNumber,
+        tollLocation: tx.tollLocation,
+        gasUsed: tx.gasUsed,
+        zkProofHash: tx.zkProofHash,
+        processedAt: tx.processedAt,
+        metadata: tx.metadata || {}
+      };
+    });
+    
     res.json({
-      transactions,
+      success: true,
+      transactions: transformedTransactions,
       totalPages: Math.ceil(total / Number(limit)),
       currentPage: Number(page),
-      total
+      total,
+      limit: Number(limit)
     });
   } catch (error) {
     console.error('Error fetching transactions:', error);
-    res.status(500).json({ error: 'Failed to fetch transactions' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch transactions' 
+    });
   }
 });
 
@@ -750,6 +804,293 @@ router.get('/transactions/recent', async (req, res) => {
     });
   }
 });
+
+// Main analytics endpoint (for AnalyticsReporting component)
+router.get('/analytics', async (req, res) => {
+  try {
+    const { startDate, endDate, plazaId, vehicleType, reportType = 'revenue' } = req.query;
+    
+    // Parse dates
+    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+    const end = endDate ? new Date(endDate as string) : new Date();
+    
+    // Build base query
+    let baseQuery: any = {
+      timestamp: { $gte: start, $lte: end },
+      status: 'confirmed'
+    };
+    
+    // Add plaza filter if specified
+    if (plazaId) {
+      baseQuery.tollLocation = { $regex: plazaId, $options: 'i' };
+    }
+    
+    // Get transactions with vehicle data
+    const transactions = await TollTransaction.find(baseQuery)
+      .populate('vehicleId', 'vehicleId vehicleType')
+      .lean();
+    
+    // Filter by vehicle type if specified
+    let filteredTransactions = transactions;
+    if (vehicleType) {
+      filteredTransactions = transactions.filter(tx => 
+        tx.vehicleId && (tx.vehicleId as any).vehicleType === vehicleType
+      );
+    }
+    
+    // Calculate analytics data based on report type
+    let analyticsData: any = {};
+    
+    switch (reportType) {
+      case 'revenue':
+        analyticsData = {
+          revenue: {
+            total: filteredTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0),
+            daily: calculateDailyRevenue(filteredTransactions, start, end),
+            byPlaza: calculateRevenueByPlaza(filteredTransactions),
+            byVehicleType: calculateRevenueByVehicleType(filteredTransactions),
+            growth: calculateGrowthRate(filteredTransactions, start, end)
+          }
+        };
+        break;
+        
+      case 'transactions':
+        analyticsData = {
+          transactions: {
+            total: filteredTransactions.length,
+            daily: calculateDailyTransactions(filteredTransactions, start, end),
+            successRate: calculateSuccessRate(filteredTransactions),
+            averageAmount: calculateAverageAmount(filteredTransactions),
+            peakHours: calculatePeakHours(filteredTransactions)
+          }
+        };
+        break;
+        
+      case 'vehicles':
+        analyticsData = {
+          vehicles: {
+            total: await Vehicle.countDocuments(),
+            newRegistrations: await calculateNewRegistrations(start, end),
+            byType: await calculateVehiclesByType(),
+            blacklisted: await Vehicle.countDocuments({ isBlacklisted: true }),
+            active: await Vehicle.countDocuments({ isActive: true })
+          }
+        };
+        break;
+        
+      case 'performance':
+        analyticsData = {
+          performance: {
+            averageWaitTime: calculateAverageWaitTime(filteredTransactions),
+            plazaPerformance: calculatePlazaPerformance(filteredTransactions),
+            systemUptime: 99.9, // Mock data
+            errorRate: calculateErrorRate(filteredTransactions)
+          }
+        };
+        break;
+        
+      default:
+        // Return all analytics
+        analyticsData = {
+          revenue: {
+            total: filteredTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0),
+            daily: calculateDailyRevenue(filteredTransactions, start, end),
+            byPlaza: calculateRevenueByPlaza(filteredTransactions),
+            byVehicleType: calculateRevenueByVehicleType(filteredTransactions),
+            growth: calculateGrowthRate(filteredTransactions, start, end)
+          },
+          transactions: {
+            total: filteredTransactions.length,
+            daily: calculateDailyTransactions(filteredTransactions, start, end),
+            successRate: calculateSuccessRate(filteredTransactions),
+            averageAmount: calculateAverageAmount(filteredTransactions),
+            peakHours: calculatePeakHours(filteredTransactions)
+          },
+          vehicles: {
+            total: await Vehicle.countDocuments(),
+            newRegistrations: await calculateNewRegistrations(start, end),
+            byType: await calculateVehiclesByType(),
+            blacklisted: await Vehicle.countDocuments({ isBlacklisted: true }),
+            active: await Vehicle.countDocuments({ isActive: true })
+          },
+          performance: {
+            averageWaitTime: calculateAverageWaitTime(filteredTransactions),
+            plazaPerformance: calculatePlazaPerformance(filteredTransactions),
+            systemUptime: 99.9,
+            errorRate: calculateErrorRate(filteredTransactions)
+          }
+        };
+    }
+    
+    res.json({
+      success: true,
+      data: analyticsData
+    });
+    
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch analytics data' 
+    });
+  }
+});
+
+// Helper functions for analytics calculations
+function calculateDailyRevenue(transactions: any[], start: Date, end: Date) {
+  const dailyData: { [key: string]: number } = {};
+  
+  // Initialize all days in range
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateKey = d.toISOString().split('T')[0];
+    dailyData[dateKey] = 0;
+  }
+  
+  // Sum revenue by day
+  transactions.forEach(tx => {
+    const dateKey = new Date(tx.timestamp).toISOString().split('T')[0];
+    if (dailyData[dateKey] !== undefined) {
+      dailyData[dateKey] += tx.amount || 0;
+    }
+  });
+  
+  return Object.entries(dailyData).map(([date, amount]) => ({ date, amount }));
+}
+
+function calculateDailyTransactions(transactions: any[], start: Date, end: Date) {
+  const dailyData: { [key: string]: number } = {};
+  
+  // Initialize all days in range
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateKey = d.toISOString().split('T')[0];
+    dailyData[dateKey] = 0;
+  }
+  
+  // Count transactions by day
+  transactions.forEach(tx => {
+    const dateKey = new Date(tx.timestamp).toISOString().split('T')[0];
+    if (dailyData[dateKey] !== undefined) {
+      dailyData[dateKey]++;
+    }
+  });
+  
+  return Object.entries(dailyData).map(([date, count]) => ({ date, count }));
+}
+
+function calculateRevenueByPlaza(transactions: any[]) {
+  const plazaData: { [key: string]: number } = {};
+  
+  transactions.forEach(tx => {
+    const plaza = tx.tollLocation || 'Unknown';
+    plazaData[plaza] = (plazaData[plaza] || 0) + (tx.amount || 0);
+  });
+  
+  return Object.entries(plazaData).map(([plaza, amount]) => ({ plaza, amount }));
+}
+
+function calculateRevenueByVehicleType(transactions: any[]) {
+  const typeData: { [key: string]: number } = {};
+  
+  transactions.forEach(tx => {
+    const vehicleType = (tx.vehicleId as any)?.vehicleType || 'Unknown';
+    typeData[vehicleType] = (typeData[vehicleType] || 0) + (tx.amount || 0);
+  });
+  
+  return Object.entries(typeData).map(([type, amount]) => ({ type, amount }));
+}
+
+function calculateGrowthRate(transactions: any[], start: Date, end: Date) {
+  const midPoint = new Date(start.getTime() + (end.getTime() - start.getTime()) / 2);
+  
+  const firstHalf = transactions.filter(tx => new Date(tx.timestamp) < midPoint);
+  const secondHalf = transactions.filter(tx => new Date(tx.timestamp) >= midPoint);
+  
+  const firstHalfRevenue = firstHalf.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  const secondHalfRevenue = secondHalf.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  
+  if (firstHalfRevenue === 0) return 0;
+  return ((secondHalfRevenue - firstHalfRevenue) / firstHalfRevenue) * 100;
+}
+
+function calculateSuccessRate(transactions: any[]) {
+  const total = transactions.length;
+  const successful = transactions.filter(tx => tx.status === 'confirmed').length;
+  return total > 0 ? (successful / total) * 100 : 0;
+}
+
+function calculateAverageAmount(transactions: any[]) {
+  const total = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  return transactions.length > 0 ? total / transactions.length : 0;
+}
+
+function calculatePeakHours(transactions: any[]) {
+  const hourData: { [key: number]: number } = {};
+  
+  transactions.forEach(tx => {
+    const hour = new Date(tx.timestamp).getHours();
+    hourData[hour] = (hourData[hour] || 0) + 1;
+  });
+  
+  return Object.entries(hourData).map(([hour, count]) => ({ 
+    hour: parseInt(hour), 
+    count 
+  })).sort((a, b) => b.count - a.count);
+}
+
+function calculateAverageWaitTime(transactions: any[]) {
+  // Mock calculation - in real implementation, this would be based on actual wait times
+  return 2.5; // minutes
+}
+
+function calculatePlazaPerformance(transactions: any[]) {
+  const plazaData: { [key: string]: any } = {};
+  
+  transactions.forEach(tx => {
+    const plaza = tx.tollLocation || 'Unknown';
+    if (!plazaData[plaza]) {
+      plazaData[plaza] = {
+        plaza,
+        transactions: 0,
+        revenue: 0,
+        waitTime: 2.5, // Mock data
+        successRate: 95 // Mock data
+      };
+    }
+    plazaData[plaza].transactions++;
+    plazaData[plaza].revenue += tx.amount || 0;
+  });
+  
+  return Object.values(plazaData);
+}
+
+function calculateErrorRate(transactions: any[]) {
+  const total = transactions.length;
+  const failed = transactions.filter(tx => tx.status === 'failed').length;
+  return total > 0 ? (failed / total) * 100 : 0;
+}
+
+async function calculateNewRegistrations(start: Date, end: Date) {
+  const registrations = await Vehicle.find({
+    registrationTime: { $gte: start, $lte: end }
+  });
+  
+  const dailyData: { [key: string]: number } = {};
+  
+  registrations.forEach(vehicle => {
+    const dateKey = vehicle.registrationTime.toISOString().split('T')[0];
+    dailyData[dateKey] = (dailyData[dateKey] || 0) + 1;
+  });
+  
+  return Object.entries(dailyData).map(([date, count]) => ({ date, count }));
+}
+
+async function calculateVehiclesByType() {
+  const typeData = await Vehicle.aggregate([
+    { $group: { _id: '$vehicleType', count: { $sum: 1 } } }
+  ]);
+  
+  return typeData.map(item => ({ type: item._id, count: item.count }));
+}
 
 // Revenue analytics endpoint
 router.get('/analytics/revenue', async (req, res) => {
