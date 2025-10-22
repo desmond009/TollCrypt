@@ -936,65 +936,32 @@ class BlockchainService {
         console.warn('⚠️ This might cause the transaction to fail if the wallet is not already authorized');
       }
 
-      // Check if user has a TopUpWallet using the factory
-      console.log('🔍 Checking if user has TopUpWallet...');
+      // Check if the provided wallet address is a valid top-up wallet
+      console.log('🔍 Checking if provided address is a valid top-up wallet...');
       let hasTopUpWallet = false;
-      let topUpWalletAddress = '';
+      let topUpWalletAddress = walletAddress; // The walletAddress from QR is already the top-up wallet
       
       try {
-        if (this.topUpWalletFactory) {
-          console.log('🏭 TopUpWalletFactory is available, checking user wallet...');
+        if (this.tollContract) {
+          console.log('🏭 TollContract is available, checking wallet authorization...');
           
-          // Add timeout for the contract call
-          const hasWalletPromise = this.topUpWalletFactory.hasTopUpWallet(walletAddress);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('hasTopUpWallet call timeout')), 10000)
-          );
+          // Check if this wallet address is authorized as a top-up wallet
+          const isAuthorized = await this.tollContract.isTopUpWalletAuthorized(walletAddress);
+          console.log('📊 Is TopUpWallet Authorized:', isAuthorized);
           
-          hasTopUpWallet = await Promise.race([hasWalletPromise, timeoutPromise]) as boolean;
-          console.log('📊 Has TopUpWallet:', hasTopUpWallet);
-          
-          if (hasTopUpWallet) {
-            // Get the top-up wallet address
-            const walletAddressPromise = this.topUpWalletFactory.getUserTopUpWallet(walletAddress);
-            const walletTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('getUserTopUpWallet call timeout')), 10000)
-            );
-            
-            topUpWalletAddress = await Promise.race([walletAddressPromise, walletTimeoutPromise]) as string;
-            console.log('📍 TopUpWallet Address:', topUpWalletAddress);
-            
-            if (topUpWalletAddress === '0x0000000000000000000000000000000000000000') {
-              console.warn('⚠️ TopUpWallet address is zero, falling back to direct payment');
-              hasTopUpWallet = false;
-            }
+          if (isAuthorized) {
+            hasTopUpWallet = true;
+            console.log('✅ Valid authorized top-up wallet found:', walletAddress);
           } else {
-            // Try to create a TopUpWallet for the user if it doesn't exist
-            console.log('🔄 User does not have TopUpWallet, attempting to create one...');
-            try {
-              const createResult = await this.createAndAuthorizeTopUpWallet(walletAddress);
-              if (createResult.success) {
-                console.log('✅ TopUpWallet created and authorized successfully');
-                hasTopUpWallet = true;
-                topUpWalletAddress = createResult.walletAddress || walletAddress;
-              } else {
-                console.warn('⚠️ Failed to create TopUpWallet:', createResult.error);
-                hasTopUpWallet = false;
-              }
-            } catch (createError: any) {
-              console.error('❌ TopUpWallet creation failed:', createError);
-              hasTopUpWallet = false;
-            }
+            console.log('⚠️ Wallet address is not authorized as top-up wallet');
+            hasTopUpWallet = false;
           }
         } else {
-          console.warn('⚠️ TopUpWalletFactory not available, assuming no TopUpWallet');
+          console.warn('⚠️ TollContract not available, cannot verify top-up wallet');
           hasTopUpWallet = false;
         }
-      } catch (walletCheckError: any) {
-        console.error('❌ Failed to check TopUpWallet status:', walletCheckError);
-        
-        // If the call fails, we'll assume no TopUpWallet and use direct payment
-        console.log('🔄 Falling back to direct payment method');
+      } catch (error: any) {
+        console.error('❌ Failed to check top-up wallet authorization:', error);
         hasTopUpWallet = false;
       }
       
