@@ -8,6 +8,15 @@ const CHAIN_ID = 11155111; // Ethereum Sepolia
 // Contract addresses (updated with actual deployed addresses from Sepolia)
 const TOLL_COLLECTION_CONTRACT = process.env.REACT_APP_TOLL_CONTRACT_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0xE5f4743CF4726A7f58E0ccBB5888f1507E5aeF9d'; // TopUp TollCollection contract
 const USDC_CONTRACT = process.env.REACT_APP_USDC_CONTRACT_ADDRESS || '0xe2DF4Ef71b9B0fc155c2817Df93eb04b4C590720'; // Sepolia Mock USDC
+const TOPUP_WALLET_FACTORY = process.env.REACT_APP_TOPUP_WALLET_FACTORY_ADDRESS || '0x3Bd98A2a16EfEa3B40B0d5F8a2E16613b625d9aA'; // TopUpWalletFactory
+
+// Debug logging for contract addresses
+console.log('🔧 Contract Configuration:');
+console.log('  - REACT_APP_TOLL_CONTRACT_ADDRESS:', process.env.REACT_APP_TOLL_CONTRACT_ADDRESS);
+console.log('  - REACT_APP_CONTRACT_ADDRESS:', process.env.REACT_APP_CONTRACT_ADDRESS);
+console.log('  - Final TOLL_COLLECTION_CONTRACT:', TOLL_COLLECTION_CONTRACT);
+console.log('  - REACT_APP_USDC_CONTRACT_ADDRESS:', process.env.REACT_APP_USDC_CONTRACT_ADDRESS);
+console.log('  - Final USDC_CONTRACT:', USDC_CONTRACT);
 
 
 // ABI for TollCollection contract
@@ -20,6 +29,8 @@ const TOLL_COLLECTION_ABI = [
   'function hasUserTopUpWallet(address user) external view returns (bool hasWallet)',
   'function getUserTopUpWalletBalance(address user) external view returns (uint256 balance)',
   'function isTopUpWalletAuthorized(address topUpWallet) external view returns (bool isAuthorized)',
+  'function authorizeTopUpWalletFromFactory(address topUpWallet) external',
+  'function setTopUpWalletAuthorization(address topUpWallet, bool isAuthorized) external',
   'event TollPaid(address indexed payer, string indexed vehicleId, uint256 amount, uint256 tollId, bytes32 zkProofHash, uint256 timestamp)',
   'event TopUpWalletPaymentProcessed(address indexed topUpWallet, string indexed vehicleId, uint256 amount, uint256 tollId, bytes32 zkProofHash, uint256 timestamp)',
 ];
@@ -31,6 +42,29 @@ const USDC_ABI = [
   'function transferFrom(address from, address to, uint256 amount) external returns (bool)',
   'function allowance(address owner, address spender) external view returns (uint256)',
   'function decimals() external view returns (uint8)',
+];
+
+// ABI for TopUpWallet contract
+const TOPUP_WALLET_ABI = [
+  'function getBalance() external view returns (uint256)',
+  'function getWalletStats() external view returns (uint256 totalTopUpsAmount, uint256 totalTollPaymentsAmount, uint256 totalWithdrawalsAmount, uint256 currentBalance)',
+  'function isInitialized() external view returns (bool)',
+  'function authorizedTollContracts(address) external view returns (bool)',
+  'function processTollPayment(uint256 amount, string memory vehicleId, bytes32 zkProofHash) external',
+  'function topUp(bytes memory signature) external payable',
+  'function withdraw(uint256 amount, bytes memory signature) external',
+  'function emergencyWithdraw(uint256 amount) external',
+  'function pause() external',
+  'function unpause() external',
+];
+
+// ABI for TopUpWalletFactory contract
+const TOPUP_WALLET_FACTORY_ABI = [
+  'function createTopUpWallet(address user) external returns (address walletAddress)',
+  'function getUserTopUpWallet(address user) external view returns (address walletAddress)',
+  'function hasTopUpWallet(address user) external view returns (bool hasWallet)',
+  'function getAllUserWallets(address user) external view returns (address[] memory wallets)',
+  'function getWalletCount() external view returns (uint256 count)',
 ];
 
 export interface VehicleRegistration {
@@ -65,6 +99,7 @@ class BlockchainService {
   private provider: ethers.BrowserProvider | ethers.JsonRpcProvider | null = null;
   private tollContract: ethers.Contract | null = null;
   private usdcContract: ethers.Contract | null = null;
+  private topUpWalletFactory: ethers.Contract | null = null;
   private signer: ethers.Signer | null = null;
 
   constructor() {
@@ -72,6 +107,7 @@ class BlockchainService {
     console.log('📋 Contract Addresses:');
     console.log('  - Toll Collection:', TOLL_COLLECTION_CONTRACT);
     console.log('  - USDC Contract:', USDC_CONTRACT);
+    console.log('  - TopUp Wallet Factory:', TOPUP_WALLET_FACTORY);
     console.log('  - Network:', SEPOLIA_RPC);
     console.log('  - Chain ID:', CHAIN_ID);
     this.initializeProvider();
@@ -133,6 +169,28 @@ class BlockchainService {
         } else {
           console.warn('⚠️ Invalid or zero USDC contract address:', USDC_CONTRACT);
           this.usdcContract = null;
+        }
+
+        if (ethers.isAddress(TOPUP_WALLET_FACTORY) && TOPUP_WALLET_FACTORY !== '0x0000000000000000000000000000000000000000') {
+          try {
+            console.log('🔧 Initializing TopUp Wallet Factory at:', TOPUP_WALLET_FACTORY);
+            this.topUpWalletFactory = new ethers.Contract(
+              TOPUP_WALLET_FACTORY,
+              TOPUP_WALLET_FACTORY_ABI,
+              this.signer || this.provider
+            );
+            
+            // Test if contract exists by calling a simple view function
+            const walletCount = await this.topUpWalletFactory.getWalletCount();
+            console.log('✅ TopUp Wallet Factory initialized successfully');
+            console.log('📊 Total wallets created:', walletCount.toString());
+          } catch (contractError) {
+            console.error('❌ Failed to initialize TopUp Wallet Factory:', contractError);
+            this.topUpWalletFactory = null;
+          }
+        } else {
+          console.warn('⚠️ Invalid or zero TopUp Wallet Factory address:', TOPUP_WALLET_FACTORY);
+          this.topUpWalletFactory = null;
         }
       }
     } catch (error) {
@@ -346,31 +404,45 @@ class BlockchainService {
     }
 
     try {
-      // First, try to get ETH balance (this should always work)
-      const ethBalance = await this.provider.getBalance(walletAddress);
-      const ethInUsdc = parseFloat(ethers.formatEther(ethBalance)) * 2000; // Approximate ETH to USDC rate
+      // Try to get TopUpWallet balance first (this is the primary balance for toll payments)
+      let topUpWalletBalance: bigint = BigInt(0);
+      let topUpWalletAddress = '';
       
-      // Try to get TopUpWallet balance if contract is available
-      let topUpWalletBalance = 0;
       if (this.tollContract) {
         try {
-          // Check if the contract has the getUserTopUpWalletBalance method
-          const hasMethod = this.tollContract.interface.hasFunction('getUserTopUpWalletBalance');
-          if (hasMethod) {
-            topUpWalletBalance = await this.tollContract.getUserTopUpWalletBalance(walletAddress);
+          // Check if user has a top-up wallet
+          const hasTopUpWallet = await this.tollContract.hasUserTopUpWallet(walletAddress);
+          if (hasTopUpWallet) {
+            // Get the top-up wallet address
+            topUpWalletAddress = await this.tollContract.getUserTopUpWallet(walletAddress);
+            
+            // Get the balance from the top-up wallet
+            const topUpWalletContract = new ethers.Contract(
+              topUpWalletAddress,
+              TOPUP_WALLET_ABI,
+              this.provider
+            );
+            
+            topUpWalletBalance = await topUpWalletContract.getBalance();
+            console.log('💰 TopUp Wallet Balance:', ethers.formatEther(topUpWalletBalance), 'ETH');
           }
         } catch (contractError) {
-          console.warn('Failed to get TopUpWallet balance from contract:', contractError);
-          // Continue with just ETH balance
+          console.warn('Failed to get TopUpWallet balance:', contractError);
+          // Fallback to main wallet ETH balance
         }
       }
       
-      const totalBalance = topUpWalletBalance + ethInUsdc;
+      // If no top-up wallet or failed to get balance, use main wallet ETH balance
+      if (topUpWalletBalance === BigInt(0)) {
+        const ethBalance = await this.provider.getBalance(walletAddress);
+        topUpWalletBalance = ethBalance;
+        console.log('💰 Main Wallet Balance:', ethers.formatEther(ethBalance), 'ETH');
+      }
       
       return {
-        balance: totalBalance.toString(),
-        formattedBalance: totalBalance.toFixed(2),
-        decimals: 6, // USDC decimals
+        balance: topUpWalletBalance.toString(),
+        formattedBalance: ethers.formatEther(topUpWalletBalance),
+        decimals: 18, // ETH decimals
       };
     } catch (error) {
       console.error('Failed to get wallet balance:', error);
@@ -378,8 +450,8 @@ class BlockchainService {
       // Final fallback - return zero balance
       return {
         balance: '0',
-        formattedBalance: '0.00',
-        decimals: 6,
+        formattedBalance: '0.000000',
+        decimals: 18,
       };
     }
   }
@@ -762,11 +834,119 @@ class BlockchainService {
     }
   }
 
+  // Check if a top-up wallet is authorized for toll collection
+  async isTopUpWalletAuthorized(topUpWalletAddress: string): Promise<boolean> {
+    if (!this.tollContract) {
+      console.warn('⚠️ Toll contract not initialized');
+      return false;
+    }
+
+    try {
+      const isAuthorized = await this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
+      console.log('🔐 TopUp Wallet Authorization Status:', isAuthorized);
+      return isAuthorized;
+    } catch (error) {
+      console.error('Failed to check top-up wallet authorization:', error);
+      return false;
+    }
+  }
+
+  // Check if user's top-up wallet is authorized for automatic toll collection
+  async checkUserAuthorization(userAddress: string): Promise<{
+    hasTopUpWallet: boolean;
+    topUpWalletAddress: string;
+    isAuthorized: boolean;
+    balance: string;
+    formattedBalance: string;
+  }> {
+    try {
+      let hasTopUpWallet = false;
+      let topUpWalletAddress = '';
+      let isAuthorized = false;
+      let balance = '0';
+      let formattedBalance = '0.000000';
+
+      if (this.tollContract) {
+        // Check if user has a top-up wallet
+        hasTopUpWallet = await this.tollContract.hasUserTopUpWallet(userAddress);
+        
+        if (hasTopUpWallet) {
+          // Get the top-up wallet address
+          topUpWalletAddress = await this.tollContract.getUserTopUpWallet(userAddress);
+          
+          // Check if the top-up wallet is authorized
+          isAuthorized = await this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
+          
+          // Get the balance
+          const balanceInfo = await this.getWalletBalance(userAddress);
+          balance = balanceInfo.balance;
+          formattedBalance = balanceInfo.formattedBalance;
+        }
+      }
+
+      return {
+        hasTopUpWallet,
+        topUpWalletAddress,
+        isAuthorized,
+        balance,
+        formattedBalance
+      };
+    } catch (error) {
+      console.error('Failed to check user authorization:', error);
+      return {
+        hasTopUpWallet: false,
+        topUpWalletAddress: '',
+        isAuthorized: false,
+        balance: '0',
+        formattedBalance: '0.000000'
+      };
+    }
+  }
+
+  // Authorize a top-up wallet for toll collection (admin function)
+  async authorizeTopUpWallet(topUpWalletAddress: string): Promise<TransactionResult> {
+    if (!this.tollContract || !this.signer) {
+      throw new Error('Contract or signer not initialized');
+    }
+
+    try {
+      const tx = await this.tollContract.setTopUpWalletAuthorization(
+        topUpWalletAddress,
+        true,
+        {
+          gasLimit: 100000,
+        }
+      );
+
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 1) {
+        return {
+          success: true,
+          transactionHash: receipt.hash,
+          gasUsed: receipt.gasUsed.toString(),
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Authorization transaction failed',
+        };
+      }
+    } catch (error: any) {
+      console.error('Top-up wallet authorization failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Authorization failed',
+      };
+    }
+  }
+
   // Debug method to check contract status
-  getContractStatus(): { tollContract: boolean; usdcContract: boolean; provider: boolean; contractAddress: string } {
+  getContractStatus(): { tollContract: boolean; usdcContract: boolean; topUpWalletFactory: boolean; provider: boolean; contractAddress: string } {
     return {
       tollContract: !!this.tollContract,
       usdcContract: !!this.usdcContract,
+      topUpWalletFactory: !!this.topUpWalletFactory,
       provider: !!this.provider,
       contractAddress: TOLL_COLLECTION_CONTRACT
     };

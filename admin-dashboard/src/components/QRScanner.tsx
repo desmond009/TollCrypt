@@ -50,6 +50,8 @@ interface WalletInfo {
   formattedBalance: string;
   hasTopUpWallet: boolean;
   topUpWalletAddress: string;
+  isAuthorized: boolean;
+  userMainWallet: string;
 }
 
 export const QRScanner: React.FC<QRScannerProps> = ({
@@ -370,7 +372,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       console.log('Verifying signature for message:', message);
       console.log('Signature:', qrData.signature);
       
-      // Fix: Use ethers.verifyMessage with the original message, not the hash
+      // Fix: Use ethers.verifyMessage with the original message string, not the hash
       const recoveredAddress = ethers.verifyMessage(message, qrData.signature);
       
       console.log('Recovered address:', recoveredAddress);
@@ -436,15 +438,16 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   const fetchWalletInfo = async (walletAddress: string): Promise<WalletInfo> => {
     try {
-      const balance = await blockchainService.getWalletBalance(walletAddress);
-      const hasTopUpWallet = await blockchainService.hasUserTopUpWallet(walletAddress);
-      const topUpWalletAddress = hasTopUpWallet ? await blockchainService.getUserTopUpWallet(walletAddress) : '';
+      // Get comprehensive wallet information including authorization status
+      const authInfo = await blockchainService.checkUserAuthorization(walletAddress);
       
       return {
-        balance: balance.balance,
-        formattedBalance: balance.formattedBalance,
-        hasTopUpWallet,
-        topUpWalletAddress
+        balance: authInfo.balance,
+        formattedBalance: authInfo.formattedBalance,
+        hasTopUpWallet: authInfo.hasTopUpWallet,
+        topUpWalletAddress: authInfo.topUpWalletAddress,
+        isAuthorized: authInfo.isAuthorized,
+        userMainWallet: walletAddress // The QR code contains the top-up wallet, but we need the main wallet for display
       };
     } catch (error) {
       console.error('Error fetching wallet info:', error);
@@ -452,8 +455,38 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   };
 
+  const handleAuthorizeWallet = async () => {
+    if (!walletInfo?.topUpWalletAddress) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const result = await blockchainService.authorizeTopUpWallet(walletInfo.topUpWalletAddress);
+      
+      if (result.success) {
+        // Refresh wallet info to get updated authorization status
+        const updatedWalletInfo = await fetchWalletInfo(qrData?.walletAddress || '');
+        setWalletInfo(updatedWalletInfo);
+        
+        onError?.('Wallet authorized successfully!');
+      } else {
+        onError?.(result.error || 'Authorization failed');
+      }
+    } catch (error: any) {
+      onError?.(error.message || 'Authorization failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleCollectToll = async () => {
     if (!qrData || !vehicleDetails || !walletInfo) return;
+    
+    // Check authorization before processing
+    if (!walletInfo.isAuthorized) {
+      onError?.('Wallet is not authorized for automatic toll collection');
+      return;
+    }
     
     setIsProcessing(true);
     setCurrentStep('processing');
@@ -739,7 +772,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             </div>
             <div className="flex justify-between items-center mb-2">
               <span>Owner:</span>
-              <span className="font-bold">Anonymous</span>
+              <span className="font-bold text-blue-400">
+                {walletInfo?.userMainWallet ? 
+                  `${walletInfo.userMainWallet.slice(0, 6)}...${walletInfo.userMainWallet.slice(-4)}` : 
+                  'Loading...'
+                }
+              </span>
             </div>
             <div className="flex justify-between items-center mb-2">
               <span>Wallet Balance:</span>
@@ -756,9 +794,24 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               <span className="font-bold text-yellow-400">{tollRate} ETH</span>
             </div>
             <div className="border-t border-gray-600 pt-2 mt-2">
+              <div className="flex justify-between items-center mb-1">
+                <span>Authorization:</span>
+                <span className={`font-bold ${walletInfo?.isAuthorized ? 'text-green-400' : 'text-red-400'}`}>
+                  {walletInfo?.isAuthorized ? '✓ Authorized' : '✗ Not Authorized'}
+                </span>
+              </div>
               <div className="flex justify-between items-center">
                 <span>Status:</span>
-                <span className="text-green-400 font-bold">✓ Sufficient Balance</span>
+                <span className={`font-bold ${
+                  walletInfo && parseFloat(walletInfo.formattedBalance) >= parseFloat(tollRate) 
+                    ? 'text-green-400' 
+                    : 'text-red-400'
+                }`}>
+                  {walletInfo && parseFloat(walletInfo.formattedBalance) >= parseFloat(tollRate) 
+                    ? '✓ Sufficient Balance' 
+                    : '✗ Insufficient Balance'
+                  }
+                </span>
               </div>
             </div>
           </div>
@@ -768,13 +821,31 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         <div className="mt-6 space-y-3">
           <button
             onClick={handleCollectToll}
-            disabled={isProcessing || !walletInfo || parseFloat(walletInfo.formattedBalance) < parseFloat(tollRate)}
+            disabled={
+              isProcessing || 
+              !walletInfo || 
+              parseFloat(walletInfo.formattedBalance) < parseFloat(tollRate) ||
+              !walletInfo.isAuthorized
+            }
             className="w-full px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-lg"
           >
-            {isProcessing ? 'Processing...' : `COLLECT TOLL ${tollRate} ETH`}
+            {isProcessing ? 'Processing...' : 
+             !walletInfo?.isAuthorized ? 'Not Authorized' :
+             parseFloat(walletInfo.formattedBalance) < parseFloat(tollRate) ? 'Insufficient Balance' :
+             `COLLECT TOLL ${tollRate} ETH`
+            }
           </button>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            {!walletInfo?.isAuthorized && walletInfo?.hasTopUpWallet && (
+              <button
+                onClick={handleAuthorizeWallet}
+                disabled={isProcessing}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Authorize Wallet
+              </button>
+            )}
             <button
               onClick={() => {
                 setCurrentStep('scanning');
