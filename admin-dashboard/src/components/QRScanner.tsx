@@ -439,7 +439,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const fetchWalletInfo = async (walletAddress: string): Promise<WalletInfo> => {
     try {
       // Get comprehensive wallet information including authorization status
-      const authInfo = await blockchainService.checkUserAuthorization(walletAddress);
+      // Use the wallet address directly from QR code (top-up wallet address)
+      const authInfo = await blockchainService.checkTopUpWalletAuthorization(walletAddress);
       
       return {
         balance: authInfo.balance,
@@ -482,22 +483,25 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         
         onError?.('✅ Wallet authorized and funded successfully! Ready for toll collection.');
       } else {
-        console.log('❌ Authorization failed, trying mock authorization:', result.error);
+        console.log('❌ Authorization failed, trying original authorization flow:', result.error);
         
-        // Try mock authorization as fallback
-        const mockResult = await blockchainService.mockAuthorizeWalletForTesting(qrData.walletAddress);
+        // Try original authorization flow as fallback
+        // Get the connected wallet address as the user address
+        const userAddress = await blockchainService.getConnectedWalletAddress();
         
-        if (mockResult.success) {
-          console.log('✅ Mock authorization successful');
+        const originalResult = await blockchainService.createAndAuthorizeTopUpWalletForUser(userAddress);
+        
+        if (originalResult.success) {
+          console.log('✅ Original authorization successful');
           
           // Refresh wallet info to get updated status
-          const updatedWalletInfo = await fetchWalletInfo(qrData.walletAddress);
+          const updatedWalletInfo = await fetchWalletInfo(originalResult.walletAddress || qrData.walletAddress);
           setWalletInfo(updatedWalletInfo);
           
-          onError?.('✅ Wallet funded successfully! (Mock authorization for testing)');
+          onError?.('✅ Wallet authorized and funded successfully! Ready for toll collection.');
         } else {
-          console.log('❌ Mock authorization also failed:', mockResult.error);
-          onError?.(mockResult.error || 'Authorization failed');
+          console.log('❌ Original authorization also failed:', originalResult.error);
+          onError?.(originalResult.error || 'Authorization failed');
         }
       }
     } catch (error: any) {

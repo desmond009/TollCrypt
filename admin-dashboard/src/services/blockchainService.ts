@@ -1511,7 +1511,7 @@ class BlockchainService {
       const tx = await this.signer.sendTransaction({
         to: topUpWalletAddress,
         value: ethers.parseEther(amount),
-        gasLimit: 15000, // Reduced gas limit for simple transfer
+        gasLimit: 21000, // Minimum gas limit for ETH transfer
       });
 
       console.log('⏳ Waiting for funding transaction confirmation...');
@@ -1684,12 +1684,13 @@ class BlockchainService {
       if (authResult.success) {
         console.log('✅ Wallet authorized successfully');
         
-        // Fund the wallet with test ETH
-        console.log('💰 Funding wallet with test ETH...');
-        const fundResult = await this.fundTopUpWallet(walletAddress, '0.01');
+        // Check if wallet already has sufficient balance before funding
+        const balanceInfo = await this.getWalletBalance(walletAddress);
+        const currentBalance = parseFloat(balanceInfo.formattedBalance);
+        const minRequiredBalance = 0.01; // Minimum balance for testing
         
-        if (fundResult.success) {
-          console.log('✅ Wallet funded successfully');
+        if (currentBalance >= minRequiredBalance) {
+          console.log(`✅ Wallet already has sufficient balance: ${balanceInfo.formattedBalance} ETH`);
           
           return {
             success: true,
@@ -1697,14 +1698,31 @@ class BlockchainService {
             gasUsed: authResult.gasUsed,
             walletAddress: walletAddress,
             authorizationResult: authResult,
-            fundingResult: fundResult,
+            fundingResult: { success: true, transactionHash: 'no-funding-needed', gasUsed: '0' },
           };
         } else {
-          return {
-            success: false,
-            error: 'Authorization succeeded but funding failed: ' + fundResult.error,
-            walletAddress: walletAddress,
-          };
+          console.log(`💰 Wallet needs funding. Current balance: ${balanceInfo.formattedBalance} ETH`);
+          console.log('💰 Funding wallet with test ETH...');
+          const fundResult = await this.fundTopUpWallet(walletAddress, '0.01');
+          
+          if (fundResult.success) {
+            console.log('✅ Wallet funded successfully');
+            
+            return {
+              success: true,
+              transactionHash: authResult.transactionHash,
+              gasUsed: authResult.gasUsed,
+              walletAddress: walletAddress,
+              authorizationResult: authResult,
+              fundingResult: fundResult,
+            };
+          } else {
+            return {
+              success: false,
+              error: 'Authorization succeeded but funding failed: ' + fundResult.error,
+              walletAddress: walletAddress,
+            };
+          }
         }
       } else {
         return {
@@ -1756,6 +1774,264 @@ class BlockchainService {
       return {
         success: false,
         error: error.message || 'Mock authorization failed',
+      };
+    }
+  }
+
+  // Create and authorize a top-up wallet for a user using the original flow
+  async createAndAuthorizeTopUpWalletForUser(userAddress: string): Promise<TransactionResult> {
+    console.log('🔐 Creating and authorizing top-up wallet for user:', userAddress);
+    
+    try {
+      // Ensure contracts and signer are initialized
+      await this.ensureInitialized();
+      
+      if (!this.topUpWalletFactory || !this.signer) {
+        throw new Error('Factory or signer not initialized');
+      }
+
+      // Check if user already has a top-up wallet
+      const existingWallet = await this.topUpWalletFactory.getUserTopUpWallet(userAddress);
+      if (existingWallet !== '0x0000000000000000000000000000000000000000') {
+        console.log('📍 User already has a top-up wallet:', existingWallet);
+        
+        // Check if it's authorized
+        const isAuthorized = await this.tollContract?.isTopUpWalletAuthorized(existingWallet);
+        if (isAuthorized) {
+          console.log('✅ Wallet is already authorized');
+          
+          // Check if wallet already has sufficient balance before funding
+          const balanceInfo = await this.getWalletBalance(existingWallet);
+          const currentBalance = parseFloat(balanceInfo.formattedBalance);
+          const minRequiredBalance = 0.01; // Minimum balance for testing
+          
+          if (currentBalance >= minRequiredBalance) {
+            console.log(`✅ Wallet already has sufficient balance: ${balanceInfo.formattedBalance} ETH`);
+            
+            return {
+              success: true,
+              transactionHash: 'already-authorized',
+              gasUsed: '0',
+              walletAddress: existingWallet,
+              authorizationResult: { success: true, transactionHash: 'already-authorized' },
+              fundingResult: { success: true, transactionHash: 'no-funding-needed', gasUsed: '0' },
+            };
+          } else {
+            console.log(`💰 Wallet needs funding. Current balance: ${balanceInfo.formattedBalance} ETH`);
+            const fundResult = await this.fundTopUpWallet(existingWallet, '0.01');
+            return {
+              success: fundResult.success,
+              transactionHash: fundResult.transactionHash,
+              gasUsed: fundResult.gasUsed,
+              walletAddress: existingWallet,
+              authorizationResult: { success: true, transactionHash: 'already-authorized' },
+              fundingResult: fundResult,
+              error: fundResult.success ? undefined : fundResult.error,
+            };
+          }
+        } else {
+          console.log('⚠️ Wallet exists but not authorized, authorizing...');
+          const authResult = await this.authorizeTopUpWallet(existingWallet);
+          if (authResult.success) {
+            // Check if wallet already has sufficient balance before funding
+            const balanceInfo = await this.getWalletBalance(existingWallet);
+            const currentBalance = parseFloat(balanceInfo.formattedBalance);
+            const minRequiredBalance = 0.01; // Minimum balance for testing
+            
+            if (currentBalance >= minRequiredBalance) {
+              console.log(`✅ Wallet already has sufficient balance: ${balanceInfo.formattedBalance} ETH`);
+              
+              return {
+                success: true,
+                transactionHash: authResult.transactionHash,
+                gasUsed: authResult.gasUsed,
+                walletAddress: existingWallet,
+                authorizationResult: authResult,
+                fundingResult: { success: true, transactionHash: 'no-funding-needed', gasUsed: '0' },
+              };
+            } else {
+              console.log(`💰 Wallet needs funding. Current balance: ${balanceInfo.formattedBalance} ETH`);
+              const fundResult = await this.fundTopUpWallet(existingWallet, '0.01');
+              return {
+                success: fundResult.success,
+                transactionHash: fundResult.transactionHash,
+                gasUsed: fundResult.gasUsed,
+                walletAddress: existingWallet,
+                authorizationResult: authResult,
+                fundingResult: fundResult,
+                error: fundResult.success ? undefined : fundResult.error,
+              };
+            }
+          } else {
+            return {
+              success: false,
+              error: 'Failed to authorize existing wallet: ' + authResult.error,
+              walletAddress: existingWallet,
+            };
+          }
+        }
+      }
+
+      // Deploy new top-up wallet for the user
+      console.log('🏗️ Deploying new top-up wallet...');
+      const tx = await this.topUpWalletFactory.deployTopUpWallet(userAddress, {
+        gasLimit: 500000, // Sufficient gas for deployment
+      });
+
+      console.log('⏳ Waiting for wallet deployment confirmation...');
+      const receipt = await tx.wait();
+      
+      if (receipt && receipt.status === 1) {
+        console.log('✅ Top-up wallet deployed successfully!');
+        
+        // Get the created wallet address
+        const walletAddress = await this.topUpWalletFactory.getUserTopUpWallet(userAddress);
+        console.log('📍 Created wallet address:', walletAddress);
+        
+        // The factory automatically authorizes the wallet, but let's verify
+        const isAuthorized = await this.tollContract?.isTopUpWalletAuthorized(walletAddress);
+        if (isAuthorized) {
+          console.log('✅ Wallet automatically authorized by factory');
+          
+          // Check if wallet already has sufficient balance before funding
+          const balanceInfo = await this.getWalletBalance(walletAddress);
+          const currentBalance = parseFloat(balanceInfo.formattedBalance);
+          const minRequiredBalance = 0.01; // Minimum balance for testing
+          
+          if (currentBalance >= minRequiredBalance) {
+            console.log(`✅ Wallet already has sufficient balance: ${balanceInfo.formattedBalance} ETH`);
+            
+            return {
+              success: true,
+              transactionHash: receipt.hash,
+              gasUsed: receipt.gasUsed.toString(),
+              walletAddress: walletAddress,
+              authorizationResult: { success: true, transactionHash: 'factory-authorized' },
+              fundingResult: { success: true, transactionHash: 'no-funding-needed', gasUsed: '0' },
+            };
+          } else {
+            console.log(`💰 Wallet needs funding. Current balance: ${balanceInfo.formattedBalance} ETH`);
+            const fundResult = await this.fundTopUpWallet(walletAddress, '0.01');
+            
+            return {
+              success: fundResult.success,
+              transactionHash: receipt.hash,
+              gasUsed: receipt.gasUsed.toString(),
+              walletAddress: walletAddress,
+              authorizationResult: { success: true, transactionHash: 'factory-authorized' },
+              fundingResult: fundResult,
+              error: fundResult.success ? undefined : fundResult.error,
+            };
+          }
+        } else {
+          console.log('⚠️ Wallet not authorized by factory, authorizing manually...');
+          const authResult = await this.authorizeTopUpWallet(walletAddress);
+          if (authResult.success) {
+            // Check if wallet already has sufficient balance before funding
+            const balanceInfo = await this.getWalletBalance(walletAddress);
+            const currentBalance = parseFloat(balanceInfo.formattedBalance);
+            const minRequiredBalance = 0.01; // Minimum balance for testing
+            
+            if (currentBalance >= minRequiredBalance) {
+              console.log(`✅ Wallet already has sufficient balance: ${balanceInfo.formattedBalance} ETH`);
+              
+              return {
+                success: true,
+                transactionHash: receipt.hash,
+                gasUsed: receipt.gasUsed.toString(),
+                walletAddress: walletAddress,
+                authorizationResult: authResult,
+                fundingResult: { success: true, transactionHash: 'no-funding-needed', gasUsed: '0' },
+              };
+            } else {
+              console.log(`💰 Wallet needs funding. Current balance: ${balanceInfo.formattedBalance} ETH`);
+              const fundResult = await this.fundTopUpWallet(walletAddress, '0.01');
+              return {
+                success: fundResult.success,
+                transactionHash: receipt.hash,
+                gasUsed: receipt.gasUsed.toString(),
+                walletAddress: walletAddress,
+                authorizationResult: authResult,
+                fundingResult: fundResult,
+                error: fundResult.success ? undefined : fundResult.error,
+              };
+            }
+          } else {
+            return {
+              success: false,
+              error: 'Wallet deployed but authorization failed: ' + authResult.error,
+              walletAddress: walletAddress,
+            };
+          }
+        }
+      } else {
+        return {
+          success: false,
+          error: 'Wallet deployment transaction failed',
+        };
+      }
+    } catch (error: any) {
+      console.error('Top-up wallet creation and authorization failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Wallet creation failed',
+      };
+    }
+  }
+
+  // Check if a specific top-up wallet is authorized for automatic toll collection
+  async checkTopUpWalletAuthorization(topUpWalletAddress: string): Promise<{
+    hasTopUpWallet: boolean;
+    topUpWalletAddress: string;
+    isAuthorized: boolean;
+    balance: string;
+    formattedBalance: string;
+  }> {
+    try {
+      let hasTopUpWallet = false;
+      let isAuthorized = false;
+      let balance = '0';
+      let formattedBalance = '0.000000';
+
+      if (this.tollContract) {
+        try {
+          // Check if the top-up wallet is authorized in the toll contract
+          isAuthorized = await this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
+          hasTopUpWallet = true; // If we have the address, it exists
+          
+          console.log(`🔍 Checking authorization for top-up wallet: ${topUpWalletAddress}`);
+          console.log(`✅ Authorization status: ${isAuthorized}`);
+        } catch (contractError) {
+          console.warn('Contract check failed:', contractError);
+          hasTopUpWallet = false;
+          isAuthorized = false;
+        }
+      } else {
+        console.log('🔄 Toll contract not available');
+        hasTopUpWallet = false;
+        isAuthorized = false;
+      }
+      
+      // Get the balance of the top-up wallet
+      const balanceInfo = await this.getWalletBalance(topUpWalletAddress);
+      balance = balanceInfo.balance;
+      formattedBalance = balanceInfo.formattedBalance;
+
+      return {
+        hasTopUpWallet,
+        topUpWalletAddress,
+        isAuthorized,
+        balance,
+        formattedBalance
+      };
+    } catch (error) {
+      console.error('Failed to check top-up wallet authorization:', error);
+      return {
+        hasTopUpWallet: false,
+        topUpWalletAddress: '',
+        isAuthorized: false,
+        balance: '0',
+        formattedBalance: '0.000000'
       };
     }
   }
