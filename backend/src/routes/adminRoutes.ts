@@ -474,7 +474,7 @@ router.post('/plazas', async (req, res) => {
       data: plaza,
       message: 'Plaza created successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating plaza:', error);
     res.status(500).json({ 
       success: false,
@@ -537,7 +537,7 @@ router.put('/plazas/:id', async (req, res) => {
       data: plaza,
       message: 'Plaza updated successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating plaza:', error);
     res.status(500).json({ 
       success: false,
@@ -573,7 +573,7 @@ router.delete('/plazas/:id', async (req, res) => {
       success: true,
       message: 'Plaza deleted successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting plaza:', error);
     res.status(500).json({ 
       success: false,
@@ -860,7 +860,7 @@ router.get('/dashboard/stats', async (req, res) => {
     });
     
     // Get active plazas
-    const activePlazas = await TollPlaza.countDocuments({ isActive: true });
+    const activePlazas = await SimplePlaza.countDocuments({ status: 'active' });
     
     // Get failed transactions
     const failedTransactions = await TollTransaction.countDocuments({
