@@ -1,12 +1,16 @@
 import { ethers } from 'ethers';
 import { QRCodeData } from '../types/qr';
 
-// Ethereum Sepolia testnet configuration
-const SEPOLIA_RPC = 'https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161';
+// Ethereum Sepolia testnet configuration - Updated with reliable RPC endpoints
+const SEPOLIA_RPC = 'https://sepolia.infura.io/v3/2896a592f4a34b96b1cfbf0eb2224be5';
+const SEPOLIA_RPC_ALT = 'https://rpc.sepolia.org'; // Alternative RPC endpoint
+const SEPOLIA_RPC_ALT2 = 'https://ethereum-sepolia.publicnode.com'; // Additional backup
+const SEPOLIA_RPC_ALT3 = 'https://sepolia.gateway.tenderly.co'; // Another backup
 const CHAIN_ID = 11155111; // Ethereum Sepolia
 
 // Contract addresses (updated with actual deployed addresses from Sepolia)
-const TOLL_COLLECTION_CONTRACT = process.env.REACT_APP_TOLL_CONTRACT_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0xE5f4743CF4726A7f58E0ccBB5888f1507E5aeF9d'; // TopUp TollCollection contract
+const TOLL_COLLECTION_CONTRACT = process.env.REACT_APP_TOLL_CONTRACT_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291'; // Main TollCollection contract
+const TOPUP_TOLL_COLLECTION_CONTRACT = process.env.REACT_APP_TOPUP_TOLL_CONTRACT_ADDRESS || '0xE5f4743CF4726A7f58E0ccBB5888f1507E5aeF9d'; // TopUp TollCollection contract
 const USDC_CONTRACT = process.env.REACT_APP_USDC_CONTRACT_ADDRESS || '0xe2DF4Ef71b9B0fc155c2817Df93eb04b4C590720'; // Sepolia Mock USDC
 const TOPUP_WALLET_FACTORY = process.env.REACT_APP_TOPUP_WALLET_FACTORY_ADDRESS || '0x3Bd98A2a16EfEa3B40B0d5F8a2E16613b625d9aA'; // TopUpWalletFactory
 
@@ -15,24 +19,34 @@ console.log('🔧 Contract Configuration:');
 console.log('  - REACT_APP_TOLL_CONTRACT_ADDRESS:', process.env.REACT_APP_TOLL_CONTRACT_ADDRESS);
 console.log('  - REACT_APP_CONTRACT_ADDRESS:', process.env.REACT_APP_CONTRACT_ADDRESS);
 console.log('  - Final TOLL_COLLECTION_CONTRACT:', TOLL_COLLECTION_CONTRACT);
+console.log('  - REACT_APP_TOPUP_TOLL_CONTRACT_ADDRESS:', process.env.REACT_APP_TOPUP_TOLL_CONTRACT_ADDRESS);
+console.log('  - Final TOPUP_TOLL_COLLECTION_CONTRACT:', TOPUP_TOLL_COLLECTION_CONTRACT);
 console.log('  - REACT_APP_USDC_CONTRACT_ADDRESS:', process.env.REACT_APP_USDC_CONTRACT_ADDRESS);
 console.log('  - Final USDC_CONTRACT:', USDC_CONTRACT);
+console.log('  - REACT_APP_TOPUP_WALLET_FACTORY_ADDRESS:', process.env.REACT_APP_TOPUP_WALLET_FACTORY_ADDRESS);
+console.log('  - Final TOPUP_WALLET_FACTORY:', TOPUP_WALLET_FACTORY);
 
 
 // ABI for TollCollection contract
 const TOLL_COLLECTION_ABI = [
   'function processTollPayment(string memory vehicleId, bytes32 zkProofHash, uint256 amount) external returns (bool)',
   'function processTollPaymentFromTopUpWallet(string memory vehicleId, bytes32 zkProofHash, uint256 amount) external returns (bool)',
+  'function registerVehicle(string memory vehicleId, address owner) external',
+  'function setOperatorAuthorization(address operator, bool isAuthorized) external',
   'function getVehicle(string memory vehicleId) external view returns (address owner, string memory vehicleId, bool isActive, bool isBlacklisted, uint256 registrationTime, uint256 lastTollTime)',
-  'function getTollRate() external view returns (uint256)',
-  'function getUserTopUpWallet(address user) external view returns (address walletAddress)',
-  'function hasUserTopUpWallet(address user) external view returns (bool hasWallet)',
-  'function getUserTopUpWalletBalance(address user) external view returns (uint256 balance)',
+  'function tollRate() external view returns (uint256)', // This is the automatic getter for the public variable
   'function isTopUpWalletAuthorized(address topUpWallet) external view returns (bool isAuthorized)',
   'function authorizeTopUpWalletFromFactory(address topUpWallet) external',
   'function setTopUpWalletAuthorization(address topUpWallet, bool isAuthorized) external',
+  'function topUpWalletFactory() external view returns (address)',
+  'function withdrawRevenue(address to, uint256 amount) external',
+  'function totalRevenue() external view returns (uint256)',
+  'function getTotalTransactions() external view returns (uint256)',
+  'function getTotalVehicles() external view returns (uint256)',
   'event TollPaid(address indexed payer, string indexed vehicleId, uint256 amount, uint256 tollId, bytes32 zkProofHash, uint256 timestamp)',
   'event TopUpWalletPaymentProcessed(address indexed topUpWallet, string indexed vehicleId, uint256 amount, uint256 tollId, bytes32 zkProofHash, uint256 timestamp)',
+  'event VehicleRegistered(address indexed owner, string indexed vehicleId, uint256 timestamp)',
+  'event RevenueWithdrawn(address indexed to, uint256 amount, uint256 timestamp)',
 ];
 
 // ABI for USDC contract
@@ -60,11 +74,13 @@ const TOPUP_WALLET_ABI = [
 
 // ABI for TopUpWalletFactory contract
 const TOPUP_WALLET_FACTORY_ABI = [
-  'function createTopUpWallet(address user) external returns (address walletAddress)',
+  'function deployTopUpWallet(address user) external returns (address walletAddress)',
   'function getUserTopUpWallet(address user) external view returns (address walletAddress)',
   'function hasTopUpWallet(address user) external view returns (bool hasWallet)',
-  'function getAllUserWallets(address user) external view returns (address[] memory wallets)',
-  'function getWalletCount() external view returns (uint256 count)',
+  'function getUserWalletInfo(address user) external view returns (address walletAddress, bool exists, uint256 balance)',
+  'function getTotalDeployedWallets() external view returns (uint256 count)',
+  'function getAllDeployedWallets() external view returns (address[] memory wallets)',
+  'function tollCollectionContract() external view returns (address)',
 ];
 
 export interface VehicleRegistration {
@@ -85,6 +101,7 @@ export interface TransactionResult {
   success: boolean;
   transactionHash?: string;
   error?: string;
+  message?: string;
   gasUsed?: string;
   blockNumber?: number;
   walletAddress?: string;
@@ -108,7 +125,8 @@ class BlockchainService {
   constructor() {
     console.log('🔗 Initializing Blockchain Service...');
     console.log('📋 Contract Addresses:');
-    console.log('  - Toll Collection:', TOLL_COLLECTION_CONTRACT);
+    console.log('  - Main Toll Collection:', TOLL_COLLECTION_CONTRACT);
+    console.log('  - TopUp Toll Collection:', TOPUP_TOLL_COLLECTION_CONTRACT);
     console.log('  - USDC Contract:', USDC_CONTRACT);
     console.log('  - TopUp Wallet Factory:', TOPUP_WALLET_FACTORY);
     console.log('  - Network:', SEPOLIA_RPC);
@@ -120,11 +138,50 @@ class BlockchainService {
     try {
       // Try to use MetaMask provider first
       if (window.ethereum) {
+        console.log('🔗 Initializing MetaMask provider...');
         this.provider = new ethers.BrowserProvider(window.ethereum);
-        this.signer = await this.provider.getSigner();
+        
+        // Add error handling for MetaMask connection
+        try {
+          this.signer = await this.provider.getSigner();
+          console.log('✅ MetaMask signer initialized');
+        } catch (signerError) {
+          console.warn('⚠️ MetaMask signer failed, using provider only:', signerError);
+          this.signer = null;
+        }
       } else {
-        // Fallback to public RPC
-        this.provider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
+        console.log('🔗 MetaMask not available, using public RPC endpoints...');
+        // Fallback to public RPC - try multiple endpoints with better error handling
+        const rpcEndpoints = [SEPOLIA_RPC, SEPOLIA_RPC_ALT, SEPOLIA_RPC_ALT2, SEPOLIA_RPC_ALT3];
+        let providerInitialized = false;
+        
+        for (let i = 0; i < rpcEndpoints.length; i++) {
+          try {
+            console.log(`🔄 Trying RPC endpoint ${i + 1}/${rpcEndpoints.length}: ${rpcEndpoints[i]}`);
+            this.provider = new ethers.JsonRpcProvider(rpcEndpoints[i]);
+            
+            // Test the connection with timeout
+            const networkPromise = this.provider.getNetwork();
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('RPC timeout')), 10000)
+            );
+            
+            await Promise.race([networkPromise, timeoutPromise]);
+            console.log(`✅ RPC endpoint ${i + 1} connected successfully`);
+            providerInitialized = true;
+            break;
+          } catch (rpcError) {
+            console.warn(`❌ RPC endpoint ${i + 1} failed:`, rpcError);
+            if (i === rpcEndpoints.length - 1) {
+              throw new Error('All RPC endpoints failed. Please check your internet connection.');
+            }
+          }
+        }
+        
+        if (!providerInitialized) {
+          throw new Error('Failed to initialize any RPC provider');
+        }
+        
         this.signer = null;
       }
 
@@ -133,18 +190,51 @@ class BlockchainService {
         if (ethers.isAddress(TOLL_COLLECTION_CONTRACT) && TOLL_COLLECTION_CONTRACT !== '0x0000000000000000000000000000000000000000') {
           try {
             console.log('🔧 Initializing Toll Collection contract at:', TOLL_COLLECTION_CONTRACT);
+            
+            // First check if contract has code at this address with timeout
+            const codePromise = this.provider.getCode(TOLL_COLLECTION_CONTRACT);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Contract code check timeout')), 15000)
+            );
+            
+            const contractCode = await Promise.race([codePromise, timeoutPromise]) as string;
+            console.log('📋 Contract code length:', contractCode.length);
+            
+            if (contractCode === '0x') {
+              throw new Error(`No contract found at address ${TOLL_COLLECTION_CONTRACT}. Please verify the contract is deployed.`);
+            }
+            
             this.tollContract = new ethers.Contract(
               TOLL_COLLECTION_CONTRACT,
               TOLL_COLLECTION_ABI,
               this.signer || this.provider
             );
             
-            // Test if contract exists by calling a simple view function
-            const tollRate = await this.tollContract.getTollRate();
+            // Test if contract exists by calling a simple view function with timeout
+            console.log('🧪 Testing contract by calling tollRate()...');
+            const tollRatePromise = this.tollContract.tollRate();
+            const tollRateTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Contract call timeout')), 10000)
+            );
+            
+            const tollRate = await Promise.race([tollRatePromise, tollRateTimeoutPromise]) as bigint;
             console.log('✅ Toll collection contract initialized successfully');
             console.log('💰 Current toll rate:', ethers.formatEther(tollRate), 'ETH');
-          } catch (contractError) {
+          } catch (contractError: any) {
             console.error('❌ Failed to initialize toll collection contract:', contractError);
+            console.error('❌ Contract address:', TOLL_COLLECTION_CONTRACT);
+            console.error('❌ Error details:', contractError.message);
+            console.error('❌ Error code:', contractError.code);
+            
+            // Provide more specific error messages
+            if (contractError.message.includes('timeout')) {
+              console.error('💡 This might be due to RPC endpoint issues. Try refreshing the page.');
+            } else if (contractError.message.includes('No contract found')) {
+              console.error('💡 The contract address might be incorrect or the contract is not deployed.');
+            } else if (contractError.code === 'NETWORK_ERROR') {
+              console.error('💡 Network connection issue. Please check your internet connection.');
+            }
+            
             this.tollContract = null;
           }
         } else {
@@ -317,10 +407,10 @@ class BlockchainService {
     }
 
     try {
-      // Check if the contract has the getTollRate method
-      const hasMethod = this.tollContract.interface.hasFunction('getTollRate');
+      // Check if the contract has the tollRate method
+      const hasMethod = this.tollContract.interface.hasFunction('tollRate');
       if (!hasMethod) {
-        console.warn('Contract does not have getTollRate method, using default rates');
+        console.warn('Contract does not have tollRate method, using default rates');
         // Return default rates based on vehicle type
         const defaultRates: { [key: string]: string } = {
           '2-wheeler': '0.50', // $0.50
@@ -334,7 +424,7 @@ class BlockchainService {
         return defaultRates[vehicleType.toLowerCase()] || '2.00';
       }
       
-      const rate = await this.tollContract.getTollRate();
+      const rate = await this.tollContract.tollRate();
       // Convert from wei to ETH
       const rateInEth = ethers.formatEther(rate);
       return rateInEth;
@@ -411,23 +501,27 @@ class BlockchainService {
       let topUpWalletBalance: bigint = BigInt(0);
       let topUpWalletAddress = '';
       
-      if (this.tollContract) {
+      if (this.topUpWalletFactory) {
         try {
-          // Check if user has a top-up wallet
-          const hasTopUpWallet = await this.tollContract.hasUserTopUpWallet(walletAddress);
+          // Check if user has a top-up wallet using the factory
+          const hasTopUpWallet = await this.topUpWalletFactory.hasTopUpWallet(walletAddress);
           if (hasTopUpWallet) {
-            // Get the top-up wallet address
-            topUpWalletAddress = await this.tollContract.getUserTopUpWallet(walletAddress);
+            // Get the top-up wallet address from the factory
+            topUpWalletAddress = await this.topUpWalletFactory.getUserTopUpWallet(walletAddress);
             
-            // Get the balance from the top-up wallet
-            const topUpWalletContract = new ethers.Contract(
-              topUpWalletAddress,
-              TOPUP_WALLET_ABI,
-              this.provider
-            );
-            
-            topUpWalletBalance = await topUpWalletContract.getBalance();
-            console.log('💰 TopUp Wallet Balance:', ethers.formatEther(topUpWalletBalance), 'ETH');
+            if (topUpWalletAddress !== '0x0000000000000000000000000000000000000000') {
+              // Get the balance from the top-up wallet
+              const topUpWalletContract = new ethers.Contract(
+                topUpWalletAddress,
+                TOPUP_WALLET_ABI,
+                this.provider
+              );
+              
+              topUpWalletBalance = await topUpWalletContract.getBalance();
+              console.log('💰 TopUp Wallet Balance:', ethers.formatEther(topUpWalletBalance), 'ETH');
+            } else {
+              console.warn('⚠️ TopUpWallet address is zero, using main wallet balance');
+            }
           }
         } catch (contractError) {
           console.warn('Failed to get TopUpWallet balance:', contractError);
@@ -542,6 +636,129 @@ class BlockchainService {
     }
   }
 
+  // Authorize an operator for toll collection (admin function)
+  async authorizeOperator(operatorAddress: string): Promise<TransactionResult> {
+    // Ensure contracts and signer are initialized before proceeding
+    await this.ensureInitialized();
+    
+    if (!this.tollContract || !this.signer) {
+      throw new Error('Contract or signer not initialized');
+    }
+
+    try {
+      console.log('🔐 Authorizing operator:', operatorAddress);
+      
+      const tx = await this.tollContract.setOperatorAuthorization(
+        operatorAddress,
+        true,
+        {
+          gasLimit: 50000,
+        }
+      );
+
+      console.log('⏳ Waiting for operator authorization transaction confirmation...');
+      const receipt = await tx.wait();
+      
+      if (receipt && receipt.status === 1) {
+        console.log('✅ Operator authorized successfully!');
+        console.log('📋 Transaction hash:', receipt.hash);
+        return {
+          success: true,
+          transactionHash: receipt.hash,
+          gasUsed: receipt.gasUsed.toString(),
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Operator authorization transaction failed',
+        };
+      }
+    } catch (error: any) {
+      console.error('Operator authorization failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Authorization failed',
+      };
+    }
+  }
+
+  // Register a vehicle on the smart contract
+  async registerVehicleOnContract(
+    vehicleId: string,
+    ownerAddress: string
+  ): Promise<TransactionResult> {
+    // Ensure contracts and signer are initialized before proceeding
+    await this.ensureInitialized();
+    
+    if (!this.tollContract || !this.signer) {
+      throw new Error('Contract or signer not initialized');
+    }
+
+    try {
+      console.log('🚗 Registering vehicle on smart contract...');
+      console.log('📋 Registration Details:');
+      console.log('  - Vehicle ID:', vehicleId);
+      console.log('  - Owner Address:', ownerAddress);
+      console.log('  - Contract Address:', TOLL_COLLECTION_CONTRACT);
+
+      // Check if vehicle is already registered
+      const vehicleInfo = await this.tollContract.getVehicle(vehicleId);
+      if (vehicleInfo.owner !== '0x0000000000000000000000000000000000000000') {
+        console.log('✅ Vehicle already registered on contract');
+        return {
+          success: true,
+          message: 'Vehicle already registered'
+        };
+      }
+
+      // Register the vehicle
+      const tx = await this.tollContract.registerVehicle(
+        vehicleId,
+        ownerAddress,
+        {
+          gasLimit: 200000,
+        }
+      );
+
+      console.log('⏳ Waiting for vehicle registration confirmation...');
+      console.log('📋 Transaction Hash:', tx.hash);
+      
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 1) {
+        console.log('✅ Vehicle registered successfully on smart contract!');
+        console.log('📊 Gas Used:', receipt.gasUsed.toString());
+        console.log('🔢 Block Number:', receipt.blockNumber);
+        
+        return {
+          success: true,
+          transactionHash: receipt.hash,
+          gasUsed: receipt.gasUsed.toString(),
+          blockNumber: receipt.blockNumber
+        };
+      } else {
+        console.error('❌ Vehicle registration failed with status:', receipt.status);
+        return {
+          success: false,
+          error: 'Vehicle registration failed',
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ Vehicle registration failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        reason: error.reason,
+        data: error.data
+      });
+      
+      return {
+        success: false,
+        error: error.message || 'Vehicle registration failed',
+      };
+    }
+  }
+
   // New method for admin toll processing with plaza-specific rates
   async processAdminTollPayment(
     walletAddress: string,
@@ -559,8 +776,19 @@ class BlockchainService {
     }
 
     try {
+      console.log('🚀 Starting admin toll payment process...');
+      console.log('📋 Transaction Details:');
+      console.log('  - Wallet Address:', walletAddress);
+      console.log('  - Vehicle Number:', vehicleNumber);
+      console.log('  - Vehicle Type:', vehicleType);
+      console.log('  - Toll Amount:', tollAmount);
+      console.log('  - Plaza ID:', plazaId);
+      console.log('  - Admin Wallet:', adminWallet);
+      console.log('  - Contract Address:', TOLL_COLLECTION_CONTRACT);
+      
       // Convert toll amount to wei (ETH has 18 decimals)
       const amountInWei = ethers.parseEther(tollAmount);
+      console.log('💰 Amount in Wei:', amountInWei.toString());
       
       // Generate transaction hash for this specific toll payment
       const transactionHash = ethers.keccak256(
@@ -576,23 +804,137 @@ class BlockchainService {
           })
         )
       );
+      console.log('🔐 Transaction Hash:', transactionHash);
 
-      // Check if user has a TopUpWallet
-      const hasTopUpWallet = await this.tollContract.hasUserTopUpWallet(walletAddress);
+      // Check if vehicle is registered on the smart contract
+      console.log('🔍 Checking if vehicle is registered on smart contract...');
+      try {
+        const vehicleInfo = await this.tollContract.getVehicle(vehicleNumber);
+        if (vehicleInfo.owner === '0x0000000000000000000000000000000000000000') {
+          console.log('⚠️ Vehicle not registered on smart contract, registering now...');
+          const registrationResult = await this.registerVehicleOnContract(vehicleNumber, walletAddress);
+          if (!registrationResult.success) {
+            throw new Error(`Failed to register vehicle on smart contract: ${registrationResult.error}`);
+          }
+          console.log('✅ Vehicle registered successfully on smart contract');
+        } else {
+          console.log('✅ Vehicle already registered on smart contract');
+        }
+      } catch (vehicleCheckError: any) {
+        console.error('❌ Failed to check vehicle registration:', vehicleCheckError);
+        // Try to register the vehicle anyway
+        console.log('🔄 Attempting to register vehicle on smart contract...');
+        const registrationResult = await this.registerVehicleOnContract(vehicleNumber, walletAddress);
+        if (!registrationResult.success) {
+          throw new Error(`Failed to register vehicle on smart contract: ${registrationResult.error}`);
+        }
+        console.log('✅ Vehicle registered successfully on smart contract');
+      }
+
+      // Check if admin wallet is authorized as operator
+      console.log('🔍 Checking if admin wallet is authorized as operator...');
+      try {
+        // Note: We can't directly check authorization from the contract without additional ABI functions
+        // For now, we'll assume the admin wallet needs to be authorized and try to authorize it
+        console.log('🔄 Attempting to authorize admin wallet as operator...');
+        const authResult = await this.authorizeOperator(adminWallet);
+        if (!authResult.success) {
+          console.warn('⚠️ Failed to authorize admin wallet, but continuing with transaction...');
+          console.warn('⚠️ This might cause the transaction to fail if the wallet is not already authorized');
+        } else {
+          console.log('✅ Admin wallet authorized successfully');
+        }
+      } catch (authError: any) {
+        console.warn('⚠️ Authorization check failed, but continuing with transaction...');
+        console.warn('⚠️ This might cause the transaction to fail if the wallet is not already authorized');
+      }
+
+      // Check if user has a TopUpWallet using the factory
+      console.log('🔍 Checking if user has TopUpWallet...');
+      let hasTopUpWallet = false;
+      try {
+        if (this.topUpWalletFactory) {
+          // Add timeout for the contract call
+          const hasWalletPromise = this.topUpWalletFactory.hasTopUpWallet(walletAddress);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('hasTopUpWallet call timeout')), 10000)
+          );
+          
+          hasTopUpWallet = await Promise.race([hasWalletPromise, timeoutPromise]) as boolean;
+          console.log('📊 Has TopUpWallet:', hasTopUpWallet);
+        } else {
+          console.warn('⚠️ TopUpWalletFactory not available, assuming no TopUpWallet');
+          hasTopUpWallet = false;
+        }
+      } catch (walletCheckError: any) {
+        console.error('❌ Failed to check TopUpWallet status:', walletCheckError);
+        
+        // If the call fails, we'll assume no TopUpWallet and use direct payment
+        console.log('🔄 Falling back to direct payment method');
+        hasTopUpWallet = false;
+      }
       
       let tx;
       if (hasTopUpWallet) {
-        // Process payment from TopUpWallet
-        tx = await this.tollContract.processTollPaymentFromTopUpWallet(
-          vehicleNumber,
-          transactionHash,
-          amountInWei,
-          {
-            from: adminWallet,
-            gasLimit: 300000,
+        console.log('💳 Processing payment from TopUpWallet...');
+        
+        // Check if the top-up wallet is authorized with timeout
+        let topUpWalletAddress = '';
+        let isAuthorized = false;
+        
+        try {
+          if (this.topUpWalletFactory) {
+            const walletAddressPromise = this.topUpWalletFactory.getUserTopUpWallet(walletAddress);
+            const walletTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('getUserTopUpWallet call timeout')), 10000)
+            );
+            
+            topUpWalletAddress = await Promise.race([walletAddressPromise, walletTimeoutPromise]) as string;
+            console.log('📍 TopUpWallet Address:', topUpWalletAddress);
+            
+            if (topUpWalletAddress === '0x0000000000000000000000000000000000000000') {
+              console.warn('⚠️ TopUpWallet address is zero, falling back to direct payment');
+              hasTopUpWallet = false;
+            } else {
+              const authPromise = this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
+              const authTimeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('isTopUpWalletAuthorized call timeout')), 10000)
+              );
+              
+              isAuthorized = await Promise.race([authPromise, authTimeoutPromise]) as boolean;
+              console.log('🔐 TopUpWallet Authorized:', isAuthorized);
+              
+              if (!isAuthorized) {
+                console.warn('⚠️ TopUpWallet not authorized, falling back to direct payment');
+                hasTopUpWallet = false; // Force direct payment
+              }
+            }
+          } else {
+            console.warn('⚠️ TopUpWalletFactory not available, falling back to direct payment');
+            hasTopUpWallet = false;
           }
-        );
+        } catch (authCheckError: any) {
+          console.error('❌ Failed to check TopUpWallet authorization:', authCheckError);
+          console.log('🔄 Falling back to direct payment method due to authorization check failure');
+          hasTopUpWallet = false; // Force direct payment
+        }
+        
+        if (hasTopUpWallet) {
+          // Process payment from TopUpWallet
+          tx = await this.tollContract.processTollPaymentFromTopUpWallet(
+            vehicleNumber,
+            transactionHash,
+            amountInWei,
+            {
+              from: adminWallet,
+              gasLimit: 300000,
+            }
+          );
+        } else {
+          throw new Error('TopUpWallet authorization failed, cannot process payment');
+        }
       } else {
+        console.log('💳 Processing direct payment (fallback)...');
         // Process direct payment (fallback)
         tx = await this.tollContract.processTollPayment(
           vehicleNumber,
@@ -605,10 +947,26 @@ class BlockchainService {
         );
       }
 
+      console.log('⏳ Waiting for transaction confirmation...');
+      console.log('📋 Transaction Hash:', tx.hash);
+      console.log('📍 Transaction To Address:', tx.to);
+      console.log('📍 Expected Contract Address:', TOLL_COLLECTION_CONTRACT);
+      
+      // Verify the transaction is going to the correct contract
+      if (tx.to && tx.to.toLowerCase() !== TOLL_COLLECTION_CONTRACT.toLowerCase()) {
+        console.warn('⚠️ WARNING: Transaction is going to a different address than expected!');
+        console.warn('  - Expected:', TOLL_COLLECTION_CONTRACT);
+        console.warn('  - Actual:', tx.to);
+      }
+      
       // Wait for transaction confirmation
       const receipt = await tx.wait();
       
       if (receipt.status === 1) {
+        console.log('✅ Transaction successful!');
+        console.log('📊 Gas Used:', receipt.gasUsed.toString());
+        console.log('🔢 Block Number:', receipt.blockNumber);
+        
         return {
           success: true,
           transactionHash: receipt.hash,
@@ -616,16 +974,50 @@ class BlockchainService {
           blockNumber: receipt.blockNumber
         };
       } else {
+        console.error('❌ Transaction failed with status:', receipt.status);
         return {
           success: false,
           error: 'Transaction failed',
         };
       }
     } catch (error: any) {
-      console.error('Admin toll payment processing failed:', error);
+      console.error('❌ Admin toll payment processing failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        reason: error.reason,
+        data: error.data
+      });
+      
+      // Provide more specific error messages
+      let errorMessage = error.message || 'Transaction failed';
+      if (error.code === 'CALL_EXCEPTION') {
+        if (error.message.includes('missing revert data')) {
+          errorMessage = 'Contract call failed with missing revert data. This usually indicates:\n' +
+                        '1. The contract method does not exist\n' +
+                        '2. The contract is not properly deployed\n' +
+                        '3. Insufficient authorization or permissions\n' +
+                        '4. Invalid parameters passed to the contract\n\n' +
+                        'Please check:\n' +
+                        '- Contract address: ' + TOLL_COLLECTION_CONTRACT + '\n' +
+                        '- Wallet authorization status\n' +
+                        '- Contract deployment verification';
+        } else {
+          errorMessage = 'Contract call failed. This might be due to insufficient authorization or invalid parameters.';
+        }
+      } else if (error.message.includes('TopUpWallet') && error.message.includes('not authorized')) {
+        errorMessage = 'TopUpWallet is not authorized. Please authorize the wallet first.';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds in the TopUpWallet for this transaction.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Contract call timed out. This might be due to RPC endpoint issues. Please try again.';
+      } else if (error.message.includes('No contract found')) {
+        errorMessage = 'No contract found at the specified address. Please verify the contract is deployed correctly.';
+      }
+      
       return {
         success: false,
-        error: error.message || 'Transaction failed',
+        error: errorMessage,
       };
     }
   }
@@ -801,21 +1193,22 @@ class BlockchainService {
   }
 
   async hasUserTopUpWallet(walletAddress: string): Promise<boolean> {
-    if (!this.tollContract) {
-      console.warn('⚠️ Toll contract not initialized. Contract address:', TOLL_COLLECTION_CONTRACT);
-      console.warn('💡 Make sure the contract is deployed and the address is correct');
+    if (!this.topUpWalletFactory) {
+      console.warn('⚠️ TopUpWalletFactory not initialized. Contract address:', TOPUP_WALLET_FACTORY);
+      console.warn('💡 Make sure the factory contract is deployed and the address is correct');
       return false;
     }
 
     try {
-      // Check if the contract has the hasUserTopUpWallet method
-      const hasMethod = this.tollContract.interface.hasFunction('hasUserTopUpWallet');
+      // Check if the contract has the hasTopUpWallet method
+      const hasMethod = this.topUpWalletFactory.interface.hasFunction('hasTopUpWallet');
       if (!hasMethod) {
-        console.warn('Contract does not have hasUserTopUpWallet method');
+        console.warn('TopUpWalletFactory does not have hasTopUpWallet method');
         return false;
       }
       
-      const hasWallet = await this.tollContract.hasUserTopUpWallet(walletAddress);
+      const hasWallet = await this.topUpWalletFactory.hasTopUpWallet(walletAddress);
+      console.log('📊 User has TopUpWallet:', hasWallet);
       return hasWallet;
     } catch (error) {
       console.error('Failed to check if user has top-up wallet:', error);
@@ -824,18 +1217,19 @@ class BlockchainService {
   }
 
   async getUserTopUpWallet(walletAddress: string): Promise<string> {
-    if (!this.tollContract) {
-      throw new Error('Contract not initialized');
+    if (!this.topUpWalletFactory) {
+      throw new Error('TopUpWalletFactory not initialized');
     }
 
     try {
       // Check if the contract has the getUserTopUpWallet method
-      const hasMethod = this.tollContract.interface.hasFunction('getUserTopUpWallet');
+      const hasMethod = this.topUpWalletFactory.interface.hasFunction('getUserTopUpWallet');
       if (!hasMethod) {
-        throw new Error('Contract does not have getUserTopUpWallet method');
+        throw new Error('TopUpWalletFactory does not have getUserTopUpWallet method');
       }
       
-      const topUpWalletAddress = await this.tollContract.getUserTopUpWallet(walletAddress);
+      const topUpWalletAddress = await this.topUpWalletFactory.getUserTopUpWallet(walletAddress);
+      console.log('📍 User TopUpWallet Address:', topUpWalletAddress);
       return topUpWalletAddress;
     } catch (error) {
       console.error('Failed to get user top-up wallet:', error);
@@ -875,17 +1269,23 @@ class BlockchainService {
       let balance = '0';
       let formattedBalance = '0.000000';
 
-      if (this.tollContract) {
+      if (this.topUpWalletFactory && this.tollContract) {
         try {
-          // Check if user has a top-up wallet
-          hasTopUpWallet = await this.tollContract.hasUserTopUpWallet(userAddress);
+          // Check if user has a top-up wallet using the factory
+          hasTopUpWallet = await this.topUpWalletFactory.hasTopUpWallet(userAddress);
           
           if (hasTopUpWallet) {
-            // Get the top-up wallet address
-            topUpWalletAddress = await this.tollContract.getUserTopUpWallet(userAddress);
+            // Get the top-up wallet address from the factory
+            topUpWalletAddress = await this.topUpWalletFactory.getUserTopUpWallet(userAddress);
             
-            // Check if the top-up wallet is authorized
-            isAuthorized = await this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
+            if (topUpWalletAddress !== '0x0000000000000000000000000000000000000000') {
+              // Check if the top-up wallet is authorized in the toll contract
+              isAuthorized = await this.tollContract.isTopUpWalletAuthorized(topUpWalletAddress);
+            } else {
+              console.warn('⚠️ TopUpWallet address is zero');
+              hasTopUpWallet = false;
+              isAuthorized = false;
+            }
           }
         } catch (contractError) {
           console.warn('Contract check failed, using fallback:', contractError);
@@ -895,8 +1295,8 @@ class BlockchainService {
           isAuthorized = true; // Mock authorization for testing
         }
       } else {
-        // Fallback when contract is not available
-        console.log('🔄 Contract not available, using fallback authorization');
+        // Fallback when contracts are not available
+        console.log('🔄 Contracts not available, using fallback authorization');
         hasTopUpWallet = true;
         topUpWalletAddress = userAddress;
         isAuthorized = true; // Mock authorization for testing
@@ -1231,6 +1631,11 @@ class BlockchainService {
   // Ensure contracts and signer are properly initialized
   async ensureInitialized(): Promise<void> {
     console.log('🔍 Checking initialization status...');
+    console.log('📋 Current status:');
+    console.log('  - Provider:', !!this.provider);
+    console.log('  - Signer:', !!this.signer);
+    console.log('  - Toll Contract:', !!this.tollContract);
+    console.log('  - Contract Address:', TOLL_COLLECTION_CONTRACT);
     
     // Check if we have a provider
     if (!this.provider) {
@@ -1245,6 +1650,15 @@ class BlockchainService {
         this.provider = new ethers.BrowserProvider(window.ethereum);
         this.signer = await this.provider.getSigner();
         console.log('✅ Signer initialized successfully');
+        
+        // Update contracts with the new signer
+        if (this.tollContract) {
+          this.tollContract = new ethers.Contract(
+            TOLL_COLLECTION_CONTRACT,
+            TOLL_COLLECTION_ABI,
+            this.signer
+          );
+        }
       } catch (error) {
         console.error('❌ Failed to initialize signer:', error);
         throw new Error('Failed to connect to MetaMask wallet');
@@ -1253,15 +1667,40 @@ class BlockchainService {
     
     // Check if we have the toll contract
     if (!this.tollContract) {
-      console.log('🔄 Toll contract not initialized, reinitializing...');
-      await this.reinitializeContracts();
+      console.log('🔄 Toll contract not initialized, attempting to initialize...');
       
-      if (!this.tollContract) {
-        throw new Error('Failed to initialize toll contract. Please check contract configuration.');
+      // Try to initialize the contract directly
+      try {
+        if (ethers.isAddress(TOLL_COLLECTION_CONTRACT) && TOLL_COLLECTION_CONTRACT !== '0x0000000000000000000000000000000000000000') {
+          console.log('🔧 Initializing Toll Collection contract at:', TOLL_COLLECTION_CONTRACT);
+          this.tollContract = new ethers.Contract(
+            TOLL_COLLECTION_CONTRACT,
+            TOLL_COLLECTION_ABI,
+            this.signer || this.provider
+          );
+          
+          // Test if contract exists by calling a simple view function
+          const tollRate = await this.tollContract.tollRate();
+          console.log('✅ Toll collection contract initialized successfully');
+          console.log('💰 Current toll rate:', ethers.formatEther(tollRate), 'ETH');
+        } else {
+          throw new Error(`Invalid contract address: ${TOLL_COLLECTION_CONTRACT}`);
+        }
+      } catch (contractError) {
+        console.error('❌ Failed to initialize toll collection contract:', contractError);
+        throw new Error(`Failed to initialize toll contract at address ${TOLL_COLLECTION_CONTRACT}. Please check if the contract is deployed and the address is correct.`);
       }
     }
     
     console.log('✅ All components initialized successfully');
+  }
+
+  // Get the connected wallet address
+  async getConnectedWalletAddress(): Promise<string> {
+    if (!this.signer) {
+      throw new Error('No signer available. Please connect MetaMask wallet.');
+    }
+    return await this.signer.getAddress();
   }
 
   // Check if wallet is connected and contracts are initialized
@@ -1271,6 +1710,17 @@ class BlockchainService {
         return {
           connected: false,
           error: 'MetaMask not detected. Please install MetaMask browser extension.',
+        };
+      }
+
+      // Ensure everything is initialized before checking
+      try {
+        await this.ensureInitialized();
+      } catch (initError: any) {
+        console.error('Initialization failed during wallet connection check:', initError);
+        return {
+          connected: false,
+          error: initError.message || 'Failed to initialize blockchain components',
         };
       }
 
@@ -1320,6 +1770,396 @@ class BlockchainService {
       provider: !!this.provider,
       contractAddress: TOLL_COLLECTION_CONTRACT
     };
+  }
+
+  // Method to verify contract address and get detailed contract info
+  async getContractInfo(): Promise<{ 
+    address: string; 
+    codeLength: number; 
+    isDeployed: boolean; 
+    error?: string;
+    actualContractAddress?: string;
+  }> {
+    try {
+      console.log('🔍 Getting contract information...');
+      console.log('📋 Configured contract address:', TOLL_COLLECTION_CONTRACT);
+      
+      if (!this.provider) {
+        return {
+          address: TOLL_COLLECTION_CONTRACT,
+          codeLength: 0,
+          isDeployed: false,
+          error: 'Provider not initialized'
+        };
+      }
+      
+      // Check if contract has code at the configured address
+      const code = await this.provider.getCode(TOLL_COLLECTION_CONTRACT);
+      const codeLength = code.length;
+      
+      console.log('📊 Contract code length:', codeLength);
+      
+      if (code === '0x') {
+        return {
+          address: TOLL_COLLECTION_CONTRACT,
+          codeLength: 0,
+          isDeployed: false,
+          error: `No contract found at configured address ${TOLL_COLLECTION_CONTRACT}`
+        };
+      }
+      
+      // If we have a contract instance, check its actual address
+      let actualContractAddress = TOLL_COLLECTION_CONTRACT;
+      if (this.tollContract) {
+        actualContractAddress = await this.tollContract.getAddress();
+        console.log('📍 Actual contract address:', actualContractAddress);
+      }
+      
+      return {
+        address: TOLL_COLLECTION_CONTRACT,
+        codeLength,
+        isDeployed: true,
+        actualContractAddress
+      };
+    } catch (error: any) {
+      console.error('❌ Failed to get contract info:', error);
+      return {
+        address: TOLL_COLLECTION_CONTRACT,
+        codeLength: 0,
+        isDeployed: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Method to test contract accessibility from browser
+  async testContractAccess(): Promise<{ accessible: boolean; error?: string; details?: any }> {
+    try {
+      console.log('🧪 Testing contract access...');
+      console.log('📍 Contract address:', TOLL_COLLECTION_CONTRACT);
+      
+      if (!this.provider) {
+        return { accessible: false, error: 'Provider not initialized' };
+      }
+      
+      // Test 1: Check if contract has code
+      const code = await this.provider.getCode(TOLL_COLLECTION_CONTRACT);
+      console.log('📋 Contract code length:', code.length);
+      
+      if (code === '0x') {
+        return { 
+          accessible: false, 
+          error: `No contract found at address ${TOLL_COLLECTION_CONTRACT}`,
+          details: { codeLength: code.length }
+        };
+      }
+      
+      // Test 2: Try to create contract instance
+      const testContract = new ethers.Contract(
+        TOLL_COLLECTION_CONTRACT,
+        TOLL_COLLECTION_ABI,
+        this.provider
+      );
+      
+      // Test 3: Try to call a view function
+      const tollRate = await testContract.tollRate();
+      console.log('✅ Contract accessible, toll rate:', ethers.formatEther(tollRate));
+      
+      return { 
+        accessible: true, 
+        details: { 
+          codeLength: code.length,
+          tollRate: ethers.formatEther(tollRate)
+        }
+      };
+    } catch (error: any) {
+      console.error('❌ Contract access test failed:', error);
+      return { 
+        accessible: false, 
+        error: error.message,
+        details: { 
+          contractAddress: TOLL_COLLECTION_CONTRACT,
+          errorType: error.name
+        }
+      };
+    }
+  }
+
+  // Method to verify contract deployment with detailed diagnostics
+  async verifyContractDeployment(): Promise<{ isDeployed: boolean; error?: string; diagnostics?: any }> {
+    try {
+      if (!this.provider) {
+        return { isDeployed: false, error: 'Provider not initialized' };
+      }
+
+      console.log('🔍 Verifying contract deployment...');
+      console.log('📍 Contract address:', TOLL_COLLECTION_CONTRACT);
+      
+      // Check if contract has code at the address
+      const code = await this.provider.getCode(TOLL_COLLECTION_CONTRACT);
+      console.log('📋 Contract code length:', code.length);
+      
+      if (code === '0x') {
+        return { 
+          isDeployed: false, 
+          error: `No contract found at address ${TOLL_COLLECTION_CONTRACT}. Please verify the contract is deployed.`,
+          diagnostics: {
+            contractAddress: TOLL_COLLECTION_CONTRACT,
+            codeLength: code.length,
+            network: await this.provider.getNetwork().then(n => n.name),
+            chainId: await this.provider.getNetwork().then(n => n.chainId)
+          }
+        };
+      }
+
+      // Try to call a view function to verify the contract is working
+      const tempContract = new ethers.Contract(
+        TOLL_COLLECTION_CONTRACT,
+        TOLL_COLLECTION_ABI,
+        this.provider
+      );
+      
+      try {
+        console.log('🧪 Testing contract methods...');
+        
+        // Test multiple methods to ensure contract is working
+        const tollRate = await tempContract.tollRate();
+        console.log('✅ tollRate() method works:', ethers.formatEther(tollRate));
+        
+        // Test if the contract has the required methods
+        const hasProcessTollPayment = tempContract.interface.hasFunction('processTollPayment');
+        const hasProcessTollPaymentFromTopUpWallet = tempContract.interface.hasFunction('processTollPaymentFromTopUpWallet');
+        const hasHasUserTopUpWallet = tempContract.interface.hasFunction('hasUserTopUpWallet');
+        
+        console.log('📋 Available methods:');
+        console.log('  - processTollPayment:', hasProcessTollPayment);
+        console.log('  - processTollPaymentFromTopUpWallet:', hasProcessTollPaymentFromTopUpWallet);
+        console.log('  - hasUserTopUpWallet:', hasHasUserTopUpWallet);
+        
+        return { 
+          isDeployed: true,
+          diagnostics: {
+            contractAddress: TOLL_COLLECTION_CONTRACT,
+            codeLength: code.length,
+            tollRate: ethers.formatEther(tollRate),
+            methods: {
+              processTollPayment: hasProcessTollPayment,
+              processTollPaymentFromTopUpWallet: hasProcessTollPaymentFromTopUpWallet,
+              hasUserTopUpWallet: hasHasUserTopUpWallet
+            },
+            network: await this.provider.getNetwork().then(n => n.name),
+            chainId: await this.provider.getNetwork().then(n => n.chainId)
+          }
+        };
+      } catch (error: any) {
+        console.error('❌ Contract method test failed:', error);
+        return { 
+          isDeployed: false, 
+          error: `Contract exists but method calls failed: ${error.message}`,
+          diagnostics: {
+            contractAddress: TOLL_COLLECTION_CONTRACT,
+            codeLength: code.length,
+            error: error.message,
+            errorCode: error.code,
+            network: await this.provider.getNetwork().then(n => n.name),
+            chainId: await this.provider.getNetwork().then(n => n.chainId)
+          }
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ Contract deployment verification failed:', error);
+      return { 
+        isDeployed: false, 
+        error: `Failed to verify contract deployment: ${error.message}`,
+        diagnostics: {
+          contractAddress: TOLL_COLLECTION_CONTRACT,
+          error: error.message,
+          errorCode: error.code
+        }
+      };
+    }
+  }
+
+  // Revenue Management Methods
+  async getContractRevenue(): Promise<{ totalRevenue: string; formattedRevenue: string }> {
+    await this.ensureInitialized();
+    
+    if (!this.tollContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      const totalRevenue = await this.tollContract.totalRevenue();
+      const formattedRevenue = ethers.formatEther(totalRevenue);
+      
+      return {
+        totalRevenue: totalRevenue.toString(),
+        formattedRevenue
+      };
+    } catch (error: any) {
+      console.error('❌ Failed to get contract revenue:', error);
+      throw new Error(`Failed to get contract revenue: ${error.message}`);
+    }
+  }
+
+  async getContractStats(): Promise<{
+    totalRevenue: string;
+    formattedRevenue: string;
+    totalTransactions: number;
+    totalVehicles: number;
+    tollRate: string;
+    formattedTollRate: string;
+  }> {
+    await this.ensureInitialized();
+    
+    if (!this.tollContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      const [totalRevenue, totalTransactions, totalVehicles, tollRate] = await Promise.all([
+        this.tollContract.totalRevenue(),
+        this.tollContract.getTotalTransactions(),
+        this.tollContract.getTotalVehicles(),
+        this.tollContract.tollRate()
+      ]);
+
+      return {
+        totalRevenue: totalRevenue.toString(),
+        formattedRevenue: ethers.formatEther(totalRevenue),
+        totalTransactions: Number(totalTransactions),
+        totalVehicles: Number(totalVehicles),
+        tollRate: tollRate.toString(),
+        formattedTollRate: ethers.formatEther(tollRate)
+      };
+    } catch (error: any) {
+      console.error('❌ Failed to get contract stats:', error);
+      throw new Error(`Failed to get contract stats: ${error.message}`);
+    }
+  }
+
+  async withdrawRevenue(
+    treasuryWallet: string,
+    amount: string,
+    adminWallet: string
+  ): Promise<TransactionResult> {
+    await this.ensureInitialized();
+    
+    if (!this.tollContract || !this.signer) {
+      throw new Error('Contract or signer not initialized');
+    }
+
+    try {
+      console.log('💰 Starting revenue withdrawal...');
+      console.log('📋 Withdrawal Details:');
+      console.log('  - Treasury Wallet:', treasuryWallet);
+      console.log('  - Amount:', amount);
+      console.log('  - Admin Wallet:', adminWallet);
+      console.log('  - Contract Address:', TOLL_COLLECTION_CONTRACT);
+
+      // Convert amount to wei
+      const amountInWei = ethers.parseEther(amount);
+      console.log('💰 Amount in Wei:', amountInWei.toString());
+
+      // Execute withdrawal transaction
+      const tx = await this.tollContract.withdrawRevenue(
+        treasuryWallet,
+        amountInWei,
+        {
+          from: adminWallet,
+          gasLimit: 200000,
+        }
+      );
+
+      console.log('⏳ Waiting for withdrawal transaction confirmation...');
+      console.log('📋 Transaction Hash:', tx.hash);
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 1) {
+        console.log('✅ Revenue withdrawal successful!');
+        console.log('📊 Transaction Details:');
+        console.log('  - Block Number:', receipt.blockNumber);
+        console.log('  - Gas Used:', receipt.gasUsed.toString());
+        console.log('  - Transaction Hash:', tx.hash);
+
+        return {
+          success: true,
+          transactionHash: tx.hash,
+          gasUsed: receipt.gasUsed.toString(),
+          blockNumber: receipt.blockNumber,
+          walletAddress: treasuryWallet
+        };
+      } else {
+        console.error('❌ Withdrawal transaction failed');
+        return {
+          success: false,
+          error: 'Withdrawal transaction failed'
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ Revenue withdrawal failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Withdrawal failed'
+      };
+    }
+  }
+
+  async withdrawAllRevenue(
+    treasuryWallet: string,
+    adminWallet: string
+  ): Promise<TransactionResult> {
+    try {
+      // Get current revenue amount
+      const revenueInfo = await this.getContractRevenue();
+      
+      if (revenueInfo.totalRevenue === '0') {
+        return {
+          success: false,
+          error: 'No revenue available to withdraw'
+        };
+      }
+
+      console.log('💰 Withdrawing all available revenue...');
+      console.log('📊 Available Revenue:', revenueInfo.formattedRevenue, 'ETH');
+
+      // Withdraw all revenue
+      return await this.withdrawRevenue(
+        treasuryWallet,
+        revenueInfo.formattedRevenue,
+        adminWallet
+      );
+    } catch (error: any) {
+      console.error('❌ Failed to withdraw all revenue:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to withdraw all revenue'
+      };
+    }
+  }
+
+  async getTreasuryWalletBalance(treasuryWallet: string): Promise<BalanceInfo> {
+    await this.ensureInitialized();
+    
+    if (!this.provider) {
+      throw new Error('Provider not initialized');
+    }
+
+    try {
+      const balance = await this.provider.getBalance(treasuryWallet);
+      const formattedBalance = ethers.formatEther(balance);
+      
+      return {
+        balance: balance.toString(),
+        formattedBalance,
+        decimals: 18
+      };
+    } catch (error: any) {
+      console.error('❌ Failed to get treasury wallet balance:', error);
+      throw new Error(`Failed to get treasury wallet balance: ${error.message}`);
+    }
   }
 }
 

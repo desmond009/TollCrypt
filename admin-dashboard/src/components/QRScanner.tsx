@@ -564,8 +564,43 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         throw new Error(connectionCheck.error || 'Wallet connection issue');
       }
       
+      // Get detailed contract information with diagnostics
+      const contractInfo = await blockchainService.getContractInfo();
+      console.log('📋 Contract Info:', contractInfo);
+      
+      if (!contractInfo.isDeployed) {
+        throw new Error(contractInfo.error || 'Contract not deployed');
+      }
+      
+      // Test contract access and provide detailed debugging
+      const contractTest = await blockchainService.testContractAccess();
+      if (!contractTest.accessible) {
+        console.error('Contract access test failed:', contractTest);
+        throw new Error(contractTest.error || 'Contract access test failed');
+      }
+      
+      console.log('✅ Contract access test passed:', contractTest.details);
+      
+      // Additional contract deployment verification
+      const deploymentVerification = await blockchainService.verifyContractDeployment();
+      if (!deploymentVerification.isDeployed) {
+        console.error('Contract deployment verification failed:', deploymentVerification);
+        throw new Error(deploymentVerification.error || 'Contract deployment verification failed');
+      }
+      
+      console.log('✅ Contract deployment verification passed:', deploymentVerification.diagnostics);
+      
       const currentPlazaId = 3; // This should come from admin's session
-      const adminWallet = '0x0000000000000000000000000000000000000000'; // Admin wallet placeholder
+      
+      // Get the actual connected admin wallet address
+      let adminWallet: string;
+      try {
+        adminWallet = await blockchainService.getConnectedWalletAddress();
+        console.log('📍 Admin Wallet Address:', adminWallet);
+      } catch (error) {
+        console.error('❌ Failed to get admin wallet address:', error);
+        throw new Error('Failed to get admin wallet address. Please ensure MetaMask is connected.');
+      }
       
       // Process the toll payment on blockchain
       const result = await blockchainService.processAdminTollPayment(
@@ -634,6 +669,43 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         errorMessage = 'Please connect your MetaMask wallet and try again.';
       } else if (error.message.includes('insufficient funds')) {
         errorMessage = 'Insufficient funds for transaction. Please add ETH to your wallet.';
+      } else if (error.message.includes('No contract found at address')) {
+        errorMessage = 'Smart contract not found. Please check if the contract is deployed correctly.';
+      } else if (error.message.includes('Contract deployment verification failed')) {
+        errorMessage = 'Contract verification failed. Please check contract deployment status.';
+      } else if (error.message.includes('Failed to initialize toll contract')) {
+        errorMessage = 'Contract initialization failed. Please refresh the page and try again.';
+      } else if (error.message.includes('Contract access test failed')) {
+        errorMessage = 'Contract accessibility test failed. Please check if the contract is deployed correctly.';
+      } else if (error.message.includes('Contract call failed')) {
+        errorMessage = 'Contract call failed. This might be due to insufficient authorization or invalid parameters.';
+      } else if (error.message.includes('TopUpWallet is not authorized')) {
+        errorMessage = 'TopUpWallet is not authorized. Please authorize the wallet first.';
+      } else if (error.message.includes('Insufficient funds in the TopUpWallet')) {
+        errorMessage = 'Insufficient funds in the TopUpWallet for this transaction.';
+      } else if (error.message.includes('missing revert data')) {
+        errorMessage = 'Contract call failed with missing revert data. This usually indicates:\n\n' +
+                      '1. The contract method does not exist\n' +
+                      '2. The contract is not properly deployed\n' +
+                      '3. Insufficient authorization or permissions\n' +
+                      '4. Invalid parameters passed to the contract\n\n' +
+                      'Please check:\n' +
+                      '- Contract deployment status\n' +
+                      '- Wallet authorization\n' +
+                      '- Network connection\n' +
+                      '- Contract method availability';
+      } else if (error.message.includes('CALL_EXCEPTION')) {
+        errorMessage = 'Contract call exception. Please check:\n\n' +
+                      '1. Wallet authorization status\n' +
+                      '2. Contract deployment verification\n' +
+                      '3. Network connectivity\n' +
+                      '4. Contract method parameters';
+      } else if (error.message.includes('Contract deployment verification failed')) {
+        errorMessage = 'Contract deployment verification failed. Please check:\n\n' +
+                      '1. Contract is properly deployed on Sepolia testnet\n' +
+                      '2. Contract address is correct\n' +
+                      '3. Network connection is stable\n' +
+                      '4. Contract methods are available';
       }
       
       onError?.(errorMessage);
