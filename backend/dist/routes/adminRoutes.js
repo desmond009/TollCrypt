@@ -1024,4 +1024,157 @@ router.post('/validate-vehicle', async (req, res) => {
         });
     }
 });
+// Revenue Management Endpoints
+// Get contract revenue statistics
+router.get('/revenue/stats', async (req, res) => {
+    try {
+        // This would typically call the blockchain service to get contract stats
+        // For now, we'll return mock data structure
+        res.json({
+            success: true,
+            data: {
+                totalRevenue: '0',
+                formattedRevenue: '0.0000',
+                totalTransactions: 0,
+                totalVehicles: 0,
+                tollRate: '0',
+                formattedTollRate: '0.0001'
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error getting revenue stats:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get revenue statistics'
+        });
+    }
+});
+// Get treasury wallet balance
+router.post('/revenue/treasury-balance', async (req, res) => {
+    try {
+        const { treasuryWallet } = req.body;
+        if (!treasuryWallet) {
+            return res.status(400).json({
+                success: false,
+                error: 'Treasury wallet address is required'
+            });
+        }
+        // This would typically call the blockchain service to get wallet balance
+        // For now, we'll return mock data
+        res.json({
+            success: true,
+            data: {
+                balance: '0',
+                formattedBalance: '0.0000',
+                decimals: 18
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error getting treasury balance:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get treasury balance'
+        });
+    }
+});
+// Record revenue withdrawal transaction
+router.post('/revenue/withdrawal', async (req, res) => {
+    try {
+        const { treasuryWallet, amount, adminWallet, transactionHash, blockNumber, gasUsed } = req.body;
+        if (!treasuryWallet || !amount || !adminWallet || !transactionHash) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields'
+            });
+        }
+        // Create withdrawal record in database
+        const withdrawalRecord = new TollTransaction_1.TollTransaction({
+            transactionId: `withdrawal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            vehicleId: null, // No vehicle for withdrawal
+            payer: adminWallet,
+            amount: parseFloat(amount),
+            currency: 'ETH',
+            zkProofHash: transactionHash,
+            tollLocation: 'Revenue Withdrawal',
+            status: 'completed',
+            blockchainTxHash: transactionHash,
+            gasUsed: gasUsed ? parseInt(gasUsed) : undefined,
+            processedAt: new Date(),
+            metadata: {
+                type: 'revenue_withdrawal',
+                treasuryWallet,
+                adminWallet,
+                blockNumber,
+                processedAt: new Date()
+            }
+        });
+        await withdrawalRecord.save();
+        // Broadcast to admin dashboard
+        try {
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('revenue_withdrawal_completed', {
+                    treasuryWallet,
+                    amount,
+                    transactionHash,
+                    timestamp: new Date()
+                });
+            }
+        }
+        catch (socketError) {
+            console.error('Error broadcasting withdrawal:', socketError);
+        }
+        res.json({
+            success: true,
+            message: 'Revenue withdrawal recorded successfully',
+            data: withdrawalRecord
+        });
+    }
+    catch (error) {
+        console.error('Error recording revenue withdrawal:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to record revenue withdrawal'
+        });
+    }
+});
+// Get withdrawal history
+router.get('/revenue/withdrawal-history', async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        // Convert to numbers to avoid TypeScript arithmetic errors
+        const pageNum = parseInt(page, 10) || 1;
+        const limitNum = parseInt(limit, 10) || 10;
+        const withdrawals = await TollTransaction_1.TollTransaction.find({
+            'metadata.type': 'revenue_withdrawal'
+        })
+            .sort({ processedAt: -1 })
+            .limit(limitNum)
+            .skip((pageNum - 1) * limitNum);
+        const total = await TollTransaction_1.TollTransaction.countDocuments({
+            'metadata.type': 'revenue_withdrawal'
+        });
+        res.json({
+            success: true,
+            data: {
+                withdrawals,
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total,
+                    pages: Math.ceil(total / limitNum)
+                }
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error getting withdrawal history:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get withdrawal history'
+        });
+    }
+});
 //# sourceMappingURL=adminRoutes.js.map

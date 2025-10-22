@@ -1256,12 +1256,16 @@ router.get('/revenue/withdrawal-history', async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     
+    // Convert to numbers to avoid TypeScript arithmetic errors
+    const pageNum = parseInt(page as string, 10) || 1;
+    const limitNum = parseInt(limit as string, 10) || 10;
+    
     const withdrawals = await TollTransaction.find({
       'metadata.type': 'revenue_withdrawal'
     })
     .sort({ processedAt: -1 })
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
+    .limit(limitNum)
+    .skip((pageNum - 1) * limitNum);
     
     const total = await TollTransaction.countDocuments({
       'metadata.type': 'revenue_withdrawal'
@@ -1272,10 +1276,10 @@ router.get('/revenue/withdrawal-history', async (req, res) => {
       data: {
         withdrawals,
         pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
+          page: pageNum,
+          limit: limitNum,
           total,
-          pages: Math.ceil(total / parseInt(limit as string))
+          pages: Math.ceil(total / limitNum)
         }
       }
     });
