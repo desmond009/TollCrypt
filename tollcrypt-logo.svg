@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="95" fill="#1a1a2e" stroke="#16213e" stroke-width="2"/>
+  
+  <!-- Inner Circle -->
+  <circle cx="100" cy="100" r="80" fill="none" stroke="#0f3460" stroke-width="1"/>
+  
+  <!-- Toll Gate Structure -->
+  <rect x="85" y="60" width="30" height="80" fill="#4a90e2" rx="2"/>
+  
+  <!-- Gate Arms -->
+  <rect x="70" y="75" width="25" height="4" fill="#e74c3c" rx="2"/>
+  <rect x="105" y="75" width="25" height="4" fill="#e74c3c" rx="2"/>
+  
+  <!-- Blockchain Chain Links -->
+  <circle cx="50" cy="100" r="8" fill="none" stroke="#f39c12" stroke-width="3"/>
+  <circle cx="65" cy="100" r="8" fill="none" stroke="#f39c12" stroke-width="3"/>
+  <circle cx="135" cy="100" r="8" fill="none" stroke="#f39c12" stroke-width="3"/>
+  <circle cx="150" cy="100" r="8" fill="none" stroke="#f39c12" stroke-width="3"/>
+  
+  <!-- Chain Connections -->
+  <line x1="58" y1="100" x2="57" y2="100" stroke="#f39c12" stroke-width="2"/>
+  <line x1="127" y1="100" x2="142" y2="100" stroke="#f39c12" stroke-width="2"/>
+  
+  <!-- Cryptocurrency Symbol (Bitcoin-style) -->
+  <circle cx="100" cy="130" r="12" fill="none" stroke="#f7931a" stroke-width="2"/>
+  <text x="100" y="137" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#f7931a">₵</text>
+  
+  <!-- Digital Elements -->
+  <rect x="40" y="40" width="8" height="8" fill="#00d4aa" opacity="0.7"/>
+  <rect x="52" y="40" width="8" height="8" fill="#00d4aa" opacity="0.7"/>
+  <rect x="64" y="40" width="8" height="8" fill="#00d4aa" opacity="0.7"/>
+  
+  <rect x="128" y="40" width="8" height="8" fill="#00d4aa" opacity="0.7"/>
+  <rect x="140" y="40" width="8" height="8" fill="#00d4aa" opacity="0.7"/>
+  <rect x="152" y="40" width="8" height="8" fill="#00d4aa" opacity="0.7"/>
+  
+  <!-- Security Shield -->
+  <path d="M100 50 L110 60 L110 75 L100 85 L90 75 L90 60 Z" fill="#27ae60" opacity="0.8"/>
+  <text x="100" y="75" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="white">🔒</text>
+  
+  <!-- Speed Lines -->
+  <line x1="20" y1="100" x2="35" y2="100" stroke="#3498db" stroke-width="2" opacity="0.6"/>
+  <line x1="165" y1="100" x2="180" y2="100" stroke="#3498db" stroke-width="2" opacity="0.6"/>
+  
+  <!-- Text -->
+  <text x="100" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ecf0f1">TollCrypt</text>
+  <text x="100" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#bdc3c7">Blockchain Toll Collection</text>
+</svg>

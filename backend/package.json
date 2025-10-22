@@ -1,7 +1,7 @@
 {
-  "name": "tollchain-backend",
+  "name": "tollcrypt-backend",
   "version": "1.0.0",
-  "description": "Backend API for TollChain blockchain toll collection system",
+  "description": "Backend API for TollCrypt blockchain toll collection system",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
@@ -19,7 +19,7 @@
     "api",
     "express"
   ],
-  "author": "TollChain Team",
+  "author": "TollCrypt Team",
   "license": "MIT",
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

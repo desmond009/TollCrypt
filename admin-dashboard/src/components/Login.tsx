@@ -60,7 +60,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="w-6 h-6 lg:w-8 lg:h-8 bg-yellow-400 rounded-lg mr-2 lg:mr-3 flex items-center justify-center">
             <WalletIcon className="h-4 w-4 lg:h-5 lg:w-5 text-black" />
           </div>
-          <h1 className="text-lg lg:text-xl font-bold text-white">TollChain Admin</h1>
+          <h1 className="text-lg lg:text-xl font-bold text-white">TollCrypt Admin</h1>
         </div>
         <WalletConnector />
       </div>

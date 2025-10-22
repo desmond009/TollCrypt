@@ -3,11 +3,9 @@ import {
   HomeIcon,
   TruckIcon,
   CurrencyDollarIcon,
-  ChartBarIcon,
   CogIcon,
   QrCodeIcon,
   MapPinIcon,
-  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 
 interface TopNavigationProps {
@@ -20,9 +18,7 @@ const navigation = [
   { name: 'QR Scanner', tab: 'scanner', icon: QrCodeIcon },
   { name: 'Vehicles', tab: 'vehicles', icon: TruckIcon },
   { name: 'Transactions', tab: 'transactions', icon: CurrencyDollarIcon },
-  { name: 'Revenue', tab: 'revenue', icon: BanknotesIcon },
   { name: 'Plazas', tab: 'plazas', icon: MapPinIcon },
-  { name: 'Analytics', tab: 'analytics', icon: ChartBarIcon },
   { name: 'Settings', tab: 'settings', icon: CogIcon },
 ];
 

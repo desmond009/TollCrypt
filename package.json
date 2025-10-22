@@ -1,7 +1,7 @@
 {
-  "name": "tollchain",
+  "name": "tollcrypt",
   "version": "1.0.0",
-  "description": "Blockchain-based automated toll collection system with privacy-preserving authentication",
+  "description": "TollCrypt - Blockchain-based automated toll collection system with privacy-preserving authentication",
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:hardware\"",
@@ -18,8 +18,8 @@
     "deploy:contracts": "cd contracts && npm run deploy",
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../contracts && npm install && cd ../hardware && pip install -r requirements.txt"
   },
-  "keywords": ["blockchain", "toll-collection", "privacy", "zkp", "aadhaar", "ethereum"],
-  "author": "TollChain Team",
+  "keywords": ["blockchain", "toll-collection", "privacy", "zkp", "aadhaar", "ethereum", "tollcrypt"],
+  "author": "TollCrypt Team",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2",

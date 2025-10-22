@@ -40,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout, notifications, a
             {/* Left side - Brand */}
             <div className="flex items-center space-x-2 sm:space-x-3">
               <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white font-serif">
-                TollChain Admin
+                TollCrypt Admin
               </h1>
               <span className="hidden sm:inline-flex items-center px-2 py-1 text-xs font-medium text-blue-300 bg-blue-900 rounded-full">
                 {user.role.replace('_', ' ').toUpperCase()}

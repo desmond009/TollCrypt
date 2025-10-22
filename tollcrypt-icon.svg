@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="64" height="64" rx="12" fill="#1a1a2e"/>
+  
+  <!-- Toll Gate -->
+  <rect x="24" y="16" width="16" height="32" fill="#4a90e2" rx="2"/>
+  
+  <!-- Gate Arms -->
+  <rect x="16" y="24" width="12" height="3" fill="#e74c3c" rx="1.5"/>
+  <rect x="36" y="24" width="12" height="3" fill="#e74c3c" rx="1.5"/>
+  
+  <!-- Blockchain Chain -->
+  <circle cx="16" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
+  <circle cx="24" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
+  <circle cx="40" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
+  <circle cx="48" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
+  
+  <!-- Cryptocurrency Symbol -->
+  <circle cx="32" cy="48" r="6" fill="none" stroke="#f7931a" stroke-width="2"/>
+  <text x="32" y="52" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#f7931a">₵</text>
+  
+  <!-- Digital Pixels -->
+  <rect x="8" y="8" width="3" height="3" fill="#00d4aa"/>
+  <rect x="12" y="8" width="3" height="3" fill="#00d4aa"/>
+  <rect x="49" y="8" width="3" height="3" fill="#00d4aa"/>
+  <rect x="53" y="8" width="3" height="3" fill="#00d4aa"/>
+</svg>

@@ -166,7 +166,7 @@ function AppContent() {
                 <span className="text-black font-bold text-xl">TC</span>
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">
-                Welcome to TollChain FASTag
+                Welcome to TollCrypt FASTag
               </h1>
               <p className="text-gray-400 text-sm">
                 Connect your wallet to start using our blockchain-based toll collection system

@@ -1,4 +1,4 @@
-# TollChain - Blockchain-Based Automated Toll Collection System
+# TollCrypt - Blockchain-Based Automated Toll Collection System
 
 A production-ready web application for automated toll collection using blockchain smart contracts, privacy-preserving anon-Aadhaar user authentication, and RFID/QR hardware integration.
 
@@ -22,7 +22,7 @@ A production-ready web application for automated toll collection using blockchai
 ## Project Structure
 
 ```
-TollChain/
+TollCrypt/
 ├── frontend/          # React frontend application
 ├── backend/           # Node.js/Express backend API
 ├── contracts/         # Solidity smart contracts

@@ -11,12 +11,10 @@ import { runtimeErrorSuppressor } from './utils/runtimeErrorSuppressor'; // Init
 import { Dashboard } from './components/Dashboard';
 import { VehicleManagement } from './components/VehicleManagement';
 import { TransactionMonitoring } from './components/TransactionMonitoring';
-import { AnalyticsReporting } from './components/AnalyticsReporting';
 import { PlazaManagement } from './components/PlazaManagement';
 import { QRScanner } from './components/QRScanner';
 import { TransactionProcessor } from './components/TransactionProcessor';
 import { QRCodeTollCollection } from './components/QRCodeTollCollection';
-import RevenueManagement from './components/RevenueManagement';
 import { Header } from './components/Header';
 import { Login } from './components/Login';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
@@ -233,10 +231,6 @@ function AppContent() {
         return <VehicleManagement socket={socket} />;
       case 'transactions':
         return <TransactionMonitoring socket={socket} />;
-      case 'revenue':
-        return <RevenueManagement />;
-      case 'analytics':
-        return <AnalyticsReporting socket={socket} />;
       case 'plazas':
         return <PlazaManagement socket={socket} />;
       case 'scanner':

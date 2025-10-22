@@ -23,7 +23,7 @@ import {
   ArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { api } from '../services/api';
-import { processRevenueData, processVehicleTypeData, isValidChartData } from '../utils/chartUtils';
+import { processVehicleTypeData, isValidChartData } from '../utils/chartUtils';
 
 // Register Chart.js components
 ChartJS.register(
@@ -40,11 +40,9 @@ ChartJS.register(
 
 interface DashboardStats {
   totalVehicles: number;
-  totalRevenue: number;
   averageWaitTime: number;
   successRate: number;
   todayTransactions: number;
-  todayRevenue: number;
   activePlazas: number;
   failedTransactions: number;
 }
@@ -66,7 +64,6 @@ interface Plaza {
   location: string;
   status: 'active' | 'maintenance' | 'inactive';
   todayTransactions: number;
-  todayRevenue: number;
   coordinates: {
     lat: number;
     lng: number;
@@ -81,17 +78,14 @@ interface LiveDashboardProps {
 export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notifications }) => {
   const [stats, setStats] = useState<DashboardStats>({
     totalVehicles: 0,
-    totalRevenue: 0,
     averageWaitTime: 0,
     successRate: 0,
     todayTransactions: 0,
-    todayRevenue: 0,
     activePlazas: 0,
     failedTransactions: 0,
   });
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [plazas, setPlazas] = useState<Plaza[]>([]);
-  const [revenueData, setRevenueData] = useState<any>(null);
   const [vehicleTypeData, setVehicleTypeData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -111,11 +105,6 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
       // Fetch plazas
       const plazasResponse = await api.get('/api/admin/plazas');
       setPlazas(plazasResponse.data.data || []);
-
-      // Fetch revenue chart data
-      const revenueResponse = await api.get('/api/admin/analytics/revenue?period=7d');
-      const revenueData = processRevenueData(revenueResponse.data.data);
-      setRevenueData(revenueData);
 
       // Fetch vehicle type distribution
       const vehicleTypeResponse = await api.get('/api/admin/analytics/vehicle-types');
@@ -148,7 +137,6 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
         setStats(prev => ({
           ...prev,
           todayTransactions: prev.todayTransactions + 1,
-          todayRevenue: prev.todayRevenue + data.amount,
         }));
       });
 
@@ -241,22 +229,6 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
 
         <div className="admin-card">
           <div className="flex items-center">
-            <div className="p-2 bg-green-900/20 rounded-lg">
-              <CurrencyDollarIcon className="h-6 w-6 text-green-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Today's Revenue</p>
-              <p className="text-2xl font-semibold text-white">{formatCurrency(stats.todayRevenue)}</p>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center">
-            <ArrowUpIcon className="h-4 w-4 text-green-500" />
-            <span className="text-sm text-green-400 ml-1">+8% from yesterday</span>
-          </div>
-        </div>
-
-        <div className="admin-card">
-          <div className="flex items-center">
             <div className="p-2 bg-yellow-900/20 rounded-lg">
               <ClockIcon className="h-6 w-6 text-yellow-400" />
             </div>
@@ -290,56 +262,6 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <div className="admin-card">
-          <h3 className="text-lg font-semibold text-white mb-4">Revenue Trend (7 Days)</h3>
-          {isValidChartData(revenueData) ? (
-            <Line
-              data={revenueData}
-              options={{
-                responsive: true,
-                plugins: {
-                  legend: {
-                    position: 'top' as const,
-                    labels: {
-                      color: '#ffffff'
-                    }
-                  },
-                  title: {
-                    display: false,
-                  },
-                },
-                scales: {
-                  x: {
-                    ticks: {
-                      color: '#9ca3af'
-                    },
-                    grid: {
-                      color: '#374151'
-                    }
-                  },
-                  y: {
-                    beginAtZero: true,
-                    ticks: {
-                      color: '#9ca3af',
-                      callback: function(value: any) {
-                        return formatCurrency(Number(value));
-                      }
-                    },
-                    grid: {
-                      color: '#374151'
-                    }
-                  }
-                }
-              }}
-            />
-          ) : (
-            <div className="h-64 flex items-center justify-center">
-              <div className="text-gray-400">No revenue data available</div>
-            </div>
-          )}
-        </div>
-
         {/* Vehicle Type Distribution */}
         <div className="admin-card">
           <h3 className="text-lg font-semibold text-white mb-4">Vehicle Type Distribution</h3>
