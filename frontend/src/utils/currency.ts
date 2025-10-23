@@ -1,5 +1,5 @@
 /**
- * Currency formatting utilities for the TollChain application
+ * Currency formatting utilities for the Toll Crypt application
  */
 
 /**

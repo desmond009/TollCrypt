@@ -25,7 +25,7 @@ export interface WalletLookupResult {
 
 class WalletPersistenceService {
   private static instance: WalletPersistenceService;
-  private readonly STORAGE_PREFIX = 'tollchain_wallet_';
+  private readonly STORAGE_PREFIX = 'tollcrypt_wallet_';
   private readonly CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
   public static getInstance(): WalletPersistenceService {

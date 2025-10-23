@@ -14,10 +14,10 @@ if (!projectId || projectId === 'your_walletconnect_project_id' || projectId ===
 }
 
 const metadata = {
-  name: 'TollChain',
+  name: 'Toll Crypt',
   description: 'Blockchain-based toll collection system',
-  url: 'https://tollchain.com',
-  icons: ['https://tollchain.com/icon.png']
+  url: 'https://tollcrypt.com',
+  icons: ['https://tollcrypt.com/icon.png']
 }
 
 const chains = [sepolia, mainnet, polygon, polygonMumbai] as const

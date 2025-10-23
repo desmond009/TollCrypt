@@ -22,6 +22,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string>('');
   const [topUpWalletInfo, setTopUpWalletInfo] = useState<TopUpWalletInfo | null>(null);
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
   // Load vehicles on component mount
   useEffect(() => {
@@ -35,6 +36,78 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     }
   }, [selectedVehicleProp]);
 
+  // Function to refresh balance from blockchain using direct RPC calls
+  const refreshWalletBalance = async () => {
+    if (!topUpWalletInfo?.walletAddress) return;
+    
+    setIsRefreshingBalance(true);
+    try {
+      // Try multiple RPC endpoints for better reliability
+      const rpcEndpoints = [
+        process.env.REACT_APP_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+        'https://rpc.ankr.com/eth_sepolia'
+      ].filter(Boolean);
+      
+      for (const rpcUrl of rpcEndpoints as string[]) {
+        try {
+          // Add timeout to prevent hanging requests
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          
+          const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getBalance',
+              params: [topUpWalletInfo.walletAddress, 'latest'],
+              id: 1
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (data && data.result && !data.error) {
+              const balanceInWei = parseInt(data.result, 16);
+              const balanceInEth = balanceInWei / Math.pow(10, 18);
+              const balanceString = balanceInEth.toString();
+              
+              console.log('✅ Balance refreshed from blockchain (direct RPC):', balanceInEth, 'ETH');
+              setTopUpWalletInfo(prev => {
+                if (prev) {
+                  return { ...prev, balance: balanceString };
+                }
+                return prev;
+              });
+              return; // Success, exit early
+            }
+          }
+        } catch (rpcError) {
+          console.warn(`RPC endpoint ${rpcUrl} failed:`, rpcError);
+          continue; // Try next endpoint
+        }
+      }
+      
+      console.warn('All RPC endpoints failed, falling back to API');
+      // Fallback to API if RPC fails
+      const balanceResponse = await topUpWalletAPI.getTopUpWalletBalance();
+      setTopUpWalletInfo(prev => {
+        if (prev) {
+          return { ...prev, balance: balanceResponse.balance };
+        }
+        return prev;
+      });
+    } catch (error) {
+      console.error('Error refreshing wallet balance:', error);
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  };
+
   // Load top-up wallet info
   useEffect(() => {
     const loadTopUpWalletInfo = async () => {
@@ -43,6 +116,12 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
       try {
         const walletInfo = await topUpWalletAPI.getTopUpWalletInfo();
         setTopUpWalletInfo(walletInfo);
+        
+        // Immediately refresh balance using direct RPC to get fresh data
+        if (walletInfo.walletAddress) {
+          console.log('🔄 Refreshing balance immediately after wallet load...');
+          setTimeout(() => refreshWalletBalance(), 100); // Small delay to ensure state is set
+        }
       } catch (error) {
         // Only log non-404 errors as errors, 404 or "not found" means wallet doesn't exist yet
         if (error instanceof Error && (error.message.includes('404') || error.message.toLowerCase().includes('not found'))) {
@@ -188,7 +267,29 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
           {/* Top-up Wallet Info */}
           {topUpWalletInfo ? (
             <div className="mb-6 p-4 bg-blue-900 rounded-lg border border-blue-700">
-              <h3 className="font-medium text-blue-300 mb-2">Top-up Wallet Details</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium text-blue-300">Top-up Wallet Details</h3>
+                <button
+                  onClick={refreshWalletBalance}
+                  disabled={isRefreshingBalance}
+                  className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1 disabled:opacity-50"
+                  title="Refresh balance from blockchain"
+                >
+                  {isRefreshingBalance ? (
+                    <>
+                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      🔄 Refresh
+                    </>
+                  )}
+                </button>
+              </div>
               <div className="text-sm text-blue-400 space-y-1">
                 <p><span className="font-medium">Address:</span> 
                   <span className="font-mono text-xs ml-1">

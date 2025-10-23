@@ -348,8 +348,20 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
       <div className="card">
         <h2 className="text-xl font-bold text-white mb-4">User Profile</h2>
         <div className="text-center py-8">
-          <div className="w-16 h-16 bg-yellow-400 rounded-xl mx-auto mb-4 flex items-center justify-center">
-            <span className="text-black font-bold text-xl">TC</span>
+          <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+            <svg width="100%" height="100%" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="16" cy="16" r="16" fill="#fbbf24"/>
+              <rect x="6" y="8" width="8" height="12" fill="#f59e0b" rx="1"/>
+              <rect x="7" y="9" width="6" height="10" fill="#d97706" rx="0.5"/>
+              <rect x="4" y="20" width="24" height="4" fill="#6b7280"/>
+              <rect x="4" y="22" width="24" height="1" fill="#9ca3af"/>
+              <rect x="18" y="6" width="4" height="4" fill="#3b82f6" rx="0.5"/>
+              <rect x="23" y="4" width="4" height="4" fill="#3b82f6" rx="0.5"/>
+              <rect x="18" y="11" width="4" height="4" fill="#1d4ed8" rx="0.5"/>
+              <rect x="23" y="9" width="4" height="4" fill="#1d4ed8" rx="0.5"/>
+              <line x1="22" y1="8" x2="23" y2="8" stroke="#3b82f6" strokeWidth="0.5"/>
+              <line x1="22" y1="13" x2="23" y2="13" stroke="#1d4ed8" strokeWidth="0.5"/>
+            </svg>
           </div>
           <p className="text-gray-400 mb-4">No active session found</p>
           <p className="text-sm text-gray-500 mb-6">Please authenticate with Aadhaar to access your profile and manage your vehicles.</p>

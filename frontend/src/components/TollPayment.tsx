@@ -4,10 +4,7 @@ import { QRCodeScanner } from './QRCodeScanner';
 import { TollPaymentProcessor } from './TollPaymentProcessor';
 import { QRCodeData, QRCodeResult } from '../services/qrService';
 
-type PaymentMode = 'user' | 'admin';
-
 export const TollPayment: React.FC = () => {
-  const [mode, setMode] = useState<PaymentMode>('user');
   const [scannedQRData, setScannedQRData] = useState<QRCodeData | null>(null);
   const [generatedQRResult, setGeneratedQRResult] = useState<QRCodeResult | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -63,37 +60,6 @@ export const TollPayment: React.FC = () => {
           </p>
         </div>
 
-        {/* Mode Selection */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-gray-900 rounded-lg shadow-md p-1 border border-gray-800">
-            <button
-              onClick={() => {
-                setMode('user');
-                resetFlow();
-              }}
-              className={`px-6 py-2 rounded-md transition-colors ${
-                mode === 'user'
-                  ? 'bg-yellow-400 text-black'
-                  : 'text-gray-400 hover:bg-gray-800'
-              }`}
-            >
-              User Mode
-            </button>
-            <button
-              onClick={() => {
-                setMode('admin');
-                resetFlow();
-              }}
-              className={`px-6 py-2 rounded-md transition-colors ${
-                mode === 'admin'
-                  ? 'bg-yellow-400 text-black'
-                  : 'text-gray-400 hover:bg-gray-800'
-              }`}
-            >
-              Admin Mode
-            </button>
-          </div>
-        </div>
 
         {/* Error Display */}
         {error && (
@@ -123,36 +89,17 @@ export const TollPayment: React.FC = () => {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* User Mode - QR Code Generation */}
-          {mode === 'user' && (
-            <div className="space-y-6">
-              <div className="card">
-                <h2 className="text-xl font-bold text-white mb-4">
-                  Generate QR Code for Toll Payment
-                </h2>
-                <QRCodeGenerator
-                  onQRGenerated={handleQRGenerated}
-                />
-              </div>
-
+          {/* QR Code Generation */}
+          <div className="space-y-6">
+            <div className="card">
+              <h2 className="text-xl font-bold text-white mb-4">
+                Generate QR Code for Toll Payment
+              </h2>
+              <QRCodeGenerator
+                onQRGenerated={handleQRGenerated}
+              />
             </div>
-          )}
-
-          {/* Admin Mode - QR Code Scanning */}
-          {mode === 'admin' && (
-            <div className="space-y-6">
-              <div className="card">
-                <h2 className="text-xl font-bold text-white mb-4">
-                  Scan QR Code at Toll Plaza
-                </h2>
-                <QRCodeScanner
-                  onQRScanned={handleQRScanned}
-                  onError={setError}
-                  isScanning={!isProcessingPayment}
-                />
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Payment Processing */}
           {isProcessingPayment && scannedQRData && (
@@ -172,91 +119,47 @@ export const TollPayment: React.FC = () => {
               How It Works
             </h2>
             
-            {mode === 'user' ? (
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
-                    1
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Login & Register Vehicle</h3>
-                    <p className="text-sm text-gray-400">Login with Anon-Aadhaar and register your vehicle</p>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
+                  1
                 </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
-                    2
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Top-up Wallet</h3>
-                    <p className="text-sm text-gray-400">Add funds to your FASTag wallet for toll payments</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
-                    3
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Generate QR Code</h3>
-                    <p className="text-sm text-gray-400">Generate a unique QR code linked to your wallet and vehicle</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
-                    4
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Show at Toll Plaza</h3>
-                    <p className="text-sm text-gray-400">Show the QR code to the toll plaza scanner</p>
-                  </div>
+                <div>
+                  <h3 className="font-medium text-white">Login & Register Vehicle</h3>
+                  <p className="text-sm text-gray-400">Login with Anon-Aadhaar and register your vehicle</p>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                    1
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Start Camera</h3>
-                    <p className="text-sm text-gray-400">Enable camera to scan QR codes from users</p>
-                  </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
+                  2
                 </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                    2
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Scan QR Code</h3>
-                    <p className="text-sm text-gray-400">Scan the QR code shown by the user</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                    3
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Verify & Process</h3>
-                    <p className="text-sm text-gray-400">Verify vehicle registration and process payment</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                    4
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">Record Transaction</h3>
-                    <p className="text-sm text-gray-400">Transaction is recorded on blockchain</p>
-                  </div>
+                <div>
+                  <h3 className="font-medium text-white">Top-up Wallet</h3>
+                  <p className="text-sm text-gray-400">Add funds to your FASTag wallet for toll payments</p>
                 </div>
               </div>
-            )}
+              
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
+                  3
+                </div>
+                <div>
+                  <h3 className="font-medium text-white">Generate QR Code</h3>
+                  <p className="text-sm text-gray-400">Generate a unique QR code linked to your wallet and vehicle</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 text-black rounded-full flex items-center justify-center font-bold text-sm">
+                  4
+                </div>
+                <div>
+                  <h3 className="font-medium text-white">Show at Toll Plaza</h3>
+                  <p className="text-sm text-gray-400">Show the QR code to the toll plaza scanner</p>
+                </div>
+              </div>
+            </div>
 
             <div className="mt-6 p-4 bg-blue-900 border border-blue-700 rounded-lg">
               <h3 className="font-medium text-blue-300 mb-2">Key Features:</h3>

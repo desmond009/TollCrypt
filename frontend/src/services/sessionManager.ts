@@ -32,7 +32,7 @@ const DEFAULT_CONFIG: SessionConfig = {
 
 class SessionManager {
   private config: SessionConfig;
-  private storageKey = 'tollchain_session';
+  private storageKey = 'tollcrypt_session';
 
   constructor(config: SessionConfig = DEFAULT_CONFIG) {
     this.config = config;

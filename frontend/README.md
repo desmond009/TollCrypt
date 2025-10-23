@@ -1,6 +1,6 @@
-# TollChain Frontend
+# Toll Crypt Frontend
 
-This is the frontend application for TollChain, a blockchain-based toll collection system built with React and wagmi.
+This is the frontend application for Toll Crypt, a blockchain-based toll collection system built with React and wagmi.
 
 ## Setup Instructions
 

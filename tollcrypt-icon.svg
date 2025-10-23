@@ -1,28 +1,22 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="64" height="64" rx="12" fill="#1a1a2e"/>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="16" cy="16" r="16" fill="#fbbf24"/>
   
-  <!-- Toll Gate -->
-  <rect x="24" y="16" width="16" height="32" fill="#4a90e2" rx="2"/>
+  <!-- Toll Booth Structure -->
+  <rect x="6" y="8" width="8" height="12" fill="#f59e0b" rx="1"/>
+  <rect x="7" y="9" width="6" height="10" fill="#d97706" rx="0.5"/>
   
-  <!-- Gate Arms -->
-  <rect x="16" y="24" width="12" height="3" fill="#e74c3c" rx="1.5"/>
-  <rect x="36" y="24" width="12" height="3" fill="#e74c3c" rx="1.5"/>
+  <!-- Road -->
+  <rect x="4" y="20" width="24" height="4" fill="#6b7280"/>
+  <rect x="4" y="22" width="24" height="1" fill="#9ca3af"/>
   
-  <!-- Blockchain Chain -->
-  <circle cx="16" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
-  <circle cx="24" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
-  <circle cx="40" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
-  <circle cx="48" cy="32" r="4" fill="none" stroke="#f39c12" stroke-width="2"/>
+  <!-- Blockchain Blocks -->
+  <rect x="18" y="6" width="4" height="4" fill="#3b82f6" rx="0.5"/>
+  <rect x="23" y="4" width="4" height="4" fill="#3b82f6" rx="0.5"/>
+  <rect x="18" y="11" width="4" height="4" fill="#1d4ed8" rx="0.5"/>
+  <rect x="23" y="9" width="4" height="4" fill="#1d4ed8" rx="0.5"/>
   
-  <!-- Cryptocurrency Symbol -->
-  <circle cx="32" cy="48" r="6" fill="none" stroke="#f7931a" stroke-width="2"/>
-  <text x="32" y="52" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#f7931a">₵</text>
-  
-  <!-- Digital Pixels -->
-  <rect x="8" y="8" width="3" height="3" fill="#00d4aa"/>
-  <rect x="12" y="8" width="3" height="3" fill="#00d4aa"/>
-  <rect x="49" y="8" width="3" height="3" fill="#00d4aa"/>
-  <rect x="53" y="8" width="3" height="3" fill="#00d4aa"/>
+  <!-- Connection Lines -->
+  <line x1="22" y1="8" x2="23" y2="8" stroke="#3b82f6" stroke-width="0.5"/>
+  <line x1="22" y1="13" x2="23" y2="13" stroke="#1d4ed8" stroke-width="0.5"/>
 </svg>
