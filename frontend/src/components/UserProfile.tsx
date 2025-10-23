@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useSession, VehicleInfo } from '../services/sessionManager';
 import { VehicleRegistration } from './VehicleRegistration';
 import { topUpWalletAPI, TopUpWalletInfo } from '../services/topUpWalletService';
 import { walletPersistenceService } from '../services/walletPersistenceService';
+import socketService from '../services/socketService';
 
 type AppStep = 'wallet' | 'auth' | 'register' | 'topup' | 'payment' | 'dashboard' | 'profile';
 
@@ -30,11 +31,108 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   const [topUpWalletInfo, setTopUpWalletInfo] = useState<TopUpWalletInfo | null>(null);
   const [hasTopUpWallet, setHasTopUpWallet] = useState<boolean>(false);
   const [isLoadingWallet, setIsLoadingWallet] = useState<boolean>(true);
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState<boolean>(false);
+  const [lastBalanceUpdate, setLastBalanceUpdate] = useState<Date | null>(null);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(false);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     setSession(getSession());
     setSessionStatus(getSessionStatus());
   }, []);
+
+  // Function to refresh wallet balance from blockchain (using direct RPC like WalletTopUp)
+  const refreshWalletBalance = useCallback(async () => {
+    if (!address || !hasTopUpWallet || !topUpWalletInfo) return;
+    
+    try {
+      setIsRefreshingBalance(true);
+      console.log('🔄 Refreshing top-up wallet balance from blockchain (direct RPC)...');
+      
+      // Try to get balance directly from blockchain using RPC (same as WalletTopUp)
+      if (topUpWalletInfo.walletAddress && topUpWalletInfo.walletAddress !== '0x0000000000000000000000000000000000000000') {
+        // Try multiple RPC endpoints for better reliability
+        const rpcEndpoints = [
+          process.env.REACT_APP_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+          'https://rpc.ankr.com/eth_sepolia'
+        ].filter(Boolean); // Remove any undefined values
+        
+        for (const rpcUrl of rpcEndpoints as string[]) {
+          try {
+            // Add timeout to prevent hanging requests
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
+            const response = await fetch(rpcUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'eth_getBalance',
+                params: [topUpWalletInfo.walletAddress, 'latest'],
+                id: 1
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+              const data = await response.json();
+              
+              if (data && data.result && !data.error) {
+                const balanceInWei = parseInt(data.result, 16);
+                const balanceInEth = balanceInWei / Math.pow(10, 18);
+                const balanceString = balanceInEth.toString();
+                
+                console.log('✅ Balance refreshed from blockchain (direct RPC):', balanceInEth, 'ETH');
+                setTopUpWalletInfo(prev => {
+                  const updated = prev ? { ...prev, balance: balanceString } : null;
+                  console.log('🔄 Updating state with direct RPC balance:', updated);
+                  return updated;
+                });
+                setLastBalanceUpdate(new Date());
+                return; // Success, exit early
+              }
+            }
+          } catch (rpcError) {
+            console.warn(`RPC endpoint ${rpcUrl} failed:`, rpcError);
+            continue; // Try next endpoint
+          }
+        }
+        
+        console.warn('All RPC endpoints failed, falling back to API');
+      }
+      
+      // Fallback to API if RPC fails
+      console.log('🔄 Falling back to API for balance...');
+      const balanceResponse = await topUpWalletAPI.getTopUpWalletBalance();
+      console.log('✅ Balance refreshed from API (fallback):', balanceResponse.balance, 'ETH');
+      setTopUpWalletInfo(prev => {
+        const updated = prev ? { ...prev, balance: balanceResponse.balance } : null;
+        console.log('🔄 Updating state with API balance:', updated);
+        return updated;
+      });
+      setLastBalanceUpdate(new Date());
+      
+    } catch (error) {
+      console.error('❌ Failed to refresh top-up wallet balance:', error);
+      // Final fallback to API on error
+      try {
+        const balanceResponse = await topUpWalletAPI.getTopUpWalletBalance();
+        setTopUpWalletInfo(prev => prev ? {
+          ...prev,
+          balance: balanceResponse.balance
+        } : null);
+        setLastBalanceUpdate(new Date());
+        console.log('✅ Balance refreshed from API (final fallback):', balanceResponse.balance, 'ETH');
+      } catch (apiError) {
+        console.error('❌ API fallback also failed:', apiError);
+      }
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  }, [address, hasTopUpWallet, topUpWalletInfo]);
 
   // Load top-up wallet information
   useEffect(() => {
@@ -51,15 +149,72 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
         try {
           const walletInfo = await walletPersistenceService.getWalletWithFallback(address, false);
           if (walletInfo) {
-            setTopUpWalletInfo({
+            // Load wallet info first
+            const initialWalletInfo = {
               walletAddress: walletInfo.walletAddress,
               privateKey: walletInfo.privateKey,
               publicKey: walletInfo.publicKey,
-              balance: walletInfo.balance,
+              balance: walletInfo.balance, // This might be stale
               isInitialized: true
-            });
+            };
+            
+            setTopUpWalletInfo(initialWalletInfo);
             setHasTopUpWallet(true);
+            setLastBalanceUpdate(new Date());
             console.log('Top-up wallet loaded successfully:', walletInfo.walletAddress);
+            
+            // Immediately refresh balance using direct RPC to get fresh data
+            console.log('🔄 Refreshing balance immediately after wallet load...');
+            try {
+              const rpcEndpoints = [
+                process.env.REACT_APP_SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+                'https://rpc.ankr.com/eth_sepolia'
+              ].filter(Boolean);
+              
+              for (const rpcUrl of rpcEndpoints as string[]) {
+                try {
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 5000);
+                  
+                  const response = await fetch(rpcUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      jsonrpc: '2.0',
+                      method: 'eth_getBalance',
+                      params: [walletInfo.walletAddress, 'latest'],
+                      id: 1
+                    }),
+                    signal: controller.signal
+                  });
+                  
+                  clearTimeout(timeoutId);
+                  
+                  if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.result && !data.error) {
+                      const balanceInWei = parseInt(data.result, 16);
+                      const balanceInEth = balanceInWei / Math.pow(10, 18);
+                      const balanceString = balanceInEth.toString();
+                      
+                      console.log('✅ Fresh balance loaded from blockchain:', balanceInEth, 'ETH');
+                      setTopUpWalletInfo(prev => prev ? {
+                        ...prev,
+                        balance: balanceString
+                      } : null);
+                      setLastBalanceUpdate(new Date());
+                      break; // Success, exit loop
+                    }
+                  }
+                } catch (rpcError) {
+                  console.warn(`RPC endpoint ${rpcUrl} failed during initial load:`, rpcError);
+                  continue;
+                }
+              }
+            } catch (balanceError) {
+              console.warn('⚠️ Failed to refresh balance during initial load:', balanceError);
+              // Keep the wallet info with potentially stale balance
+            }
           } else {
             // If wallet doesn't exist, that's okay - user can create one later
             console.log('No top-up wallet found for user');
@@ -82,6 +237,152 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     };
 
     loadTopUpWallet();
+  }, [address, sessionStatus.isAuthenticated]);
+
+  // Set up real-time balance updates
+  useEffect(() => {
+    if (!address || !hasTopUpWallet) return;
+
+    // Join user room for real-time updates
+    socketService.joinUserRoom(address);
+
+    // Listen for wallet balance updates
+    const handleWalletBalanceUpdate = (data: any) => {
+      console.log('Wallet balance update received:', data);
+      if (data.userAddress === address && data.balance !== undefined) {
+        setTopUpWalletInfo(prev => prev ? {
+          ...prev,
+          balance: data.balance
+        } : null);
+        setLastBalanceUpdate(new Date());
+      }
+    };
+
+    // Listen for top-up transactions
+    const handleTopUpCompleted = (data: any) => {
+      console.log('Top-up completed, refreshing balance:', data);
+      if (data.userAddress === address) {
+        refreshWalletBalance();
+      }
+    };
+
+    // Listen for toll payments
+    const handleTollPaymentCompleted = (data: any) => {
+      console.log('Toll payment completed, refreshing balance:', data);
+      if (data.userAddress === address) {
+        refreshWalletBalance();
+      }
+    };
+
+    // Set up socket listeners
+    socketService.on('wallet:balance:update', handleWalletBalanceUpdate);
+    socketService.on('wallet:topup:completed', handleTopUpCompleted);
+    socketService.on('toll:payment:completed', handleTollPaymentCompleted);
+
+    // Check connection status
+    const checkConnection = () => {
+      const status = socketService.getConnectionStatus();
+      setIsRealtimeConnected(status.isConnected);
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 5000);
+
+    // Cleanup
+    return () => {
+      socketService.off('wallet:balance:update', handleWalletBalanceUpdate);
+      socketService.off('wallet:topup:completed', handleTopUpCompleted);
+      socketService.off('toll:payment:completed', handleTollPaymentCompleted);
+      clearInterval(interval);
+    };
+  }, [address, hasTopUpWallet, refreshWalletBalance]);
+
+  // Periodic balance refresh (every 30 seconds)
+  useEffect(() => {
+    if (!address || !hasTopUpWallet) return;
+
+    const interval = setInterval(() => {
+      refreshWalletBalance();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [address, hasTopUpWallet, refreshWalletBalance]);
+
+  // Monitor topUpWalletInfo changes for debugging
+  useEffect(() => {
+    console.log('🔄 topUpWalletInfo state changed:', {
+      walletAddress: topUpWalletInfo?.walletAddress,
+      balance: topUpWalletInfo?.balance,
+      isInitialized: topUpWalletInfo?.isInitialized,
+      hasTopUpWallet,
+      isLoadingWallet
+    });
+  }, [topUpWalletInfo, hasTopUpWallet, isLoadingWallet]);
+
+  // Debug function to get backend debug info
+  const getDebugInfo = useCallback(async () => {
+    if (!address) return;
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/topup-wallet/debug`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Token': localStorage.getItem('sessionToken') || '',
+          'X-User-Address': address,
+        },
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const debugData = await response.json();
+        setDebugInfo(debugData);
+        console.log('🔍 Debug info:', debugData);
+      } else {
+        console.error('Failed to get debug info:', response.status);
+      }
+    } catch (error) {
+      console.error('Error getting debug info:', error);
+    }
+  }, [address]);
+
+  // Force reload wallet info completely
+  const forceReloadWallet = useCallback(async () => {
+    if (!address || !sessionStatus.isAuthenticated) return;
+    
+    try {
+      setIsLoadingWallet(true);
+      console.log('🔄 Force reloading wallet info...');
+      
+      // Clear current state
+      setTopUpWalletInfo(null);
+      setHasTopUpWallet(false);
+      
+      // Reload from scratch
+      const walletInfo = await walletPersistenceService.getWalletWithFallback(address, false);
+      if (walletInfo) {
+        setTopUpWalletInfo({
+          walletAddress: walletInfo.walletAddress,
+          privateKey: walletInfo.privateKey,
+          publicKey: walletInfo.publicKey,
+          balance: walletInfo.balance,
+          isInitialized: true
+        });
+        setHasTopUpWallet(true);
+        setLastBalanceUpdate(new Date());
+        console.log('✅ Wallet force reloaded successfully:', walletInfo.walletAddress, 'Balance:', walletInfo.balance);
+      } else {
+        console.log('ℹ️ No wallet found during force reload');
+        setTopUpWalletInfo(null);
+        setHasTopUpWallet(false);
+      }
+    } catch (error) {
+      console.error('❌ Error during force reload:', error);
+      setTopUpWalletInfo(null);
+      setHasTopUpWallet(false);
+    } finally {
+      setIsLoadingWallet(false);
+    }
   }, [address, sessionStatus.isAuthenticated]);
 
   const handleRemoveVehicle = async (vehicleId: string) => {
@@ -197,7 +498,44 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
 
         {/* Wallet Info */}
         <div className="bg-gray-800 rounded-lg p-4 mb-6">
-          <h3 className="text-lg font-semibold text-white mb-3">Wallet Information</h3>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-lg font-semibold text-white">Wallet Information</h3>
+            <div className="flex space-x-2">
+              {hasTopUpWallet && topUpWalletInfo && (
+                <button
+                  onClick={refreshWalletBalance}
+                  disabled={isRefreshingBalance}
+                  className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-1 rounded transition-colors flex items-center space-x-1"
+                  title="Refresh balance from blockchain"
+                >
+                  <svg 
+                    className={`w-3 h-3 ${isRefreshingBalance ? 'animate-spin' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{isRefreshingBalance ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+              )}
+              <button
+                onClick={getDebugInfo}
+                className="text-xs bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors"
+                title="Get debug information"
+              >
+                Debug
+              </button>
+              <button
+                onClick={forceReloadWallet}
+                disabled={isLoadingWallet}
+                className="text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white px-3 py-1 rounded transition-colors"
+                title="Force reload wallet from blockchain"
+              >
+                {isLoadingWallet ? 'Reloading...' : 'Force Reload'}
+              </button>
+            </div>
+          </div>
           <div className="space-y-2 mb-4">
             <div className="flex justify-between">
               <span className="text-gray-400">Address:</span>
@@ -236,9 +574,18 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Balance:</span>
-                  <span className="text-green-400 text-sm font-semibold">
-                    {parseFloat(topUpWalletInfo.balance).toFixed(4)} ETH
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-green-400 text-sm font-semibold">
+                      {(() => {
+                        const balance = parseFloat(topUpWalletInfo.balance).toFixed(4);
+                        console.log('🎯 Displaying balance:', balance, 'ETH for wallet:', topUpWalletInfo.walletAddress);
+                        return `${balance} ETH`;
+                      })()}
+                    </span>
+                    {isRefreshingBalance && (
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" title="Updating balance..."></div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Status:</span>
@@ -246,6 +593,19 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                     {topUpWalletInfo.isInitialized ? 'Active' : 'Initializing'}
                   </span>
                 </div>
+                {lastBalanceUpdate && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Last Updated:</span>
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-xs ${Date.now() - lastBalanceUpdate.getTime() > 60000 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                        {lastBalanceUpdate.toLocaleTimeString()}
+                        {Date.now() - lastBalanceUpdate.getTime() > 60000 && ' (stale)'}
+                      </span>
+                      <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-400' : 'bg-red-400'}`} 
+                           title={isRealtimeConnected ? 'Real-time updates active' : 'Real-time updates offline'}></div>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex justify-between">
@@ -292,6 +652,43 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
             )}
           </div>
         </div>
+
+        {/* Debug Information */}
+        {debugInfo && (
+          <div className="bg-gray-800 rounded-lg p-4 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-3">Debug Information</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Database User Found:</span>
+                <span className="text-white">{debugInfo.database?.userFound ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Database Top-up Wallet:</span>
+                <span className="text-white font-mono text-xs">
+                  {debugInfo.database?.topUpWalletAddress || 'None'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Blockchain Exists:</span>
+                <span className="text-white">{debugInfo.blockchain?.exists ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Blockchain Balance:</span>
+                <span className="text-white">{debugInfo.blockchain?.walletInfo?.balance || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Mock Mode:</span>
+                <span className="text-white">{debugInfo.environment?.mockBlockchain === 'true' ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setDebugInfo(null)}
+              className="mt-3 text-xs bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors"
+            >
+              Close Debug
+            </button>
+          </div>
+        )}
 
         {/* Authentication Status */}
         {sessionStatus.needsAuth && (
