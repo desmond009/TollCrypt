@@ -1,68 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { useAccount, useReadContract } from 'wagmi';
-
-// Contract addresses from deployment
-const TOLL_COLLECTION_ADDRESS = (process.env.REACT_APP_TOLL_COLLECTION_ADDRESS || '0xeC9423d9EBFe0C0f49F7bc221aE52572E8734291') as `0x${string}`;
-
-const TOLL_COLLECTION_ABI = [
-  {
-    "inputs": [{"name": "user", "type": "address"}],
-    "name": "getUserVehicles",
-    "outputs": [{"name": "", "type": "string[]"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"name": "vehicleId", "type": "string"}],
-    "name": "getVehicle",
-    "outputs": [
-      {
-        "components": [
-          {"name": "owner", "type": "address"},
-          {"name": "vehicleId", "type": "string"},
-          {"name": "isActive", "type": "bool"},
-          {"name": "isBlacklisted", "type": "bool"},
-          {"name": "registrationTime", "type": "uint256"},
-          {"name": "lastTollTime", "type": "uint256"}
-        ],
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  }
-] as const;
+import { useAccount } from 'wagmi';
+import { vehicleAPIService } from '../services/vehicleAPIService';
 
 interface Vehicle {
-  owner: string;
+  _id: string;
   vehicleId: string;
+  vehicleType: string;
+  owner: string;
   isActive: boolean;
   isBlacklisted: boolean;
-  registrationTime: bigint;
-  lastTollTime: bigint;
+  registrationTime: string;
+  lastTollTime?: string;
+  documents: Array<{
+    type: string;
+    name: string;
+    uploadedAt: string;
+    verified: boolean;
+  }>;
+  metadata?: {
+    make?: string;
+    model?: string;
+    year?: number;
+    color?: string;
+  };
 }
 
 export const VehicleList: React.FC = () => {
   const { address } = useAccount();
-  const [, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get user's vehicle IDs
-  const { data: vehicleIds } = useReadContract({
-    address: TOLL_COLLECTION_ADDRESS,
-    abi: TOLL_COLLECTION_ABI,
-    functionName: 'getUserVehicles',
-    args: address ? [address] : undefined,
-  });
-
-  // Fetch vehicle details for each vehicle ID
+  // Fetch vehicles from backend API
   useEffect(() => {
-    if (vehicleIds && vehicleIds.length > 0) {
-      // In a real implementation, you would fetch each vehicle's details
-      // For now, we'll show a placeholder
-      setVehicles([]);
-    }
-  }, [vehicleIds]);
+    const fetchVehicles = async () => {
+      if (!address) return;
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await vehicleAPIService.getUserVehicles(address);
+        console.log('API Response:', response); // Debug log
+        
+        // Handle different response formats
+        if (Array.isArray(response)) {
+          setVehicles(response);
+        } else if (response && Array.isArray(response.data)) {
+          setVehicles(response.data);
+        } else if (response && response.success !== false && Array.isArray(response)) {
+          setVehicles(response);
+        } else {
+          console.warn('Unexpected response format:', response);
+          setVehicles([]);
+        }
+      } catch (err) {
+        console.error('Error fetching vehicles:', err);
+        setError('Failed to load vehicles');
+        setVehicles([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchVehicles();
+  }, [address]);
 
   if (!address) {
     return (
@@ -72,7 +74,40 @@ export const VehicleList: React.FC = () => {
     );
   }
 
-  if (!vehicleIds || vehicleIds.length === 0) {
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 bg-gray-800 rounded-xl mx-auto mb-4 flex items-center justify-center">
+          <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <p className="text-gray-400">Loading vehicles...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 bg-red-900 rounded-xl mx-auto mb-4 flex items-center justify-center">
+          <svg className="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+          </svg>
+        </div>
+        <p className="text-red-400">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="text-sm text-gray-500 mt-2 hover:text-gray-400 underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (!vehicles || vehicles.length === 0) {
     return (
       <div className="text-center py-8">
         <div className="w-16 h-16 bg-gray-800 rounded-xl mx-auto mb-4 flex items-center justify-center">
@@ -90,9 +125,9 @@ export const VehicleList: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      {vehicleIds.map((vehicleId: string, index: number) => (
+      {vehicles.filter(vehicle => vehicle && vehicle._id).map((vehicle) => (
         <div
-          key={index}
+          key={vehicle._id}
           className="bg-gray-800 border border-gray-700 rounded-lg p-4"
         >
           <div className="flex items-center justify-between">
@@ -104,16 +139,36 @@ export const VehicleList: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-white font-medium">
-                  {vehicleId}
+                  {vehicle.vehicleId || 'Unknown Vehicle ID'}
                 </h3>
                 <p className="text-sm text-gray-400">
-                  Status: Active
+                  {vehicle.vehicleType ? 
+                    vehicle.vehicleType.charAt(0).toUpperCase() + vehicle.vehicleType.slice(1) : 
+                    'Unknown'
+                  } • 
+                  {vehicle.metadata?.make && vehicle.metadata?.model ? 
+                    ` ${vehicle.metadata.make} ${vehicle.metadata.model}` : 
+                    ' Vehicle'
+                  }
+                </p>
+                <p className="text-xs text-gray-500">
+                  Registered: {vehicle.registrationTime ? 
+                    new Date(vehicle.registrationTime).toLocaleDateString() : 
+                    'Unknown Date'
+                  }
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900 text-green-300">
-                Registered
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                vehicle.isBlacklisted === true
+                  ? 'bg-red-900 text-red-300' 
+                  : vehicle.isActive === true
+                    ? 'bg-green-900 text-green-300' 
+                    : 'bg-gray-900 text-gray-300'
+              }`}>
+                {vehicle.isBlacklisted === true ? 'Blacklisted' : 
+                 vehicle.isActive === true ? 'Active' : 'Inactive'}
               </span>
             </div>
           </div>

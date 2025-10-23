@@ -254,10 +254,25 @@ router.post('/pay', async (req, res) => {
       { lastTollTime: new Date() }
     );
     
-    // Broadcast to admin dashboard
+    // Broadcast to admin dashboard and user
     try {
       const socketService = getSocketService();
       await socketService.broadcastNewTransaction(transaction);
+      
+      // Also broadcast to the specific user for real-time dashboard updates
+      socketService.emitToUser(payer, 'transaction:new', {
+        transactionId: transaction.transactionId,
+        amount: transaction.amount,
+        status: transaction.status,
+        timestamp: transaction.timestamp
+      });
+      
+      socketService.emitToUser(payer, 'toll:payment:completed', {
+        transactionId: transaction.transactionId,
+        amount: transaction.amount,
+        vehicleId: vehicleId,
+        status: transaction.status
+      });
     } catch (socketError) {
       console.error('Error broadcasting new transaction:', socketError);
     }

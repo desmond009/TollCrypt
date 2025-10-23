@@ -17,6 +17,7 @@ import { useSession } from './services/sessionManager';
 import { vehicleAPIService } from './services/vehicleAPIService';
 import { walletPersistenceService } from './services/walletPersistenceService';
 import { useRealtime } from './hooks/useRealtime';
+import { useDashboardStats } from './hooks/useDashboardStats';
 import { formatETHDisplay } from './utils/currency';
 
 const queryClient = new QueryClient();
@@ -36,13 +37,18 @@ function AppContent() {
   
   const [currentStep, setCurrentStep] = useState<AppStep>('wallet');
   const [sessionStatus, setSessionStatus] = useState(getSessionStatus());
-  const [dashboardStats, setDashboardStats] = useState({
-    totalTransactions: 0,
-    totalSpent: 0
-  });
   
   // Initialize real-time functionality
   const { data: realtimeData, isConnected: isRealtimeConnected } = useRealtime(address, false, undefined, undefined);
+  
+  // Initialize real-time dashboard stats
+  const { 
+    stats: dashboardStats, 
+    isLoading: isStatsLoading, 
+    error: statsError, 
+    refreshStats,
+    isConnected: isStatsConnected 
+  } = useDashboardStats(address);
 
   // Initialize session when wallet connects
   useEffect(() => {
@@ -101,22 +107,7 @@ function AppContent() {
     return () => clearInterval(interval);
   }, [getSessionStatus]);
 
-  // Calculate dashboard stats from session data
-  useEffect(() => {
-    const session = getSession();
-    if (session) {
-      // Calculate total transactions (mock data for now - in real app this would come from backend)
-      const totalTransactions = session.vehicles.length * 3; // Mock: 3 transactions per vehicle
-      
-      // Calculate total spent (mock data - in real app this would come from transaction history)
-      const totalSpent = session.vehicles.length * 0.5; // Mock: 0.5 ETH per vehicle
-      
-      setDashboardStats({
-        totalTransactions,
-        totalSpent
-      });
-    }
-  }, [sessionStatus, getSession]);
+  // Dashboard stats are now handled by useDashboardStats hook
 
   const handleAuthSuccess = (proof: string, publicInputs: number[]) => {
     updateAuth(proof);
@@ -435,15 +426,48 @@ function AppContent() {
           {currentStep === 'dashboard' && (
             <div className="space-y-6">
               <div className="card">
-                <h2 className="text-lg sm:text-xl font-bold text-white mb-4">FASTag Dashboard</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg sm:text-xl font-bold text-white">FASTag Dashboard</h2>
+                  <div className="flex items-center space-x-2">
+                    {isStatsConnected && (
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Real-time connected"></div>
+                    )}
+                    {isStatsLoading && (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    <button
+                      onClick={refreshStats}
+                      className="text-gray-400 hover:text-white text-sm transition-colors"
+                      title="Refresh stats"
+                    >
+                      🔄
+                    </button>
+                    {dashboardStats && (
+                      <span className="text-xs text-gray-400">
+                        Last updated: {new Date().toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {statsError && (
+                  <div className="bg-red-900 border border-red-700 rounded-lg p-3 mb-4">
+                    <p className="text-red-300 text-sm">{statsError}</p>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
                   <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-3 sm:p-4 text-white">
                     <p className="text-xs sm:text-sm opacity-80">Total Transactions</p>
-                    <p className="text-xl sm:text-2xl font-bold">{dashboardStats.totalTransactions}</p>
+                    <p className="text-xl sm:text-2xl font-bold">
+                      {isStatsLoading ? '...' : (dashboardStats?.totalTransactions || 0)}
+                    </p>
                   </div>
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-3 sm:p-4 text-white">
                     <p className="text-xs sm:text-sm opacity-80">Total Spent</p>
-                    <p className="text-xl sm:text-2xl font-bold">{formatETHDisplay(dashboardStats.totalSpent)}</p>
+                    <p className="text-xl sm:text-2xl font-bold">
+                      {isStatsLoading ? '...' : formatETHDisplay(dashboardStats?.totalSpent || 0)}
+                    </p>
                   </div>
                 </div>
                 <VehicleList />

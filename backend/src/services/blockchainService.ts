@@ -279,6 +279,28 @@ async function handleTollPaid(event: any) {
       { vehicleId },
       { lastTollTime: new Date(Number(timestamp) * 1000) }
     );
+    
+    // Broadcast to user for real-time dashboard updates
+    try {
+      const { getSocketService } = await import('./socketInstance');
+      const socketService = getSocketService();
+      
+      socketService.emitToUser(payer, 'transaction:new', {
+        transactionId: transaction.transactionId,
+        amount: transaction.amount,
+        status: transaction.status,
+        timestamp: transaction.timestamp
+      });
+      
+      socketService.emitToUser(payer, 'toll:payment:completed', {
+        transactionId: transaction.transactionId,
+        amount: transaction.amount,
+        vehicleId: vehicleId,
+        status: transaction.status
+      });
+    } catch (socketError) {
+      console.error('Error broadcasting blockchain transaction:', socketError);
+    }
   } catch (error) {
     console.error('Error processing toll payment event:', error);
   }
