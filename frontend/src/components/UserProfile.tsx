@@ -34,7 +34,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   const [isRefreshingBalance, setIsRefreshingBalance] = useState<boolean>(false);
   const [lastBalanceUpdate, setLastBalanceUpdate] = useState<Date | null>(null);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     setSession(getSession());
@@ -308,82 +307,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     return () => clearInterval(interval);
   }, [address, hasTopUpWallet, refreshWalletBalance]);
 
-  // Monitor topUpWalletInfo changes for debugging
-  useEffect(() => {
-    console.log('🔄 topUpWalletInfo state changed:', {
-      walletAddress: topUpWalletInfo?.walletAddress,
-      balance: topUpWalletInfo?.balance,
-      isInitialized: topUpWalletInfo?.isInitialized,
-      hasTopUpWallet,
-      isLoadingWallet
-    });
-  }, [topUpWalletInfo, hasTopUpWallet, isLoadingWallet]);
-
-  // Debug function to get backend debug info
-  const getDebugInfo = useCallback(async () => {
-    if (!address) return;
-    
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/topup-wallet/debug`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-Token': localStorage.getItem('sessionToken') || '',
-          'X-User-Address': address,
-        },
-        credentials: 'include',
-      });
-      
-      if (response.ok) {
-        const debugData = await response.json();
-        setDebugInfo(debugData);
-        console.log('🔍 Debug info:', debugData);
-      } else {
-        console.error('Failed to get debug info:', response.status);
-      }
-    } catch (error) {
-      console.error('Error getting debug info:', error);
-    }
-  }, [address]);
-
-  // Force reload wallet info completely
-  const forceReloadWallet = useCallback(async () => {
-    if (!address || !sessionStatus.isAuthenticated) return;
-    
-    try {
-      setIsLoadingWallet(true);
-      console.log('🔄 Force reloading wallet info...');
-      
-      // Clear current state
-      setTopUpWalletInfo(null);
-      setHasTopUpWallet(false);
-      
-      // Reload from scratch
-      const walletInfo = await walletPersistenceService.getWalletWithFallback(address, false);
-      if (walletInfo) {
-        setTopUpWalletInfo({
-          walletAddress: walletInfo.walletAddress,
-          privateKey: walletInfo.privateKey,
-          publicKey: walletInfo.publicKey,
-          balance: walletInfo.balance,
-          isInitialized: true
-        });
-        setHasTopUpWallet(true);
-        setLastBalanceUpdate(new Date());
-        console.log('✅ Wallet force reloaded successfully:', walletInfo.walletAddress, 'Balance:', walletInfo.balance);
-      } else {
-        console.log('ℹ️ No wallet found during force reload');
-        setTopUpWalletInfo(null);
-        setHasTopUpWallet(false);
-      }
-    } catch (error) {
-      console.error('❌ Error during force reload:', error);
-      setTopUpWalletInfo(null);
-      setHasTopUpWallet(false);
-    } finally {
-      setIsLoadingWallet(false);
-    }
-  }, [address, sessionStatus.isAuthenticated]);
 
   const handleRemoveVehicle = async (vehicleId: string) => {
     if (window.confirm(`Are you sure you want to remove vehicle ${vehicleId}?`)) {
@@ -519,21 +442,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                   <span>{isRefreshingBalance ? 'Refreshing...' : 'Refresh'}</span>
                 </button>
               )}
-              <button
-                onClick={getDebugInfo}
-                className="text-xs bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors"
-                title="Get debug information"
-              >
-                Debug
-              </button>
-              <button
-                onClick={forceReloadWallet}
-                disabled={isLoadingWallet}
-                className="text-xs bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white px-3 py-1 rounded transition-colors"
-                title="Force reload wallet from blockchain"
-              >
-                {isLoadingWallet ? 'Reloading...' : 'Force Reload'}
-              </button>
             </div>
           </div>
           <div className="space-y-2 mb-4">
@@ -576,11 +484,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                   <span className="text-gray-400">Balance:</span>
                   <div className="flex items-center space-x-2">
                     <span className="text-green-400 text-sm font-semibold">
-                      {(() => {
-                        const balance = parseFloat(topUpWalletInfo.balance).toFixed(4);
-                        console.log('🎯 Displaying balance:', balance, 'ETH for wallet:', topUpWalletInfo.walletAddress);
-                        return `${balance} ETH`;
-                      })()}
+                      {parseFloat(topUpWalletInfo.balance).toFixed(4)} ETH
                     </span>
                     {isRefreshingBalance && (
                       <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" title="Updating balance..."></div>
@@ -652,43 +556,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
             )}
           </div>
         </div>
-
-        {/* Debug Information */}
-        {debugInfo && (
-          <div className="bg-gray-800 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-semibold text-white mb-3">Debug Information</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Database User Found:</span>
-                <span className="text-white">{debugInfo.database?.userFound ? 'Yes' : 'No'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Database Top-up Wallet:</span>
-                <span className="text-white font-mono text-xs">
-                  {debugInfo.database?.topUpWalletAddress || 'None'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Blockchain Exists:</span>
-                <span className="text-white">{debugInfo.blockchain?.exists ? 'Yes' : 'No'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Blockchain Balance:</span>
-                <span className="text-white">{debugInfo.blockchain?.walletInfo?.balance || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Mock Mode:</span>
-                <span className="text-white">{debugInfo.environment?.mockBlockchain === 'true' ? 'Yes' : 'No'}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setDebugInfo(null)}
-              className="mt-3 text-xs bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors"
-            >
-              Close Debug
-            </button>
-          </div>
-        )}
 
         {/* Authentication Status */}
         {sessionStatus.needsAuth && (
