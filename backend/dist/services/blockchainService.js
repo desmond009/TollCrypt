@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.connectToBlockchain = connectToBlockchain;
 exports.verifyAnonAadhaarProof = verifyAnonAadhaarProof;
@@ -246,6 +279,26 @@ async function handleTollPaid(event) {
         });
         await transaction.save();
         await Vehicle_1.Vehicle.findOneAndUpdate({ vehicleId }, { lastTollTime: new Date(Number(timestamp) * 1000) });
+        // Broadcast to user for real-time dashboard updates
+        try {
+            const { getSocketService } = await Promise.resolve().then(() => __importStar(require('./socketInstance')));
+            const socketService = getSocketService();
+            socketService.emitToUser(payer, 'transaction:new', {
+                transactionId: transaction.transactionId,
+                amount: transaction.amount,
+                status: transaction.status,
+                timestamp: transaction.timestamp
+            });
+            socketService.emitToUser(payer, 'toll:payment:completed', {
+                transactionId: transaction.transactionId,
+                amount: transaction.amount,
+                vehicleId: vehicleId,
+                status: transaction.status
+            });
+        }
+        catch (socketError) {
+            console.error('Error broadcasting blockchain transaction:', socketError);
+        }
     }
     catch (error) {
         console.error('Error processing toll payment event:', error);

@@ -74,7 +74,7 @@ export const authenticateAdmin = (req: Request, res: Response, next: NextFunctio
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as AuthUser;
     
     // Check if user has admin role
-    if (!['super_admin', 'admin', 'operator'].includes(decoded.role)) {
+    if (!['super_admin', 'plaza_operator', 'auditor', 'analyst'].includes(decoded.role)) {
       return res.status(403).json({ 
         success: false, 
         message: 'Admin access required' 

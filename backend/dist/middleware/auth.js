@@ -57,7 +57,7 @@ const authenticateAdmin = (req, res, next) => {
     try {
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET || 'fallback-secret');
         // Check if user has admin role
-        if (!['super_admin', 'admin', 'operator'].includes(decoded.role)) {
+        if (!['super_admin', 'plaza_operator', 'auditor', 'analyst'].includes(decoded.role)) {
             return res.status(403).json({
                 success: false,
                 message: 'Admin access required'

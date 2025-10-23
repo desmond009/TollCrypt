@@ -2,7 +2,7 @@ export interface AdminUser {
   id: string;
   email: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'operator' | 'auditor' | 'analyst';
+  role: 'super_admin' | 'plaza_operator' | 'auditor' | 'analyst';
   isActive: boolean;
   tollPlaza?: string;
   lastLogin?: Date;
@@ -16,6 +16,9 @@ export interface AdminUser {
     canManagePlazas: boolean;
     canViewReports: boolean;
     canManageRates: boolean;
+    canManageWallets: boolean;
+    canViewAuditLogs: boolean;
+    canManageSystemSettings: boolean;
   };
   createdAt: Date;
   updatedAt: Date;

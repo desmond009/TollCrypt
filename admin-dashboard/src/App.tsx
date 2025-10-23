@@ -15,6 +15,9 @@ import { PlazaManagement } from './components/PlazaManagement';
 import { QRScanner } from './components/QRScanner';
 import { TransactionProcessor } from './components/TransactionProcessor';
 import { QRCodeTollCollection } from './components/QRCodeTollCollection';
+import { UserManagement } from './components/UserManagement';
+import { WalletManagement } from './components/WalletManagement';
+import { SystemSettings } from './components/SystemSettings';
 import { Header } from './components/Header';
 import { Login } from './components/Login';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
@@ -238,6 +241,12 @@ function AppContent() {
           onTransactionComplete={handleTransactionComplete}
           onTransactionError={handleTransactionError}
         />;
+      case 'users':
+        return <UserManagement user={user} />;
+      case 'wallets':
+        return <WalletManagement user={user} />;
+      case 'settings':
+        return <SystemSettings user={user} />;
       default:
         return <Dashboard socket={socket} notifications={notifications} />;
     }

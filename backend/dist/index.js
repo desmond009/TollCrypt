@@ -15,12 +15,14 @@ const socketInstance_1 = require("./services/socketInstance");
 const vehicleRoutes_1 = require("./routes/vehicleRoutes");
 const tollRoutes_1 = require("./routes/tollRoutes");
 const adminRoutes_1 = require("./routes/adminRoutes");
+const adminManagementRoutes_1 = require("./routes/adminManagementRoutes");
 const hardwareRoutes_1 = require("./routes/hardwareRoutes");
 const qrRoutes_1 = __importDefault(require("./routes/qrRoutes"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const topUpWalletRoutes_1 = __importDefault(require("./routes/topUpWalletRoutes"));
 const aadhaarRoutes_1 = __importDefault(require("./routes/aadhaarRoutes"));
 const plazaRoutes_1 = __importDefault(require("./routes/plazaRoutes"));
+const simplePlazaRoutes_1 = __importDefault(require("./routes/simplePlazaRoutes"));
 // Import models for dashboard stats
 const { TollTransaction } = require('./models/TollTransaction');
 const { Vehicle } = require('./models/Vehicle');
@@ -98,11 +100,13 @@ app.use('/api/auth', authRoutes_1.default);
 app.use('/api/vehicles', vehicleRoutes_1.vehicleRoutes);
 app.use('/api/tolls', tollRoutes_1.tollRoutes);
 app.use('/api/admin', adminRoutes_1.adminRoutes);
+app.use('/api/admin-management', adminManagementRoutes_1.adminManagementRoutes);
 app.use('/api/hardware', hardwareRoutes_1.hardwareRoutes);
 app.use('/api/qr', qrRoutes_1.default);
 app.use('/api/topup-wallet', topUpWalletRoutes_1.default);
 app.use('/api/aadhaar', aadhaarRoutes_1.default);
 app.use('/api/plazas', plazaRoutes_1.default);
+app.use('/api/simple-plazas', simplePlazaRoutes_1.default);
 // Analytics route - direct endpoint for frontend compatibility
 app.get('/api/analytics', async (req, res) => {
     try {

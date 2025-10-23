@@ -6,6 +6,8 @@ import {
   CogIcon,
   QrCodeIcon,
   MapPinIcon,
+  UsersIcon,
+  WalletIcon,
 } from '@heroicons/react/24/outline';
 
 interface TopNavigationProps {
@@ -19,6 +21,8 @@ const navigation = [
   { name: 'Vehicles', tab: 'vehicles', icon: TruckIcon },
   { name: 'Transactions', tab: 'transactions', icon: CurrencyDollarIcon },
   { name: 'Plazas', tab: 'plazas', icon: MapPinIcon },
+  { name: 'Users', tab: 'users', icon: UsersIcon },
+  { name: 'Wallets', tab: 'wallets', icon: WalletIcon },
   { name: 'Settings', tab: 'settings', icon: CogIcon },
 ];
 

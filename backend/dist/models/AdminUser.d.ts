@@ -3,7 +3,7 @@ export interface IAdminUser extends Document {
     email: string;
     password: string;
     name: string;
-    role: 'super_admin' | 'admin' | 'operator' | 'viewer';
+    role: 'super_admin' | 'plaza_operator' | 'auditor' | 'analyst';
     isActive: boolean;
     tollPlaza?: string;
     lastLogin?: Date;
@@ -15,6 +15,12 @@ export interface IAdminUser extends Document {
         canViewAnalytics: boolean;
         canManageUsers: boolean;
         canHandleDisputes: boolean;
+        canManagePlazas: boolean;
+        canViewReports: boolean;
+        canManageRates: boolean;
+        canManageWallets: boolean;
+        canViewAuditLogs: boolean;
+        canManageSystemSettings: boolean;
     };
     createdAt: Date;
     updatedAt: Date;

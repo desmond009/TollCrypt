@@ -5,7 +5,7 @@ export interface IAdminUser extends Document {
   email: string;
   password: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'operator' | 'viewer';
+  role: 'super_admin' | 'plaza_operator' | 'auditor' | 'analyst';
   isActive: boolean;
   tollPlaza?: string;
   lastLogin?: Date;
@@ -17,6 +17,12 @@ export interface IAdminUser extends Document {
     canViewAnalytics: boolean;
     canManageUsers: boolean;
     canHandleDisputes: boolean;
+    canManagePlazas: boolean;
+    canViewReports: boolean;
+    canManageRates: boolean;
+    canManageWallets: boolean;
+    canViewAuditLogs: boolean;
+    canManageSystemSettings: boolean;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -43,8 +49,8 @@ const AdminUserSchema = new Schema<IAdminUser>({
   },
   role: {
     type: String,
-    enum: ['super_admin', 'admin', 'operator', 'viewer'],
-    default: 'viewer'
+    enum: ['super_admin', 'plaza_operator', 'auditor', 'analyst'],
+    default: 'analyst'
   },
   isActive: {
     type: Boolean,
@@ -82,6 +88,30 @@ const AdminUserSchema = new Schema<IAdminUser>({
     canHandleDisputes: {
       type: Boolean,
       default: false
+    },
+    canManagePlazas: {
+      type: Boolean,
+      default: false
+    },
+    canViewReports: {
+      type: Boolean,
+      default: false
+    },
+    canManageRates: {
+      type: Boolean,
+      default: false
+    },
+    canManageWallets: {
+      type: Boolean,
+      default: false
+    },
+    canViewAuditLogs: {
+      type: Boolean,
+      default: false
+    },
+    canManageSystemSettings: {
+      type: Boolean,
+      default: false
     }
   }
 }, {
@@ -97,34 +127,58 @@ AdminUserSchema.pre('save', function(next) {
         canProcessTolls: true,
         canViewAnalytics: true,
         canManageUsers: true,
-        canHandleDisputes: true
+        canHandleDisputes: true,
+        canManagePlazas: true,
+        canViewReports: true,
+        canManageRates: true,
+        canManageWallets: true,
+        canViewAuditLogs: true,
+        canManageSystemSettings: true
       };
       break;
-    case 'admin':
+    case 'plaza_operator':
       this.permissions = {
-        canManageVehicles: true,
-        canProcessTolls: true,
-        canViewAnalytics: true,
-        canManageUsers: false,
-        canHandleDisputes: true
-      };
-      break;
-    case 'operator':
-      this.permissions = {
-        canManageVehicles: true,
+        canManageVehicles: false,
         canProcessTolls: true,
         canViewAnalytics: false,
         canManageUsers: false,
-        canHandleDisputes: false
+        canHandleDisputes: false,
+        canManagePlazas: false,
+        canViewReports: false,
+        canManageRates: false,
+        canManageWallets: false,
+        canViewAuditLogs: false,
+        canManageSystemSettings: false
       };
       break;
-    case 'viewer':
+    case 'auditor':
       this.permissions = {
         canManageVehicles: false,
         canProcessTolls: false,
         canViewAnalytics: true,
         canManageUsers: false,
-        canHandleDisputes: false
+        canHandleDisputes: true,
+        canManagePlazas: false,
+        canViewReports: true,
+        canManageRates: false,
+        canManageWallets: false,
+        canViewAuditLogs: true,
+        canManageSystemSettings: false
+      };
+      break;
+    case 'analyst':
+      this.permissions = {
+        canManageVehicles: false,
+        canProcessTolls: false,
+        canViewAnalytics: true,
+        canManageUsers: false,
+        canHandleDisputes: false,
+        canManagePlazas: false,
+        canViewReports: true,
+        canManageRates: false,
+        canManageWallets: false,
+        canViewAuditLogs: false,
+        canManageSystemSettings: false
       };
       break;
   }

@@ -23,7 +23,7 @@ import {
   ArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { api } from '../services/api';
-import { processVehicleTypeData, isValidChartData } from '../utils/chartUtils';
+import { processVehicleTypeData, processRevenueData, processRevenueByPlazaData, isValidChartData } from '../utils/chartUtils';
 
 // Register Chart.js components
 ChartJS.register(
@@ -87,7 +87,24 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [plazas, setPlazas] = useState<Plaza[]>([]);
   const [vehicleTypeData, setVehicleTypeData] = useState<any>(null);
+  const [revenueChartData, setRevenueChartData] = useState<any>(null);
+  const [revenueByPlazaData, setRevenueByPlazaData] = useState<any>(null);
+  const [todayRevenue, setTodayRevenue] = useState<number>(0);
+  const [revenueRange, setRevenueRange] = useState<'7d' | '30d' | 'month' | 'custom'>('7d');
+  const [customRange, setCustomRange] = useState<{ start?: string; end?: string }>({});
   const [isLoading, setIsLoading] = useState(true);
+
+  const getRangeDates = () => {
+    const end = new Date();
+    const start = new Date();
+    if (revenueRange === '7d') start.setDate(start.getDate() - 7);
+    else if (revenueRange === '30d') start.setDate(start.getDate() - 30);
+    else if (revenueRange === 'month') { start.setDate(1); }
+    else if (revenueRange === 'custom' && customRange.start && customRange.end) {
+      return { start: new Date(customRange.start), end: new Date(customRange.end) };
+    }
+    return { start, end };
+  };
 
   // Fetch dashboard data
   const fetchDashboardData = useCallback(async () => {
@@ -99,7 +116,7 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
       setStats(statsResponse.data.data);
 
       // Fetch recent transactions
-      const transactionsResponse = await api.get('/api/admin/transactions/recent?limit=10');
+      const transactionsResponse = await api.get('/api/admin/transactions/recent?limit=20');
       setRecentTransactions(transactionsResponse.data.data || []);
 
       // Fetch plazas
@@ -111,12 +128,38 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
       const vehicleData = processVehicleTypeData(vehicleTypeResponse.data.data);
       setVehicleTypeData(vehicleData);
 
+      // Fetch revenue analytics for selected range
+      const { start, end } = getRangeDates();
+      const revenueResponse = await api.get('/api/admin/analytics', {
+        params: {
+          reportType: 'revenue',
+          startDate: start.toISOString(),
+          endDate: end.toISOString()
+        }
+      });
+      const revenueData = revenueResponse.data?.data?.revenue || {};
+      setRevenueChartData(processRevenueData(revenueData));
+      setRevenueByPlazaData(processRevenueByPlazaData(revenueData));
+
+      // Fetch today's revenue (midnight to now)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayRevenueResp = await api.get('/api/admin/analytics', {
+        params: {
+          reportType: 'revenue',
+          startDate: todayStart.toISOString(),
+          endDate: new Date().toISOString()
+        }
+      });
+      const todayTotal = todayRevenueResp.data?.data?.revenue?.total || 0;
+      setTodayRevenue(Number(todayTotal));
+
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [revenueRange, customRange.start, customRange.end]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -203,7 +246,35 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
           <h1 className="text-xl sm:text-2xl font-bold text-white">Live Dashboard</h1>
           <p className="text-gray-400">Real-time toll collection monitoring</p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          {/* Revenue range filter */}
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-400">Range</label>
+            <select
+              value={revenueRange}
+              onChange={(e) => setRevenueRange(e.target.value as any)}
+              className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-md px-2 py-1"
+            >
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="month">This Month</option>
+              <option value="custom">Custom</option>
+            </select>
+            {revenueRange === 'custom' && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="date"
+                  className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-md px-2 py-1"
+                  onChange={(e) => setCustomRange(r => ({ ...r, start: e.target.value }))}
+                />
+                <input
+                  type="date"
+                  className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-md px-2 py-1"
+                  onChange={(e) => setCustomRange(r => ({ ...r, end: e.target.value }))}
+                />
+              </div>
+            )}
+          </div>
           <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
           <span className="text-sm text-gray-400">Live</span>
         </div>
@@ -211,6 +282,19 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        {/* Today's Revenue */}
+        <div className="admin-card">
+          <div className="flex items-center">
+            <div className="p-2 bg-emerald-900/20 rounded-lg">
+              <CurrencyDollarIcon className="h-6 w-6 text-emerald-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-400">Today's Revenue</p>
+              <p className="text-2xl font-semibold text-white">{todayRevenue.toFixed(4)} ETH</p>
+            </div>
+          </div>
+        </div>
+
         <div className="admin-card">
           <div className="flex items-center">
             <div className="p-2 bg-blue-900/20 rounded-lg">
@@ -258,10 +342,60 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
             <span className="text-sm text-green-400 ml-1">+2% from yesterday</span>
           </div>
         </div>
+
+        {/* Active Plazas */}
+        <div className="admin-card">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-900/20 rounded-lg">
+              <MapPinIcon className="h-6 w-6 text-indigo-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-400">Active Plazas</p>
+              <p className="text-2xl font-semibold text-white">{stats.activePlazas}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Failed Transactions */}
+        <div className="admin-card">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-900/20 rounded-lg">
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-400">Failed Transactions</p>
+              <p className="text-2xl font-semibold text-white">{stats.failedTransactions}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue Over Time */}
+        <div className="admin-card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Revenue</h3>
+          </div>
+          {isValidChartData(revenueChartData) ? (
+            <Line
+              data={revenueChartData}
+              options={{
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { color: '#ffffff' } } },
+                scales: {
+                  x: { ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                  y: { ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                }
+              }}
+            />
+          ) : (
+            <div className="h-64 flex items-center justify-center">
+              <div className="text-gray-400">No revenue data</div>
+            </div>
+          )}
+        </div>
+
         {/* Vehicle Type Distribution */}
         <div className="admin-card">
           <h3 className="text-lg font-semibold text-white mb-4">Vehicle Type Distribution</h3>
@@ -369,6 +503,28 @@ export const LiveDashboard: React.FC<LiveDashboardProps> = ({ socket, notificati
             )}
           </div>
         </div>
+      </div>
+
+      {/* Top Performing Plazas */}
+      <div className="admin-card">
+        <h3 className="text-lg font-semibold text-white mb-4">Top Performing Plazas</h3>
+        {isValidChartData(revenueByPlazaData) ? (
+          <Bar
+            data={revenueByPlazaData}
+            options={{
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+              }
+            }}
+          />
+        ) : (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-gray-400">No revenue by plaza data</div>
+          </div>
+        )}
       </div>
 
       {/* Alerts */}

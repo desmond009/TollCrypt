@@ -169,42 +169,31 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   const initializeScanner = () => {
     if (!isInitialized) {
-      // Create a unique ID for this scanner instance
-      const scannerId = `qr-reader-${Date.now()}`;
-      
-      // Create the scanner div dynamically
-      const scannerDiv = document.createElement('div');
-      scannerDiv.id = scannerId;
-      scannerDiv.className = 'w-full h-64 bg-gray-900 rounded-lg';
-      
-      // Find the container and append the scanner div
-      const container = document.querySelector('[data-scanner-container]');
-      if (container) {
-        container.innerHTML = '';
-        container.appendChild(scannerDiv);
-        
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-          scannerId,
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-          },
-          false
-        );
+      // Use the existing React-managed element to avoid DOM conflicts
+      const targetElement = document.getElementById('qr-reader');
+      if (!targetElement) return;
 
-        html5QrcodeScanner.render(
-          (decodedText: string, decodedResult: any) => {
-            handleQRCodeSuccess(decodedText);
-          },
-          (error: any) => {
-            // Silent error handling - don't show every scan attempt error
-          }
-        );
+      const html5QrcodeScanner = new Html5QrcodeScanner(
+        'qr-reader',
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        false
+      );
 
-        setScanner(html5QrcodeScanner);
-        setIsInitialized(true);
-      }
+      html5QrcodeScanner.render(
+        (decodedText: string, decodedResult: any) => {
+          handleQRCodeSuccess(decodedText);
+        },
+        (error: any) => {
+          // Silent error handling - don't show every scan attempt error
+        }
+      );
+
+      setScanner(html5QrcodeScanner);
+      setIsInitialized(true);
     }
   };
 
@@ -780,7 +769,13 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
         // Use html5-qrcode to decode the QR code from the image
         const { Html5Qrcode } = await import('html5-qrcode');
-        const html5Qrcode = new Html5Qrcode('qr-reader');
+        // Create a temporary hidden container for Html5Qrcode instance
+        const tempContainerId = `qr-reader-file-${Date.now()}`;
+        const tempDiv = document.createElement('div');
+        tempDiv.id = tempContainerId;
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+        const html5Qrcode = new Html5Qrcode(tempContainerId);
         
         try {
           // Convert the data URL to a File object
@@ -794,7 +789,14 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           console.error('QR code decode error:', decodeError);
           onError?.('Could not decode QR code from uploaded image. Please ensure the image contains a valid QR code.');
         } finally {
-          html5Qrcode.clear();
+          try {
+            html5Qrcode.clear();
+          } catch (_) {}
+          // Clean up temporary container
+          const node = document.getElementById(tempContainerId);
+          if (node && node.parentNode) {
+            node.parentNode.removeChild(node);
+          }
           setIsUploading(false);
         }
       };
