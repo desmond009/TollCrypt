@@ -13,6 +13,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { AdminUserExtended, CreateAdminUserForm, UpdateAdminUserForm, PaginatedResponse } from '../types/adminManagement';
 
+// Ensure API requests target the backend (avoid CRA dev server returning HTML)
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:3001/api')
+  .replace(/\/api$/, '') + '/api';
+
 interface UserManagementProps {
   user: any;
 }
@@ -49,9 +53,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
         ...(statusFilter && { status: statusFilter })
       });
 
-      const response = await fetch(`/api/admin-management/users?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/admin-management/users?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token') || ''}`
         }
       });
 
@@ -71,11 +75,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
 
   const handleCreateUser = async (formData: CreateAdminUserForm) => {
     try {
-      const response = await fetch('/api/admin-management/users', {
+      const response = await fetch(`${API_BASE_URL}/admin-management/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(formData)
       });
@@ -95,11 +99,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
     if (!selectedUser) return;
 
     try {
-      const response = await fetch(`/api/admin-management/users/${selectedUser.id}`, {
+      const response = await fetch(`${API_BASE_URL}/admin-management/users/${selectedUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(formData)
       });
@@ -118,11 +122,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
 
   const handleDeactivateUser = async (userId: string, reason: string) => {
     try {
-      const response = await fetch(`/api/admin-management/users/${userId}/deactivate`, {
+      const response = await fetch(`${API_BASE_URL}/admin-management/users/${userId}/deactivate`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify({ reason })
       });
