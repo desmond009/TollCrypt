@@ -32,8 +32,8 @@ TollChain is a comprehensive, production-ready blockchain-based automated toll c
 - **Anonymous Aadhaar Integration**: First-of-its-kind privacy-preserving government ID verification
 - **TopUp Wallet System**: Smart contract-based prepaid wallets for instant toll payments
 - **Multi-Chain Support**: Deployed on Ethereum Sepolia, Polygon Mumbai, and Goerli testnets
-- **Real-Time QR Scanning**: Advanced computer vision for instant vehicle identification
-- **Hardware-Software Bridge**: Python-based RFID/Camera integration with WebSocket communication
+- **QR Code Payment System**: Users generate QR codes, admins scan for instant toll processing
+- **Real-Time Admin Scanning**: Web-based QR code scanning interface with instant payment processing
 - **Zero-Downtime Operations**: 99.9% uptime with automatic failover mechanisms
 
 ## 🏗️ System Architecture
@@ -44,8 +44,10 @@ TollChain is a comprehensive, production-ready blockchain-based automated toll c
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   User Frontend │   │ Admin Dashboard │   │  Hardware Layer │   │  Mobile Apps    │
-│   (React/TS)    │   │   (React/TS)    │   │   (Python)      │   │  (Future)       │
+│   User Frontend │   │ Admin Dashboard │   │   QR Scanner    │   │  Mobile Apps    │
+│   (React/TS)    │   │   (React/TS)    │   │  (Web-based)    │   │  (Future)       │
+│ • Generate QR   │   │ • Scan QR Codes │   │ • Camera Access │   │                 │
+│ • Vehicle Mgmt  │   │ • Process Tolls │   │ • Instant Pay   │   │                 │
 └─────────┬───────┘   └─────────┬───────┘   └─────────┬───────┘   └─────────────────┘
           │                     │                     │
           └─────────────────────┼─────────────────────┘
@@ -55,7 +57,8 @@ TollChain is a comprehensive, production-ready blockchain-based automated toll c
                   │    (Node.js/Express)      │
                   │  • REST APIs              │
                   │  • WebSocket (Socket.io)  │
-                  │  • Real-time Events       │
+                  │  • QR Code Validation     │
+                  │  • Payment Processing     │
                   └─────────────┬─────────────┘
                                 │
           ┌─────────────────────┼─────────────────────┐
@@ -66,7 +69,7 @@ TollChain is a comprehensive, production-ready blockchain-based automated toll c
 │ • User Data       │ │ • Ethereum        │ │ • Alchemy RPCs    │
 │ • Transactions    │ │ • Polygon         │ │ • Etherscan APIs  │
 │ • Vehicle Info    │ │ • Sepolia/Mumbai  │ │ • WalletConnect   │
-│ • Plaza Config    │ │                   │ │ • Anon-Aadhaar   │
+│ • QR Code Data    │ │                   │ │ • Anon-Aadhaar   │
 └───────────────────┘ └───────────────────┘ └───────────────────┘
                                 │
                     ┌───────────┴───────────┐
@@ -79,14 +82,36 @@ TollChain is a comprehensive, production-ready blockchain-based automated toll c
                     └───────────────────────┘
 ```
 
-### 📊 Data Flow Architecture
+### 📊 QR Code Payment Flow
 
 ```
-Vehicle Approach → QR/RFID Scan → Vehicle Verification → Payment Processing → Transaction Confirmation
-      ↓                ↓                    ↓                    ↓                    ↓
-   Hardware         Computer         Backend API         Smart Contract      Database Update
-   Detection        Vision           Validation          Execution           & Notifications
+User generates QR → Admin scans QR → Payment validation → Smart contract execution → Transaction confirmation
+      ↓                    ↓                    ↓                    ↓                    ↓
+   Frontend UI        Admin Dashboard       Backend API         Blockchain            Database Update
+   QR Generation      Camera Access        QR Validation        Payment              & Notifications
 ```
+
+## 🎯 How TollChain Works
+
+### 👤 For Users (Vehicle Owners):
+1. **Register Vehicle**: Connect wallet and register vehicle with Anonymous Aadhaar verification
+2. **TopUp Wallet**: Fund your smart contract wallet with ETH/USDC for toll payments  
+3. **Generate QR Code**: Create a payment QR code containing vehicle ID and payment authorization
+4. **Present QR Code**: Show the QR code to toll booth operator or scan at self-service kiosk
+5. **Instant Payment**: Toll is automatically deducted from your TopUp wallet upon QR scan
+
+### 👨‍💼 For Toll Operators (Admins):
+1. **Access Admin Dashboard**: Login to the web-based admin interface
+2. **Scan QR Code**: Use built-in camera interface to scan user's payment QR code
+3. **Verify Payment**: System validates QR code and checks wallet balance automatically
+4. **Process Transaction**: One-click payment processing through smart contracts
+5. **Issue Receipt**: Digital receipt generated and sent to user's wallet
+
+### 🔒 Security Features:
+- **Time-Limited QR Codes**: QR codes expire after 5 minutes to prevent replay attacks
+- **Encrypted Data**: QR codes contain encrypted payment authorization data
+- **Blockchain Verification**: All payments processed through immutable smart contracts
+- **Zero Personal Data**: Only wallet addresses and vehicle IDs stored, no personal information
 
 ## 🚀 Key Features
 
@@ -108,7 +133,8 @@ Vehicle Approach → QR/RFID Scan → Vehicle Verification → Payment Processin
 - **Cross-Chain Compatibility**: Support for multiple blockchain networks
 
 ### 🛣️ Intelligent Toll Management
-- **QR Code & RFID Scanning**: Dual-mode vehicle identification for maximum compatibility
+- **QR Code Generation**: Users generate unique QR codes containing payment and vehicle information
+- **Web-Based QR Scanning**: Admin dashboard with built-in QR code scanner using device camera
 - **Real-Time Processing**: Live transaction monitoring with <1 second confirmation times
 - **Plaza Management System**: Centralized control of multiple toll plaza configurations
 - **Advanced Analytics**: AI-powered insights for traffic patterns and revenue optimization
@@ -117,6 +143,8 @@ Vehicle Approach → QR/RFID Scan → Vehicle Verification → Payment Processin
 
 ### 🔧 Comprehensive Admin Features
 - **Real-Time Dashboard**: Live monitoring of all system components and transactions
+- **QR Code Scanner Interface**: Built-in camera access for scanning user-generated QR codes
+- **Instant Payment Processing**: One-click toll collection from scanned QR codes
 - **User & Vehicle Management**: Complete CRUD operations with role-based access control
 - **Transaction Monitoring**: Detailed transaction history with search, filter, and export capabilities
 - **System Configuration**: Dynamic configuration of toll rates, plaza settings, and operational parameters
@@ -124,13 +152,13 @@ Vehicle Approach → QR/RFID Scan → Vehicle Verification → Payment Processin
 - **Notification System**: Real-time alerts for critical events and system status changes
 - **Revenue Analytics**: Comprehensive reporting with charts, trends, and forecasting
 
-### 🔗 Hardware Integration
-- **Python-Based Bridge**: Robust hardware abstraction layer for various devices
-- **RFID Reader Support**: Compatible with multiple RFID reader models
-- **Camera Integration**: OpenCV-based QR code and license plate recognition
-- **Real-Time Communication**: WebSocket-based instant communication with backend
-- **Edge Computing**: Local processing capabilities for offline operation
-- **Device Management**: Remote monitoring and configuration of hardware components
+### 🔗 QR Code System Integration
+- **Frontend QR Generation**: React-based QR code creation with vehicle and payment data
+- **Camera Access API**: WebRTC-based camera integration for real-time QR scanning
+- **QR Code Validation**: Backend validation of QR code data integrity and authenticity
+- **Real-Time Communication**: WebSocket-based instant communication between user and admin interfaces
+- **Mobile-Responsive Design**: QR scanner works on desktop and mobile devices
+- **Offline QR Support**: QR codes work even with intermittent internet connectivity
 
 ## 🛠️ Technology Stack
 
@@ -164,13 +192,13 @@ Vehicle Approach → QR/RFID Scan → Vehicle Verification → Payment Processin
 - **Anonymous Aadhaar** - Privacy-preserving government ID verification
 - **TopUp Wallets** - Custom smart contract wallet system
 
-### 🔧 Hardware & IoT
-- **Python 3.11+** - Modern Python with performance improvements
-- **OpenCV** - Advanced computer vision for QR code and image processing
-- **PySerial** - Serial communication for RFID readers
-- **Raspberry Pi GPIO** - Hardware control and sensor integration
-- **WebSocket Client** - Real-time communication with backend
-- **AsyncIO** - Asynchronous programming for concurrent operations
+### 🔧 QR Code & Web Technologies
+- **QR Code Generation**: React-based QR code creation with qrcode.js library
+- **Camera Access**: WebRTC API for real-time camera integration in browsers
+- **QR Code Scanning**: html5-qrcode library for cross-browser QR scanning
+- **Image Processing**: Canvas API for QR code validation and processing
+- **WebSocket Communication**: Real-time updates between user and admin interfaces
+- **Progressive Web App**: PWA capabilities for mobile QR scanning
 
 ### 🗄️ Database & Storage
 - **MongoDB Atlas** - Cloud-native database with global clusters
@@ -196,22 +224,23 @@ Vehicle Approach → QR/RFID Scan → Vehicle Verification → Payment Processin
 
 ### System Requirements
 - **Node.js** v18.0.0 or higher
-- **Python** v3.11.0 or higher
 - **MongoDB** v6.0 or higher (or MongoDB Atlas)
 - **Git** for version control
 - **Docker & Docker Compose** (recommended for deployment)
+- **Modern Web Browser** with camera access for QR scanning
 
 ### Development Environment
 - **VS Code** with TypeScript and Solidity extensions
 - **MetaMask** or compatible Web3 wallet
 - **Foundry** for smart contract development
 - **Postman** for API testing (optional)
+- **Chrome/Firefox** with camera permissions for QR code scanning
 
-### Hardware Requirements (for toll booth setup)
-- **Raspberry Pi 4** (4GB RAM minimum)
-- **USB Camera** or **Raspberry Pi Camera Module**
-- **RFID Reader** (compatible with USB/Serial interface)
-- **Stable Internet Connection** (minimum 10 Mbps)
+### QR Code Scanning Requirements
+- **Camera Access**: Device camera (laptop webcam, mobile camera, or external USB camera)
+- **Browser Permissions**: Camera access enabled for the admin dashboard domain
+- **Adequate Lighting**: Good lighting conditions for optimal QR code scanning
+- **Stable Internet**: Reliable connection for real-time payment processing
 
 ### Blockchain Prerequisites
 - **Testnet ETH** for Sepolia network
@@ -251,7 +280,6 @@ cd frontend && npm install     # Frontend
 cd ../backend && npm install   # Backend
 cd ../admin-dashboard && npm install  # Admin dashboard
 cd ../contracts && forge install      # Smart contracts
-cd ../hardware && pip install -r requirements.txt  # Hardware
 ```
 
 ### 4. Database Setup
@@ -296,22 +324,19 @@ docker-compose up -d
 npm run dev:frontend        # Frontend on :3000
 npm run dev:backend         # Backend on :3001
 npm run dev:admin          # Admin dashboard on :3002
-python hardware/main.py    # Hardware interface on :8080
 ```
 
 ### 7. Access the Applications
 - **User Frontend**: http://localhost:3000
-- **Admin Dashboard**: http://localhost:3002
+- **Admin Dashboard**: http://localhost:3002 (includes QR scanner)
 - **Backend API**: http://localhost:3001
 - **API Documentation**: http://localhost:3001/api-docs
-- **Hardware Interface**: http://localhost:8080
 
 ## 📱 Application URLs
 
 - **Frontend**: http://localhost:3000
-- **Admin Dashboard**: http://localhost:3003
+- **Admin Dashboard**: http://localhost:3002 (QR Scanner included)
 - **Backend API**: http://localhost:3001
-- **Hardware Interface**: http://localhost:3002
 
 ## 🔧 Configuration
 
@@ -363,13 +388,15 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 POLYGONSCAN_API_KEY=your_polygonscan_api_key
 WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 
-# ==================== HARDWARE CONFIGURATION ====================
-TOLL_BOOTH_ID=TB001
-LATITUDE=12.9716
-LONGITUDE=77.5946
-RFID_SERIAL_PORT=/dev/ttyUSB0
-RFID_BAUD_RATE=9600
-QR_CAMERA_INDEX=0
+# ==================== QR CODE CONFIGURATION ====================
+# QR Code Settings
+QR_CODE_EXPIRY_TIME=300        # 5 minutes in seconds
+QR_CODE_SIZE=256               # QR code image size in pixels
+QR_CODE_ERROR_CORRECTION=M     # Error correction level (L,M,Q,H)
+
+# Camera Settings for Admin Dashboard
+CAMERA_RESOLUTION=720p         # Camera resolution for QR scanning
+CAMERA_FRAME_RATE=30          # FPS for camera feed
 ```
 
 #### Frontend Configuration (frontend/.env)
@@ -415,8 +442,14 @@ TollChain/
 ├── 📁 frontend/                    # React User Application
 │   ├── src/
 │   │   ├── components/            # Reusable UI components
+│   │   │   ├── QRGenerator.tsx    # QR code generation for payments
+│   │   │   ├── VehicleRegistration.tsx
+│   │   │   ├── PaymentInterface.tsx
+│   │   │   └── TransactionHistory.tsx
 │   │   ├── pages/                 # Route components
 │   │   ├── services/              # API & blockchain services
+│   │   │   ├── qrCodeService.ts   # QR code generation and validation
+│   │   │   └── blockchainService.ts
 │   │   ├── hooks/                 # Custom React hooks
 │   │   ├── config/                # Configuration files
 │   │   └── utils/                 # Utility functions
@@ -427,11 +460,15 @@ TollChain/
 │   ├── src/
 │   │   ├── components/            # Admin UI components
 │   │   │   ├── Dashboard.tsx      # Main dashboard
-│   │   │   ├── QRScanner.tsx      # QR code scanning
+│   │   │   ├── QRScanner.tsx      # QR code scanning interface
+│   │   │   ├── QRCodeTollCollection.tsx # Complete toll collection via QR
+│   │   │   ├── TransactionProcessor.tsx # Payment processing interface
 │   │   │   ├── VehicleManagement.tsx
 │   │   │   ├── TransactionMonitor.tsx
 │   │   │   └── SystemSettings.tsx
 │   │   ├── services/              # Admin-specific services
+│   │   │   ├── qrScannerService.ts # QR scanning logic
+│   │   │   └── tollProcessingService.ts # Toll payment processing
 │   │   └── pages/                 # Admin route components
 │   └── package.json
 │
@@ -454,6 +491,7 @@ TollChain/
 │   │   ├── services/              # Business logic
 │   │   │   ├── blockchainService.ts
 │   │   │   ├── topUpWalletService.ts
+│   │   │   ├── qrCodeValidationService.ts # QR code validation logic
 │   │   │   └── notificationService.ts
 │   │   ├── middleware/            # Express middleware
 │   │   └── utils/                 # Helper functions
@@ -473,14 +511,15 @@ TollChain/
 │   ├── foundry.toml              # Foundry configuration
 │   └── README.md
 │
-├── 📁 hardware/                    # Python Hardware Interface
-│   ├── main.py                    # Main hardware controller
-│   ├── requirements.txt           # Python dependencies
-│   ├── Dockerfile                 # Container configuration
-│   └── modules/                   # Hardware modules
-│       ├── qr_scanner.py
-│       ├── rfid_reader.py
-│       └── camera_controller.py
+├── 📁 hardware/                    # QR Code Documentation & Future Hardware
+│   ├── QR_IMPLEMENTATION.md       # QR code system documentation
+│   ├── CAMERA_SETUP.md           # Camera setup guide for QR scanning
+│   └── future-hardware/           # Future physical hardware integration
+│       ├── main.py                # Hardware controller (future use)
+│       ├── requirements.txt       # Python dependencies
+│       └── modules/               # Hardware modules
+│           ├── qr_scanner.py
+│           └── camera_controller.py
 │
 ├── 📁 docs/                        # Documentation
 │   ├── TOPUP_WALLET_SYSTEM.md
@@ -519,13 +558,15 @@ TollChain/
 #### Backend Services
 - **blockchainService.ts**: Ethereum/Polygon blockchain interaction
 - **topUpWalletService.ts**: Smart wallet management and operations
+- **qrCodeValidationService.ts**: QR code validation and payment processing
 - **notificationService.ts**: Real-time notification system
 
 #### Database Models
 - **Vehicle**: Vehicle registration and ownership data
-- **TollTransaction**: Payment records with blockchain references
+- **TollTransaction**: Payment records with blockchain references and QR code data
 - **TollPlaza**: Plaza configuration and operational settings
 - **User/AdminUser**: User management with role-based access
+- **QRCodeSession**: Temporary QR code data and validation tracking
 
 ## 🔐 Security Features
 
@@ -555,20 +596,20 @@ TollChain/
 - ✅ Production-ready deployment with Docker containerization
 
 ### 📱 Phase 2: Mobile & Enhanced UX (Q1 2026)
-- 🔄 Native iOS and Android mobile applications
-- 🔄 Progressive Web App (PWA) for offline functionality
-- 🔄 Enhanced UI/UX with voice commands and accessibility features
+- 🔄 Native iOS and Android mobile applications with QR code generation
+- 🔄 Progressive Web App (PWA) for offline QR code generation
+- 🔄 Enhanced QR scanning interface with better camera controls
 - 🔄 Push notifications for transaction confirmations
 - 🔄 Biometric authentication integration
 - 🔄 Multi-language support (Hindi, English, Regional languages)
 
 ### 🤖 Phase 3: AI & Machine Learning (Q2 2026)
-- 📋 AI-powered traffic flow optimization
-- 📋 Predictive analytics for toll pricing
-- 📋 Advanced fraud detection using ML algorithms
-- 📋 Computer vision for automatic license plate recognition
+- 📋 AI-powered traffic flow optimization based on QR scan data
+- 📋 Predictive analytics for toll pricing using transaction patterns
+- 📋 Advanced fraud detection for QR code manipulation
+- 📋 Computer vision for automatic license plate recognition (future hardware)
 - 📋 Smart routing recommendations for vehicles
-- 📋 Dynamic toll pricing based on traffic patterns
+- 📋 Dynamic toll pricing based on QR scan frequency and patterns
 
 ### 🌐 Phase 4: Ecosystem Expansion (Q3 2026)
 - 📋 Cross-border toll collection system
@@ -579,12 +620,13 @@ TollChain/
 - 📋 Fleet management solutions for commercial vehicles
 
 ### 🔮 Phase 5: Next-Generation Features (Q4 2026)
-- 📋 Quantum-resistant cryptography implementation
-- 📋 IoT sensor network for real-time traffic monitoring
-- 📋 Autonomous vehicle integration
+- 📋 Advanced QR code security with encrypted data and anti-forgery measures
+- 📋 IoT integration for automatic vehicle detection and QR display
+- 📋 Autonomous vehicle integration with automatic QR code generation
 - 📋 Blockchain interoperability with other toll systems
 - 📋 Advanced privacy features with homomorphic encryption
-- 📋 International expansion and standardization
+- 📋 International expansion and QR code standardization
+- 📋 Future hardware integration: RFID readers, automatic cameras, license plate recognition
 
 ## 🤝 Contributing & Community
 
@@ -630,12 +672,13 @@ git push origin feature/your-amazing-feature
 ## 📊 Performance Metrics & Benchmarks
 
 ### ⚡ System Performance
-- **Transaction Processing**: < 1 second average (including blockchain confirmation)
+- **QR Code Generation**: < 100ms average QR code creation time
 - **QR Code Scanning**: < 500ms vehicle identification and verification
+- **Payment Processing**: < 1 second average (including blockchain confirmation)
 - **API Response Time**: < 100ms for 95% of requests
 - **Database Queries**: < 50ms average response time
 - **Concurrent Users**: 10,000+ simultaneous connections supported
-- **Throughput**: 1,000+ transactions per minute at peak load
+- **Throughput**: 1,000+ QR code scans and payments per minute at peak load
 
 ### 🎯 Business Impact
 - **Cost Reduction**: 70% reduction in operational costs vs traditional toll booths
@@ -705,18 +748,21 @@ npm run test:db
 npm run test:blockchain
 ```
 
-### 📱 Hardware Testing
+### 📱 QR Code System Testing
 ```bash
-cd hardware
+# Test QR code generation (frontend)
+cd frontend
+npm run test:qr-generation
 
-# Hardware simulation tests
-python -m pytest tests/
+# Test QR code scanning (admin dashboard)
+cd admin-dashboard
+npm run test:qr-scanner
 
-# Camera and QR code testing
-python test_qr_scanner.py
+# Test camera permissions
+npm run test:camera-access
 
-# RFID reader testing
-python test_rfid_reader.py
+# End-to-end QR payment flow testing
+npm run test:qr-payment-flow
 ```
 
 ## 📈 Monitoring & Analytics
@@ -770,25 +816,34 @@ cast balance $WALLET_ADDRESS --rpc-url $SEPOLIA_RPC_URL
 forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast -vvvv
 ```
 
-#### 4. Frontend Wallet Connection Problems
+#### 4. QR Code Scanning Issues
 ```bash
-# Clear browser cache and localStorage
-# Restart MetaMask
-# Check network configuration
-# Verify WALLETCONNECT_PROJECT_ID
+# Check camera permissions in browser
+# Go to Settings > Privacy & Security > Camera
+# Ensure camera access is enabled for the admin dashboard domain
+
+# Test camera functionality
+open -a "Photo Booth"  # Test if camera works on macOS
+# Or check camera in browser: chrome://settings/content/camera
+
+# Clear browser data and retry
+# Reset camera permissions for the site
 ```
 
-#### 5. Hardware Interface Issues
+#### 5. QR Code Generation/Validation Issues
 ```bash
-# Check device permissions
-ls -la /dev/ttyUSB*
-sudo usermod -a -G dialout $USER
+# Test QR code service
+curl -X POST http://localhost:3001/api/qr/generate \
+  -H "Content-Type: application/json" \
+  -d '{"vehicleId":"TEST123","amount":"0.01"}'
 
-# Test camera access
-python -c "import cv2; cap = cv2.VideoCapture(0); print('Camera OK' if cap.isOpened() else 'Camera Error')"
+# Validate QR code data
+curl -X POST http://localhost:3001/api/qr/validate \
+  -H "Content-Type: application/json" \
+  -d '{"qrData":"encoded_qr_data_here"}'
 
-# Restart hardware service
-sudo systemctl restart tollchain-hardware
+# Check QR code expiration settings
+grep QR_CODE_EXPIRY_TIME .env
 ```
 
 ### 📞 Support Channels
@@ -823,8 +878,8 @@ curl http://localhost:3001/health/blockchain
 # Database status
 curl http://localhost:3001/health/database
 
-# Hardware status
-curl http://localhost:8080/health
+# QR code service status
+curl http://localhost:3001/health/qr-service
 ```
 
 #### Performance Monitoring
@@ -837,6 +892,9 @@ npm run analyze:performance
 
 # Check resource usage
 docker stats tollchain-*
+
+# QR code scanning performance
+npm run monitor:qr-performance
 ```
 
 ## 📄 License & Legal
