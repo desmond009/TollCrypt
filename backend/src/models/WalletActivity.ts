@@ -102,3 +102,4 @@ WalletActivitySchema.index({ isFlagged: 1, timestamp: -1 });
 WalletActivitySchema.index({ activityType: 1, timestamp: -1 });
 
 export const WalletActivity = mongoose.model<IWalletActivity>('WalletActivity', WalletActivitySchema);
+

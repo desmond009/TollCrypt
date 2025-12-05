@@ -96,3 +96,4 @@ LoginHistorySchema.index({ ipAddress: 1, loginTime: -1 });
 LoginHistorySchema.index({ isSuccessful: 1, loginTime: -1 });
 
 export const LoginHistory = mongoose.model<ILoginHistory>('LoginHistory', LoginHistorySchema);
+

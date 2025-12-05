@@ -384,3 +384,4 @@ const SystemSettingsSchema = new Schema<ISystemSettings>({
 SystemSettingsSchema.index({}, { unique: true });
 
 export const SystemSettings = mongoose.model<ISystemSettings>('SystemSettings', SystemSettingsSchema);
+

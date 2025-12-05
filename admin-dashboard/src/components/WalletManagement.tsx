@@ -587,3 +587,4 @@ const WalletActivityModal: React.FC<{
     </div>
   );
 };
+
